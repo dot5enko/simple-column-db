@@ -14,7 +14,7 @@ func testCycles(n int, label string, testSize int, cb func()) {
 
 	before := time.Now()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		cb()
 	}
 
