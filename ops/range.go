@@ -7,7 +7,7 @@ func b2i(b bool) int {
 	return 0
 }
 
-func CompareValuesAreInRange[T uint64 | uint16 | uint8 | uint32](arr []T, cmpFrom, cmpTo T, out []T) int {
+func CompareValuesAreInRange[T NumericTypes](arr []T, cmpFrom, cmpTo T, out []uint16) int {
 	n := len(arr)
 	var filled int = 0
 	i := 0
@@ -43,21 +43,21 @@ func CompareValuesAreInRange[T uint64 | uint16 | uint8 | uint32](arr []T, cmpFro
 		im6 := b2i(m6)
 		im7 := b2i(m7)
 
-		out[filled] = T(i + 0)
+		out[filled] = uint16(i + 0)
 		filled += im0
-		out[filled] = T(i + 1)
+		out[filled] = uint16(i + 1)
 		filled += im1
-		out[filled] = T(i + 2)
+		out[filled] = uint16(i + 2)
 		filled += im2
-		out[filled] = T(i + 3)
+		out[filled] = uint16(i + 3)
 		filled += im3
-		out[filled] = T(i + 4)
+		out[filled] = uint16(i + 4)
 		filled += im4
-		out[filled] = T(i + 5)
+		out[filled] = uint16(i + 5)
 		filled += im5
-		out[filled] = T(i + 6)
+		out[filled] = uint16(i + 6)
 		filled += im6
-		out[filled] = T(i + 7)
+		out[filled] = uint16(i + 7)
 		filled += im7
 
 	}
@@ -65,7 +65,7 @@ func CompareValuesAreInRange[T uint64 | uint16 | uint8 | uint32](arr []T, cmpFro
 	// Tail element
 	for ; i < n; i++ {
 		if arr[i] > cmpFrom && arr[i] < cmpTo {
-			out[filled] = T(i)
+			out[filled] = uint16(i)
 			filled++
 		}
 	}

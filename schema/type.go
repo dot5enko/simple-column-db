@@ -1,6 +1,6 @@
 package schema
 
-type FieldType = uint8
+type FieldType uint8
 
 const (
 	Int8FieldType FieldType = iota
@@ -16,3 +16,32 @@ const (
 	Uint32FieldType
 	Uint16FieldType
 )
+
+func (f FieldType) String() string {
+	switch f {
+	case Int8FieldType:
+		return "Int8"
+	case Int16FieldType:
+		return "Int16"
+	case Int32FieldType:
+		return "Int32"
+	case Int64FieldType:
+		return "Int64"
+	case Float64FieldType:
+		return "Float64"
+	case Float32FieldType:
+		return "Float32"
+	case Uint64FieldType:
+		return "Uint64"
+	case Uint8FieldType:
+		return "Uint8"
+	case Uint32FieldType:
+		return "Uint32"
+	case Uint16FieldType:
+		return "Uint16"
+	default:
+		return ""
+
+	}
+
+}

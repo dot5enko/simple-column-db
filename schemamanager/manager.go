@@ -1,153 +1,183 @@
 package schemamanager
 
-// import (
-// 	"fmt"
+import (
+	"errors"
+	"fmt"
+	"log"
 
-// 	"github.com/dot5enko/simple-column-db/block"
-// 	"github.com/dot5enko/simple-column-db/ops"
-// 	"github.com/dot5enko/simple-column-db/schema"
-// )
+	"github.com/dot5enko/simple-column-db/block"
+	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/ops"
+	"github.com/dot5enko/simple-column-db/schema"
+)
 
-// type BlockRuntimeInfo struct {
-// 	Val          any
-// 	Synchronized bool
-// 	Header       block.DiskHeader
-// }
+type BlockRuntimeInfo struct {
+	Val          any
+	Synchronized bool
+	Header       block.DiskHeader
+}
 
-// type SchemaManager struct {
-// 	schemas map[string]schema.Schema
-// 	blocks  map[block.BlockUniqueId]BlockRuntimeInfo
-// }
+type SchemaManager struct {
+	schemas map[string]schema.Schema
+	blocks  map[block.BlockUniqueId]BlockRuntimeInfo
+}
 
-// type CondOperand byte
+type CondOperand byte
 
-// const (
-// 	EQ CondOperand = iota
-// 	GT
-// 	LT
-// 	RANGE
-// )
+const (
+	EQ CondOperand = iota
+	GT
+	LT
+	RANGE
+)
 
-// type FilterCondition struct {
-// 	Field     string
-// 	Operand   CondOperand
-// 	Arguments []any
-// }
+type FilterCondition struct {
+	Field     string
+	Operand   CondOperand
+	Arguments []any
+}
 
-// type SelectorType byte
+type SelectorType byte
 
-// const (
-// 	SelectField SelectorType = iota
-// 	SelectFunction
-// )
+const (
+	SelectField SelectorType = iota
+	SelectFunction
+)
 
-// type Selector struct {
-// 	Type      SelectorType
-// 	Arguments []any
+type Selector struct {
+	Type      SelectorType
+	Arguments []any
 
-// 	Alias string
-// }
+	Alias string
+}
 
-// type Query struct {
-// 	Filter []FilterCondition
-// 	Select []Selector
-// }
+type Query struct {
+	Filter []FilterCondition
+	Select []Selector
+}
 
-// const blockSize = 4000
+const blockSize = 4000
 
-// func (sm *SchemaManager) Get(
-// 	schemaName string,
-// 	query Query,
-// ) ([]map[string]any, error) {
+func (sm *SchemaManager) Get(
+	schemaName string,
+	query Query,
+) ([]map[string]any, error) {
 
-// 	result := []map[string]any{}
+	result := []map[string]any{}
 
-// 	schemaObject, ok := sm.schemas[schemaName]
-// 	if !ok {
-// 		return nil, fmt.Errorf("schema not found")
-// 	} else {
-// 		for _, filter := range query.Filter {
+	schemaObject, ok := sm.schemas[schemaName]
+	if !ok {
+		return nil, fmt.Errorf("schema not found")
+	} else {
 
-// 			var columnInfo *schema.SchemaColumn
+		// should be big enough to hold all the entries to
+		mergeIndicesCache := make([]uint16, blockSize*len(query.Filter))
 
-// 			for _, it := range schemaObject.Columns {
-// 				if it.Name == filter.Field {
-// 					columnInfo = &it
-// 					break
-// 				}
-// 			}
+		var indicesResultCache [blockSize]uint16
+		var indicesCounter [blockSize]uint16
 
-// 			if columnInfo == nil {
-// 				return nil, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
-// 			}
+		// check fields before filtering data
+		for _, filter := range query.Filter {
 
-// 			// todo cache
-// 			// this is a blockmanager responsibility to load blocks from disk if they are not loaded yet
+			var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
 
-// 			var filterResultUint64 [blockSize]uint64
-// 			var blockDataUint64 [blockSize]uint64
+			if columnInfo.Id == 0 {
+				return nil, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
+			}
+		}
 
-// 			for _, columnBlock := range schemaObject.Blocks {
+		// todo cache
+		// this is a blockmanager responsibility to load blocks from disk if they are not loaded yet
 
-// 				fieldBlockUid := block.NewBlockUniqueId(columnBlock, columnInfo.Id)
+		for _, columnBlock := range schemaObject.Blocks {
 
-// 				// block manager code
-// 				blockData, blockOk := sm.blocks[fieldBlockUid]
-// 				{
-// 					if !blockOk {
-// 						return nil, fmt.Errorf("block not found while processing query : %s", fieldBlockUid.MustUid().String())
-// 					}
+			blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
 
-// 					if !(blockData.Synchronized) {
-// 						return nil, fmt.Errorf("block %s not synchronized from disk", fieldBlockUid.MustUid().String())
-// 					}
-// 				}
+			for _, filter := range query.Filter {
 
-// 				blockFiltersToMerge := [][]uint64{}
+				var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
 
-// 				// process filter on a block
-// 				switch columnInfo.Type {
-// 				case schema.Int8FieldType,
-// 					schema.Uint64FieldType:
+				fieldBlockUid := block.NewBlockUniqueId(columnBlock, columnInfo.Id)
 
-// 					switch filter.Operand {
-// 					case RANGE:
-// 						operandA := filter.Arguments[0].(uint64)
-// 						operandB := filter.Arguments[1].(uint64)
+				// block manager code
+				blockData, blockOk := sm.blocks[fieldBlockUid]
+				{
+					if !blockOk {
+						return nil, fmt.Errorf("block not found while processing query : %s", fieldBlockUid.MustUid().String())
+					}
 
-// 						runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*block.RuntimeBlockData[uint64])
-// 						if !rtBlockInfoOk {
-// 							return nil, fmt.Errorf("runtime block info type is incorrect")
-// 						}
+					if !(blockData.Synchronized) {
+						return nil, fmt.Errorf("block %s not synchronized from disk", fieldBlockUid.MustUid().String())
+					}
+				}
 
-// 						// todo do not copy
-// 						runtimeBlockInfo.ExportData(blockDataUint64[:])
+				// process filter on a block
+				switch columnInfo.Type {
+				case schema.Uint64FieldType:
+					ProcessNumericFilterOnColumnWithType[uint64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				case schema.Uint8FieldType:
+					ProcessNumericFilterOnColumnWithType[uint8](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				case schema.Float64FieldType:
+					ProcessNumericFilterOnColumnWithType[float64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				default:
+					return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
+				}
 
-// 						itemsFiltered := ops.CompareValuesAreInRange(blockDataUint64[:], operandA, operandB, filterResultUint64[:])
-// 					case EQ:
-// 						operand := filter.Arguments[0].(uint64)
+			}
 
-// 						runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*block.RuntimeBlockData[uint64])
-// 						if !rtBlockInfoOk {
-// 							return nil, fmt.Errorf("runtime block info type is incorrect")
-// 						}
+			// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
+			mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
+			mergedIndices := indicesResultCache[:mergedSize]
 
-// 						// todo do not copy
-// 						runtimeBlockInfo.ExportData(blockDataUint64[:])
-// 						itemsFiltered := ops.CompareNumericValuesAreEqual(blockDataUint64[:], operand, filterResultUint64[:])
+			log.Printf("filterd indices in block: %v", mergedIndices)
 
-// 						filteredRows := filterResultUint64[:itemsFiltered]
-// 					default:
-// 						return nil, fmt.Errorf("unsupported operand %v", filter.Operand)
-// 					}
-// 				default:
-// 					return nil, fmt.Errorf("unsupported type %v", columnInfo.Type)
-// 				}
+		}
+	}
 
-// 			}
+	return result, nil
+}
 
-// 		}
-// 	}
+var (
+	ErrRuntimeBlockInfoTypeIsIncorrect = errors.New("runtime block info type is incorrect")
+)
 
-// 	return result, nil
-// }
+func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
+	filter FilterCondition,
+	blockData *BlockRuntimeInfo,
+	merger *lists.IndiceUnmerged,
+	indicesCache []uint16,
+) error {
+
+	var itemsFiltered int
+
+	runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*block.RuntimeBlockData[T])
+	if !rtBlockInfoOk {
+		return ErrRuntimeBlockInfoTypeIsIncorrect
+	}
+
+	switch filter.Operand {
+	case RANGE:
+		operandA := filter.Arguments[0].(T)
+		operandB := filter.Arguments[1].(T)
+
+		itemsFiltered = ops.CompareValuesAreInRange(runtimeBlockInfo.DirectAccess(), operandA, operandB, indicesCache)
+
+	case EQ:
+		operand := filter.Arguments[0].(T)
+
+		itemsFiltered = ops.CompareNumericValuesAreEqual(runtimeBlockInfo.DirectAccess(), operand, indicesCache)
+
+	case GT:
+		operand := filter.Arguments[0].(T)
+
+		itemsFiltered = ops.CompareValuesAreBigger(runtimeBlockInfo.DirectAccess(), operand, indicesCache)
+
+	default:
+		return fmt.Errorf("unsupported operand %v", filter.Operand)
+	}
+
+	merger.With(indicesCache[:itemsFiltered])
+
+	return nil
+
+}

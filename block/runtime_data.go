@@ -27,6 +27,10 @@ func (b *RuntimeBlockData[T]) ExportData(out []T) int {
 	return copy(out, b.Data[:b.Items])
 }
 
+func (b *RuntimeBlockData[T]) DirectAccess() []T {
+	return b.Data[:b.Items]
+}
+
 func NewRuntimeBlockData[T any](cap int) *RuntimeBlockData[T] {
 	return &RuntimeBlockData[T]{
 		Cap:  cap,
