@@ -29,7 +29,7 @@ func BenchmarkIntersectFastRandSparse(t *testing.B) {
 	cache3 := make([]uint16, size*2)
 
 	for t.Loop() {
-		lists.IntersectFast(input, input2, cache, cache3, out)
+		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
 	}
 
 }
@@ -46,7 +46,7 @@ func BenchmarkIntersectFastRandFull(t *testing.B) {
 	cache3 := make([]uint16, size*2)
 
 	for t.Loop() {
-		lists.IntersectFast(input, input2, cache, cache3, out)
+		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
 	}
 
 }
@@ -63,7 +63,7 @@ func BenchmarkIntersectFastRandHalfSparse(t *testing.B) {
 	cache3 := make([]uint16, size*2)
 
 	for t.Loop() {
-		lists.IntersectFast(input, input2, cache, cache3, out)
+		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
 	}
 
 }
@@ -88,7 +88,7 @@ func BenchmarkIntersectFastRandHalfSparse(t *testing.B) {
 // 	cache3 := make([]uint16, size*2)
 
 // 	for t.Loop() {
-// 		lists.IntersectFast(input, input2, cache, cache3, out)
+// 		lists.IntersectFastTwoList(input, input2, cache, cache3, out)
 // 	}
 
 // }
@@ -153,9 +153,7 @@ func TestMergeIsCorrect(t *testing.T) {
 
 	for i := 0; i < testI; i++ {
 		intersectSlowResult := lists.Intersect(input, input2, out, cacheMap)
-		intersectFastResult := lists.IntersectFast(input, input2, cache, cache3, out)
-
-		// t.Logf("inputs a = %d, b = %d", len(input), len(input2))
+		intersectFastResult := lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
 
 		if intersectFastResult != intersectSlowResult {
 			t.Errorf("Expected [slow=%d] but got [fast = %d]", intersectSlowResult, intersectFastResult)

@@ -32,22 +32,15 @@ func Intersect[T uint64 | uint16](a, b, out []T, cache map[T]uint8) int {
 	return filled
 }
 
-func IntersectFast(a, b, cache, cache2, out []uint16) int {
+func IntersectIndicesFastTwoList(a, b, cache, cache2, out []uint16) int {
 
 	clear(cache2)
 
 	cachePos := 0
-
-	// log.Println("len", len(cache), "cachePos", cachePos)
 	copy(cache[cachePos:], a)
 	cachePos += len(a)
-
-	// log.Println("len", len(cache), "cachePos", cachePos)
-
 	copy(cache[cachePos:], b)
 	cachePos += len(b)
-
-	// log.Println("len", len(cache), "cachePos", cachePos)
 
 	filled := 0
 
@@ -62,11 +55,33 @@ func IntersectFast(a, b, cache, cache2, out []uint16) int {
 		cache2[v] = old + 1
 	}
 
-	// for _, v := range cache[:cachePos] {
-	// 	if cache2[v] > 1 {
+	return filled
+}
 
-	// 	}
-	// }
+func IntersectIndicesFastNList[T any](cache, cache2, out []uint16, inputs ...[]uint16) int {
+
+	clear(cache2)
+
+	cachePos := 0
+	for _, input := range inputs {
+		copy(cache[cachePos:], input)
+		cachePos += len(input)
+	}
+
+	targetSize := uint16(len(inputs) - 1)
+
+	filled := 0
+
+	for _, v := range cache[:cachePos] {
+		old := cache2[v]
+
+		if old == targetSize {
+			out[filled] = v
+			filled++
+		}
+
+		cache2[v] = old + 1
+	}
 
 	return filled
 }
