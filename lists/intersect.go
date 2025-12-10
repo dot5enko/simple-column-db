@@ -1,5 +1,9 @@
 package lists
 
+import (
+	"github.com/dot5enko/simple-column-db/bits"
+)
+
 func Intersect[T uint64 | uint16](a, b, out []T, cache map[T]uint8) int {
 	if len(a) == 0 || len(b) == 0 {
 		return 0
@@ -56,6 +60,31 @@ func IntersectIndicesFastTwoList(a, b, cache, cache2, out []uint16) int {
 	}
 
 	return filled
+}
+
+func convertArrayIndicesToBitset(arr []uint16) (bitset bits.Bitfield) {
+
+	bitset.FromSorted(arr)
+
+	return bitset
+}
+
+func IntersectIndicesFastTwoListBitset(a, b, out []uint16) int {
+
+	aBitset := convertArrayIndicesToBitset(a)
+	bBitset := convertArrayIndicesToBitset(b)
+
+	// t.StopTimer()
+	// defer t.StartTimer()
+
+	resultBitset := bits.MergeAND(aBitset, bBitset)
+
+	if resultBitset.Any() {
+		return resultBitset.ToIndices(out)
+	}
+
+	return resultBitset.ToIndices(out)
+
 }
 
 func IntersectIndicesFastNList[T any](cache, cache2, out []uint16, inputs ...[]uint16) int {

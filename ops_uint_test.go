@@ -15,7 +15,7 @@ func TestRangeTail(t *testing.T) {
 	var fromBounds uint64 = 1024
 	var toBounds uint64 = 8192
 
-	out := make([]uint64, size)
+	out := make([]uint16, size)
 
 	resultSize := ops.CompareValuesAreInRange(input[:], fromBounds, toBounds, out)
 
@@ -35,7 +35,7 @@ func TestRangeBlockAndTail(t *testing.T) {
 	var fromBounds uint64 = 1024
 	var toBounds uint64 = 8192
 
-	out := make([]uint64, size)
+	out := make([]uint16, size)
 
 	resultSize := ops.CompareValuesAreInRange(input[:], fromBounds, toBounds, out)
 
@@ -61,7 +61,7 @@ func BenchmarkRange(b *testing.B) {
 	var fromBounds uint64 = 4096
 	var toBounds uint64 = 8192
 
-	out := make([]uint64, size)
+	out := make([]uint16, size)
 
 	for b.Loop() {
 		ops.CompareValuesAreInRange(input[:], fromBounds, toBounds, out)
