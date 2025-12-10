@@ -1,0 +1,12 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/dot5enko/simple-column-db
+cpu: Apple M3
+BenchmarkIntersectFastRandSparse-8       	  743731	      1594 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIntersectFastRandFull-8         	  267061	      4562 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIntersectFastRandHalfSparse-8   	  543122	      2131 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIntersectSlowSparse-8           	   39638	     30480 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIntersectSlowFull-8             	   14883	     81000 ns/op	       2 B/op	       0 allocs/op
+BenchmarkIntersectSlowHalfSparse-8       	   29928	     39955 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/dot5enko/simple-column-db	7.443s

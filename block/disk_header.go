@@ -1,11 +1,21 @@
 package block
 
+import (
+	"github.com/google/uuid"
+)
+
 const TotalHeaderSize uint64 = 128
-const HeaderSizeUsed uint64 = 2 + 2 + 1 + 8 + 8 + 1
+const HeaderSizeUsed uint64 = 16 + 2 + 2 + 1 + 8 + 8 + 1
 const ReservedSize uint64 = TotalHeaderSize - HeaderSizeUsed
 
 type DiskHeader struct {
-	Type      uint16
+
+	// same schema columns share group uid
+	GroupUid      uuid.UUID
+	SchemaFieldId uint8
+
+	Type uint16
+
 	Values    uint16
 	ValueSize uint8
 

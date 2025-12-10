@@ -66,39 +66,3 @@ func main() {
 		}
 	}
 }
-
-func intersectSorted(a, b []uint64, out []uint64, cache map[uint64]uint8) int {
-	if len(a) == 0 || len(b) == 0 {
-		return 0
-	}
-
-	// Use the smaller slice to build the map
-	clear(cache)
-
-	var other []uint64
-
-	clear(cache)
-
-	if len(a) < len(b) {
-
-		other = b
-		for _, v := range a {
-			cache[v] = 0
-		}
-	} else {
-		other = a
-		for _, v := range b {
-			cache[v] = 0
-		}
-	}
-
-	filled := 0
-	for _, v := range other {
-		if _, ok := cache[v]; ok {
-			out[filled] = v
-			filled++
-		}
-	}
-
-	return filled
-}
