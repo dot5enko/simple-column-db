@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/dot5enko/simple-column-db/block"
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -14,12 +13,12 @@ import (
 type BlockRuntimeInfo struct {
 	Val          any
 	Synchronized bool
-	Header       block.DiskHeader
+	Header       schema.DiskHeader
 }
 
 type SchemaManager struct {
 	schemas map[string]schema.Schema
-	blocks  map[block.BlockUniqueId]BlockRuntimeInfo
+	blocks  map[schema.BlockUniqueId]BlockRuntimeInfo
 }
 
 type CondOperand byte
@@ -97,7 +96,7 @@ func (sm *SchemaManager) Get(
 
 				var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
 
-				fieldBlockUid := block.NewBlockUniqueId(columnBlock, columnInfo.Id)
+				fieldBlockUid := schema.NewBlockUniqueId(columnBlock, columnInfo.Id)
 
 				// block manager code
 				blockData, blockOk := sm.blocks[fieldBlockUid]
@@ -150,7 +149,7 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 
 	var itemsFiltered int
 
-	runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*block.RuntimeBlockData[T])
+	runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*schema.RuntimeBlockData[T])
 	if !rtBlockInfoOk {
 		return ErrRuntimeBlockInfoTypeIsIncorrect
 	}

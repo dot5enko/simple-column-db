@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/dot5enko/simple-column-db/block"
+	"github.com/dot5enko/simple-column-db/schema"
 )
 
 type BlockTypes interface {
@@ -31,7 +31,7 @@ func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
 	return err
 }
 
-func DumpRuntimeBlockToDisk[T BlockTypes](path string, block *block.RuntimeBlockData[T]) error {
+func DumpRuntimeBlockToDisk[T BlockTypes](path string, block *schema.RuntimeBlockData[T]) error {
 
 	var copied []T = make([]T, block.Items)
 
