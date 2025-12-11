@@ -69,6 +69,22 @@ func (r *BitsReader) ReadU16() (uint16, error) {
 	return v, err
 }
 
+func (r *BitsReader) MustReadU16() uint16 {
+	u, er := r.ReadU16()
+	if er != nil {
+		panic(er)
+	}
+	return u
+}
+
+func (r *BitsReader) MustReadU8() uint8 {
+	u, er := r.ReadU8()
+	if er != nil {
+		panic(er)
+	}
+	return u
+}
+
 func (r *BitsReader) ReadI16() (int16, error) {
 	v, err := r.ReadU16()
 	return int16(v), err

@@ -43,5 +43,21 @@ func (f FieldType) String() string {
 		return ""
 
 	}
+}
 
+func (f FieldType) Size() int {
+	switch f {
+
+	case Int8FieldType, Uint8FieldType:
+		return 1
+	case Int16FieldType, Uint16FieldType:
+		return 2
+	case Int32FieldType, Float32FieldType, Uint32FieldType:
+		return 4
+	case Int64FieldType, Float64FieldType, Uint64FieldType:
+		return 8
+
+	default:
+		panic("unknown field type " + f.String())
+	}
 }
