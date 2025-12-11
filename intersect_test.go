@@ -7,6 +7,8 @@ import (
 	"github.com/dot5enko/simple-column-db/lists"
 )
 
+const blocksize = 32 * 1024 // ~32k rows per block
+
 func randomFillIndices(n int, fillPercent int) []uint16 {
 	out := make([]uint16, 0, n*fillPercent/100)
 	for i := 0; i < n; i++ {
@@ -19,14 +21,12 @@ func randomFillIndices(n int, fillPercent int) []uint16 {
 
 func BenchmarkIntersectFastRandHalfSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 15)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 15)
-
-	out := make([]uint16, size*2)
-	cache := make([]uint16, size*2)
-	cache3 := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
+	cache := make([]uint16, blocksize*2)
+	cache3 := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
@@ -36,14 +36,12 @@ func BenchmarkIntersectFastRandHalfSparse(t *testing.B) {
 
 func BenchmarkIntersectFastRandSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 35)
+	input2 := randomFillIndices(blocksize, 30)
 
-	input := randomFillIndices(size, 35)
-	input2 := randomFillIndices(size, 30)
-
-	out := make([]uint16, size*2)
-	cache := make([]uint16, size*2)
-	cache3 := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
+	cache := make([]uint16, blocksize*2)
+	cache3 := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
@@ -53,14 +51,12 @@ func BenchmarkIntersectFastRandSparse(t *testing.B) {
 
 func BenchmarkIntersectFastRandFull(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 80)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 80)
-
-	out := make([]uint16, size*2)
-	cache := make([]uint16, size*2)
-	cache3 := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
+	cache := make([]uint16, blocksize*2)
+	cache3 := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoList(input, input2, cache, cache3, out)
@@ -70,12 +66,10 @@ func BenchmarkIntersectFastRandFull(t *testing.B) {
 
 func BenchmarkIntersectFastestRandSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 35)
+	input2 := randomFillIndices(blocksize, 30)
 
-	input := randomFillIndices(size, 35)
-	input2 := randomFillIndices(size, 30)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoListBitset(input, input2, out)
@@ -85,12 +79,10 @@ func BenchmarkIntersectFastestRandSparse(t *testing.B) {
 
 func BenchmarkIntersectFastestRandFull(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 80)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 80)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoListBitset(input, input2, out)
@@ -100,12 +92,10 @@ func BenchmarkIntersectFastestRandFull(t *testing.B) {
 
 func BenchmarkIntersectFastestRandHalfSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 15)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 15)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 
 	for t.Loop() {
 		lists.IntersectIndicesFastTwoListBitset(input, input2, out)
@@ -114,12 +104,10 @@ func BenchmarkIntersectFastestRandHalfSparse(t *testing.B) {
 
 func BenchmarkIntersectSlowSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 35)
+	input2 := randomFillIndices(blocksize, 30)
 
-	input := randomFillIndices(size, 35)
-	input2 := randomFillIndices(size, 30)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 	cache := map[uint16]uint8{}
 
 	for t.Loop() {
@@ -129,12 +117,10 @@ func BenchmarkIntersectSlowSparse(t *testing.B) {
 
 func BenchmarkIntersectSlowFull(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 70)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 70)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 	cache := map[uint16]uint8{}
 
 	for t.Loop() {
@@ -144,12 +130,10 @@ func BenchmarkIntersectSlowFull(t *testing.B) {
 
 func BenchmarkIntersectSlowHalfSparse(t *testing.B) {
 
-	size := 4000
+	input := randomFillIndices(blocksize, 85)
+	input2 := randomFillIndices(blocksize, 15)
 
-	input := randomFillIndices(size, 85)
-	input2 := randomFillIndices(size, 15)
-
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 	cache := map[uint16]uint8{}
 
 	for t.Loop() {
@@ -158,17 +142,16 @@ func BenchmarkIntersectSlowHalfSparse(t *testing.B) {
 }
 
 func TestMergeIsCorrect(t *testing.T) {
-	size := 4000
-	testI := 20
+	testI := 5
 
-	input := randomFillIndices(size, 95)
-	input2 := randomFillIndices(size, 90)
+	input := randomFillIndices(blocksize, 95)
+	input2 := randomFillIndices(blocksize, 90)
 
-	out := make([]uint16, size*2)
+	out := make([]uint16, blocksize*2)
 	cacheMap := map[uint16]uint8{}
 
-	cache := make([]uint16, size*2)
-	cache3 := make([]uint16, size*2)
+	cache := make([]uint16, blocksize*2)
+	cache3 := make([]uint16, blocksize*2)
 
 	for i := 0; i < testI; i++ {
 		intersectSlowResult := lists.Intersect(input, input2, out, cacheMap)

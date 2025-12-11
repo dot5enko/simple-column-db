@@ -56,7 +56,7 @@ type Query struct {
 	Select []Selector
 }
 
-const blockSize = 4000
+const blockSize = 32 * 1024 // 32kb
 
 func (sm *SchemaManager) Get(
 	schemaName string,

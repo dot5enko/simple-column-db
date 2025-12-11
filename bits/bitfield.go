@@ -2,7 +2,7 @@ package bits
 
 import "math/bits"
 
-type Bitfield [64]uint64
+type Bitfield [64 * 8]uint64
 
 func (b *Bitfield) Set(bit int) {
 	word := bit >> 6 // bit / 64
