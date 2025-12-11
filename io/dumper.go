@@ -2,8 +2,10 @@ package io
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"reflect"
 	"unsafe"
 
 	"github.com/dot5enko/simple-column-db/block"
@@ -13,21 +15,18 @@ type BlockTypes interface {
 	uint64 | uint16 | uint8 | uint32 | int64 | int32 | int16 | int8 | int
 }
 
-func DumpNumbersArrayBlock[T BlockTypes](path string, arr []T) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
+
+	var arrSample T
+	valueSize := reflect.ValueOf(arrSample).Type().Elem().Size()
 
 	// Reinterpret array as byte slice
-	byteLen := len(arr) * 8
+	byteLen := len(arr) * int(valueSize)
 	b := unsafe.Slice((*byte)(unsafe.Pointer(&arr[0])), byteLen)
 
-	var writtenBytes int
-	writtenBytes, err = f.Write(b)
+	writtenBytes, err := writer.Write(b)
 
-	log.Printf("written %d bytes @ %s", writtenBytes, path)
+	log.Printf("written %d bytes", writtenBytes)
 
 	return err
 }
@@ -41,5 +40,8 @@ func DumpRuntimeBlockToDisk[T BlockTypes](path string, block *block.RuntimeBlock
 		return fmt.Errorf("exported only %d items from runtime block instead of %d", itemsExported, block.Items)
 	}
 
-	return DumpNumbersArrayBlock(path, copied)
+	fw, _ := os.Open(path)
+	defer fw.Close()
+
+	return DumpNumbersArrayBlock(fw, copied)
 }

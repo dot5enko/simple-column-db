@@ -1,71 +1,139 @@
 package bits
 
 import (
+	"encoding/binary"
 	"errors"
+	"math"
 	"unsafe"
+
+	"github.com/google/uuid"
 )
 
-// BitOrder specifies bit direction
-type BitOrder int
+var ErrEOF = errors.New("end of file")
 
-const (
-	MSBFirst BitOrder = iota // Most Significant Bit first (default network order)
-	LSBFirst                 // Least Significant Bit first
-)
-
-type BitReader struct {
-	data     []byte
-	pos      int // bit position in the data slice
-	bitOrder BitOrder
+type Reader struct {
+	buf   []byte
+	pos   int
+	order binary.ByteOrder
 }
 
-// NewBitReader creates a new BitReader with specified bit order
-func NewBitReader(data []byte, order BitOrder) *BitReader {
-	return &BitReader{
-		data:     data,
-		pos:      0,
-		bitOrder: order,
+func NewBinReader(buf []byte, order binary.ByteOrder) *Reader {
+	return &Reader{buf: buf, order: order}
+}
+
+func (r *Reader) remaining(n int) bool {
+	return r.pos+n <= len(r.buf)
+}
+
+func (r *Reader) ReadU8() (uint8, error) {
+	if !r.remaining(1) {
+		return 0, ErrEOF
 	}
+	v := r.buf[r.pos]
+	r.pos++
+	return v, nil
 }
 
-// ReadBits reads n bits and returns them as uint64
-func (r *BitReader) ReadBits(n int) (uint64, error) {
-	if n <= 0 || n > 64 {
-		return 0, errors.New("can only read 1 to 64 bits at a time")
+func (r *Reader) ReadI8() (int8, error) {
+	u, err := r.ReadU8()
+	return int8(u), err
+}
+
+func (r *Reader) ReadU16() (uint16, error) {
+	if !r.remaining(2) {
+		return 0, ErrEOF
 	}
+	v := r.order.Uint16(r.buf[r.pos:])
+	r.pos += 2
+	return v, nil
+}
 
-	var result uint64
-	for i := 0; i < n; i++ {
-		byteIndex := r.pos / 8
-		if byteIndex >= len(r.data) {
-			return 0, errors.New("out of bounds")
-		}
+func (r *Reader) ReadI16() (int16, error) {
+	v, err := r.ReadU16()
+	return int16(v), err
+}
 
-		bitIndex := r.pos % 8
-		var bit uint8
-		if r.bitOrder == MSBFirst {
-			bit = (r.data[byteIndex] >> (7 - bitIndex)) & 1
-		} else {
-			bit = (r.data[byteIndex] >> bitIndex) & 1
-		}
+func (r *Reader) ReadUUID() (result uuid.UUID, err error) {
+	err = r.ReadBytes(16, result[:])
+	return result, err
+}
 
-		result = (result << 1) | uint64(bit)
-		r.pos++
+func (r *Reader) ReadU32() (uint32, error) {
+	if !r.remaining(4) {
+		return 0, ErrEOF
 	}
-
-	return result, nil
+	v := r.order.Uint32(r.buf[r.pos:])
+	r.pos += 4
+	return v, nil
 }
 
-// ReadUint8 reads 8 bits as uint8
-func (r *BitReader) ReadUint8() (uint8, error) {
-	val, err := r.ReadBits(8)
-	return uint8(val), err
+func (r *Reader) ReadI32() (int32, error) {
+	v, err := r.ReadU32()
+	return int32(v), err
 }
 
-// ReadUint16 reads 16 bits as uint16
-func (r *BitReader) ReadUint16() (uint16, error) {
-	val, err := r.ReadBits(16)
-	return uint16(val), err
+func (r *Reader) ReadU64() (uint64, error) {
+	if !r.remaining(8) {
+		return 0, ErrEOF
+	}
+	v := r.order.Uint64(r.buf[r.pos:])
+	r.pos += 8
+	return v, nil
+}
+
+func (r *Reader) MustReadU64() uint64 {
+	u, er := r.ReadU64()
+	if er != nil {
+		panic(er)
+	}
+	return u
+}
+
+func (r *Reader) ReadI64() (int64, error) {
+	v, err := r.ReadU64()
+	return int64(v), err
+}
+
+func (r *Reader) MustReadI64() int64 {
+	i, er := r.ReadI64()
+	if er != nil {
+		panic(er)
+	}
+	return i
+
+}
+
+func (r *Reader) ReadF32() (float32, error) {
+	u, err := r.ReadU32()
+	if err != nil {
+		return 0, err
+	}
+	return math.Float32frombits(u), nil
+}
+
+func (r *Reader) ReadF64() (float64, error) {
+	u, err := r.ReadU64()
+	if err != nil {
+		return 0, err
+	}
+	return math.Float64frombits(u), nil
+}
+
+func (r *Reader) MustReadF64() float64 {
+	f, er := r.ReadF64()
+	if er != nil {
+		panic(er)
+	}
+	return f
+}
+
+func (r *Reader) ReadBytes(n int, out []byte) error {
+	if !r.remaining(n) {
+		return ErrEOF
+	}
+	copy(out, r.buf[r.pos:r.pos+n])
+	r.pos += n
+	return nil
 }
 
 func MapBytesToInt[T any](data []byte, count int) *T {

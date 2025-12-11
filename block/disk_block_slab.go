@@ -1,5 +1,7 @@
 package block
 
+import "github.com/dot5enko/simple-column-db/schema"
+
 const SlabBlocks = 128
 
 // slab of blocks on disk
@@ -24,7 +26,7 @@ type DiskBlockSlab struct {
 	BlocksFinalized uint16
 
 	SchemaFieldId uint8
-	Type          uint16
+	Type          schema.FieldType
 
 	CompressionType uint8
 

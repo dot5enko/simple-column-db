@@ -43,7 +43,12 @@ func main() {
 			}
 		}
 
-		dumpErr := io.DumpNumbersArrayBlock(fileName, data)
+		fw, ferr := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if ferr != nil {
+			panic(ferr)
+		}
+
+		dumpErr := io.DumpNumbersArrayBlock(fw, data)
 
 		if dumpErr != nil {
 			panic(dumpErr)
