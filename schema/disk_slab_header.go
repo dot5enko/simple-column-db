@@ -8,7 +8,7 @@ import (
 	"github.com/dot5enko/simple-column-db/bits"
 )
 
-const SlabBlocks = 128
+const SlabBlocks = 32
 
 // slab of blocks on disk
 
