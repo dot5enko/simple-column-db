@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/google/uuid"
 )
 
 const SlabBlocks = 32
@@ -30,6 +32,8 @@ const CurrentSlabVersion = 1
 type DiskSlabHeader struct {
 	Version uint16
 
+	Uid uuid.UUID
+
 	BlocksTotal     uint16
 	BlocksFinalized uint16
 
@@ -49,6 +53,24 @@ type DiskSlabHeader struct {
 	// BlocksCompressedData []byte
 }
 
+func NewDiskSlab(schemaObject Schema, fieldName string) *DiskSlabHeader {
+
+	columnDef := schemaObject.Columns[fieldName]
+
+	return &DiskSlabHeader{
+		Version:             CurrentSlabVersion,
+		Uid:                 uuid.New(),
+		BlocksTotal:         SlabBlocks,
+		SingleBlockRowsSize: BlockRowsSize,
+		SchemaFieldId:       columnDef.Id,
+		Type:                columnDef.Type,
+
+		//  block is new, so it's empty
+		BlocksFinalized: 0,
+		CompressionType: 0,
+	}
+}
+
 func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr error) {
 
 	reader := bits.NewReader(bytes.NewBuffer(input), binary.LittleEndian)
@@ -57,6 +79,12 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 
 	if header.Version != CurrentSlabVersion {
 		return fmt.Errorf("invalid version. Supported versions: %d ", CurrentSlabVersion)
+	}
+
+	var uuidErr error
+	header.Uid, uuidErr = reader.ReadUUID()
+	if topErr != nil {
+		return uuidErr
 	}
 
 	header.BlocksTotal = reader.MustReadU16()
@@ -82,5 +110,9 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 	// uncompressedBlockValues := make([]byte, uncompressedBlockEntriesSize)
 
 	return nil
+
+}
+
+func (header *DiskSlabHeader) WriteTo(writer io.Writer) error {
 
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const BlockRowsSize = 32 * 1024 // 32k rows per block
+
 const TotalHeaderSize uint64 = 128
 const HeaderSizeUsed uint64 = 16 + 8 + 8 + 8 + 8 + 1 // guid + start offset + compressed size + datatype + [max value + min value] (2xi64)
 const ReservedSize uint64 = TotalHeaderSize - HeaderSizeUsed

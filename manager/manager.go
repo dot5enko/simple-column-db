@@ -1,4 +1,4 @@
-package schemamanager
+package manager
 
 import (
 	"github.com/dot5enko/simple-column-db/schema"
@@ -16,19 +16,17 @@ type ManagerConfig struct {
 	CacheMaxBytes uint64
 }
 
-type SchemaManager struct {
+type Manager struct {
 	schemas map[string]schema.Schema
 	blocks  map[schema.BlockUniqueId]BlockRuntimeInfo
 
 	config ManagerConfig
 }
 
-func New(config ManagerConfig) (*SchemaManager, error) {
-	return &SchemaManager{
+func New(config ManagerConfig) (*Manager, error) {
+	return &Manager{
 		schemas: make(map[string]schema.Schema),
 		blocks:  make(map[schema.BlockUniqueId]BlockRuntimeInfo),
 		config:  config,
 	}, nil
 }
-
-const BlockRowsSize = 32 * 1024 // 32k rows per block

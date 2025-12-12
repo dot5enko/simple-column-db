@@ -1,4 +1,4 @@
-package schemamanager
+package manager
 
 import (
 	"errors"
@@ -43,7 +43,7 @@ type Query struct {
 	Select []Selector
 }
 
-func (sm *SchemaManager) Get(
+func (sm *Manager) Get(
 	schemaName string,
 	query Query,
 ) ([]map[string]any, error) {
@@ -57,10 +57,10 @@ func (sm *SchemaManager) Get(
 
 		// should be big enough to hold all the entries to
 		// todo replace with bitset
-		mergeIndicesCache := make([]uint16, BlockRowsSize*len(query.Filter))
+		mergeIndicesCache := make([]uint16, schema.BlockRowsSize*len(query.Filter))
 
-		var indicesResultCache [BlockRowsSize]uint16
-		var indicesCounter [BlockRowsSize]uint16
+		var indicesResultCache [schema.BlockRowsSize]uint16
+		var indicesCounter [schema.BlockRowsSize]uint16
 
 		// check fields before filtering data
 		for _, filter := range query.Filter {
@@ -83,7 +83,10 @@ func (sm *SchemaManager) Get(
 
 				var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
 
-				fieldBlockUid := schema.NewBlockUniqueId(columnBlock, columnInfo.Id)
+				// todo fix this
+				// we don't have a per block uids .
+				// all blocks are stored in one slab file with a column id
+				fieldBlockUid := schema.ConstructUniqueBlockIdForColumn(columnBlock, columnInfo.Id)
 
 				// block manager code
 				blockData, blockOk := sm.blocks[fieldBlockUid]

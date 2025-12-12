@@ -15,7 +15,7 @@ func (block BlockUniqueId) GetGroupAndId() (uuid.UUID, uint8) {
 	return guid, uint8(block[16])
 }
 
-func NewBlockUniqueId(guid uuid.UUID, index uint8) BlockUniqueId {
+func ConstructUniqueBlockIdForColumn(guid uuid.UUID, index uint8) BlockUniqueId {
 	var blockid BlockUniqueId
 	copy(blockid[:], guid[:])
 	blockid[16] = byte(index)
