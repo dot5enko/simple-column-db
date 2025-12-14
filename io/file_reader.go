@@ -64,3 +64,19 @@ func (f *FileReader) ReadAt(out []byte, off, length int) (err error) {
 
 	return nil
 }
+
+func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
+	if f.opened == false {
+		err = errors.New("file not opened")
+		return err
+	}
+
+	var writtenBytes int
+	writtenBytes, err = f.file.WriteAt(in, int64(off))
+	if writtenBytes != len(in) {
+		err = errors.New("written bytes mismatch")
+		return err
+	}
+
+	return nil
+}

@@ -11,18 +11,24 @@ type BitWriter struct {
 	data  []byte
 	size  int
 	order binary.ByteOrder
+
+	growingEnabled bool
 }
 
-func NewEncodeBuffer(size int, order binary.ByteOrder) BitWriter {
+func NewEncodeBuffer(buf []byte, order binary.ByteOrder) BitWriter {
 
 	result := BitWriter{}
 
-	result.data = make([]byte, size)
+	result.data = buf
 	result.pos = 0
-	result.size = size
+	result.size = len(buf)
 	result.order = order
 
 	return result
+}
+
+func (this BitWriter) EnableGrowing() {
+	this.growingEnabled = true
 }
 
 func (this BitWriter) Reset() {
@@ -52,7 +58,11 @@ func (this BitWriter) grow(atLeast int) {
 }
 func (this BitWriter) tryGrow(n int) {
 	if (this.pos + n) >= this.size {
-		this.grow(n)
+		if this.growingEnabled {
+			this.grow(n)
+		} else {
+			panic("bit writer growing is disabled")
+		}
 	}
 }
 

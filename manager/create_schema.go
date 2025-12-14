@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
@@ -41,7 +42,11 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 
 		slabHeader := schema.NewDiskSlab(schemaConfig, col.Name)
 
-		slabHeader.Write()
+		// write to
+
+		fileManager := io.NewFileReader(path, col.Id.String())
+
+		slabHeader.WriteTo()
 
 	}
 

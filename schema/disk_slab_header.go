@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/google/uuid"
@@ -113,6 +112,35 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 
 }
 
-func (header *DiskSlabHeader) WriteTo(writer io.Writer) error {
+func (header *DiskSlabHeader) WriteTo(buffer []byte) error {
+	bw := bits.NewEncodeBuffer(1024, binary.LittleEndian)
 
+	// Write basic fields
+	bw.PutUint16(header.Version)
+	bw.Write(header.Uid[:]) // UUID assumed to be [16]byte
+	bw.PutUint16(header.BlocksTotal)
+	bw.PutUint16(header.BlocksFinalized)
+	bw.PutUint16(header.SingleBlockRowsSize)
+	bw.WriteByte(header.SchemaFieldId)
+	bw.WriteByte(uint8(header.Type))
+	bw.WriteByte(header.CompressionType)
+
+	// // Write unfinished block header
+	// cache := make([]byte, TotalHeaderSize)
+	// if err := header.UnfinishedBlockHeader.WriteTo(cache); err != nil {
+	// 	return err
+	// }
+	// bw.Write(cache)
+
+	// // Write finalized block headers
+	// for i := 0; i < int(header.BlocksFinalized); i++ {
+	// 	if err := header.CompressedBlockHeaders[i].WriteTo(cache); err != nil {
+	// 		return err
+	// 	}
+	// 	bw.Write(cache)
+	// }
+
+	// // Flush to the writer
+	// _, err := writer.Write(bw.Bytes())
+	return nil
 }
