@@ -101,6 +101,12 @@ func (this BitWriter) PutInt32(v int32) {
 	this.pos += 4
 }
 
+func (this BitWriter) PutUint64(v uint64) {
+	this.tryGrow(4)
+	this.order.PutUint64(this.data[this.pos:], v)
+	this.pos += 8
+}
+
 func (this BitWriter) PutFloat32(v float32) {
 	this.tryGrow(4)
 	this.order.PutUint32(this.data[this.pos:], math.Float32bits(v))

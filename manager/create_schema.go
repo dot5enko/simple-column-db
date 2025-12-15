@@ -1,11 +1,13 @@
 package manager
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/google/uuid"
 )
 
 func (sm *Manager) getAbsStoragePath(segments ...string) string {
@@ -29,36 +31,65 @@ func (sm *Manager) createStoragePathIfNotExists(segments ...string) (string, err
 	return storagePath, nil
 }
 
+func (sm *Manager) GetSlabPath(s schema.Schema, id uuid.UUID) string {
+	return sm.getAbsStoragePath("storage", s.Name, id.String()+".slab")
+}
+
 func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 
-	path, err := sm.createStoragePathIfNotExists("storage", schemaConfig.Name)
+	_, err := sm.createStoragePathIfNotExists("storage", schemaConfig.Name)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create schema folder: %s", err.Error())
 	}
 
-	headerBuffer := make([]byte, schema.TotalHeaderSize*(schema.SlabBlocks+3))
+	headerBuffer := make([]byte, schema.TotalHeaderSize*3)
 
 	// for each column create slab on disk
 	for _, col := range schemaConfig.Columns {
 
-		slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
-		if slabError != nil {
-			return slabError
+		createOneSlabForColumn := func() error {
+			slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
+			if slabError != nil {
+				return slabError
+			}
+
+			slabPath := sm.GetSlabPath(schemaConfig, slabHeader.Uid)
+
+			writtenBytes, writeErr := slabHeader.WriteTo(headerBuffer)
+			if writeErr != nil {
+				return writeErr
+			}
+
+			fileManager := io.NewFileReader(slabPath)
+			fileManager.OpenForReadOnly(false)
+
+			defer fileManager.Close()
+
+			fileWriteErr := fileManager.WriteAt(headerBuffer[:writtenBytes], 0, writtenBytes)
+			if fileWriteErr != nil {
+				return fileWriteErr
+			}
+
+			// last unfinished block + headers for all blocks inside
+			headersReservedSpace := (int(slabHeader.BlocksTotal) + 1) * int(schema.TotalHeaderSize)
+			zeroesFilledErr := fileManager.FillZeroes(writtenBytes, headersReservedSpace)
+
+			if zeroesFilledErr != nil {
+				return zeroesFilledErr
+			}
+
+			// reserve space for block entries
+			fillContentErr := fileManager.FillZeroes(writtenBytes+headersReservedSpace, int(slabHeader.UncompressedSlabContentSize))
+
+			return fillContentErr
 		}
 
-		slabPath := sm.getAbsStoragePath(path, col.Name, slabHeader.Uid.String()+".slab")
-
-		writtenBytes, writeErr := slabHeader.WriteTo(headerBuffer)
-		if writeErr != nil {
-			return writeErr
+		slabCreationErr := createOneSlabForColumn()
+		if slabCreationErr != nil {
+			return slabCreationErr
 		}
 
-		fileManager := io.NewFileReader(slabPath)
-		fileWriteErr := fileManager.WriteAt(headerBuffer[:writtenBytes], 0, writtenBytes)
-		if fileWriteErr != nil {
-			return fileWriteErr
-		}
 	}
 
 	return nil

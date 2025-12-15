@@ -83,3 +83,22 @@ func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
 
 	return nil
 }
+
+// fill zeroes to the file at offset with given size
+func (f *FileReader) FillZeroes(offset, size int) (err error) {
+	if f.opened == false {
+		err = errors.New("file not opened")
+		return err
+	}
+
+	var writtenBytes int
+	zeroes := make([]byte, size)
+
+	writtenBytes, err = f.file.WriteAt(zeroes, int64(offset))
+	if writtenBytes != len(zeroes) {
+		err = errors.New("written bytes mismatch")
+		return err
+	}
+
+	return nil
+}

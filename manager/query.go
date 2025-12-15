@@ -83,51 +83,60 @@ func (sm *Manager) Get(
 
 		for _, slab := range schemaObject.Slabs {
 
+			slabInfo, slabErr := sm.slabManager.LoadSlabToCache(schemaObject, slab, sm)
+			if slabErr != nil {
+				return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
+			}
+
 			blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
 
-			for _, filter := range query.Filter {
+			var blocks []BlockRuntimeInfo
+			// filter slab blocks by filter
 
-				var columnInfo schema.SchemaColumn
+			for _, compressedHeader := range slabInfo.CompressedBlockHeaders {
 
-				// cache
-				for _, it := range schemaObject.Columns {
-					if it.Name == filter.Field {
-						columnInfo = it
-						break
+				// filter by headers if possible
+				blockDecodedInfo, blockErr := sm.slabManager.LoadBlockToRuntimeBlockData(schemaObject, slabInfo, compressedHeader.GroupUid, sm)
+
+				if blockErr != nil {
+					return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
+				}
+
+				blocks = append(blocks, BlockRuntimeInfo{
+					Val:          blockDecodedInfo,
+					Header:       compressedHeader,
+					Synchronized: true,
+				})
+			}
+
+			for _, blockData := range blocks {
+				for _, filter := range query.Filter {
+
+					var columnInfo schema.SchemaColumn
+
+					// cache
+					for _, it := range schemaObject.Columns {
+						if it.Name == filter.Field {
+							columnInfo = it
+							break
+						}
 					}
+
+					// process filter on a block
+					switch columnInfo.Type {
+					case schema.Uint64FieldType:
+						ProcessNumericFilterOnColumnWithType[uint64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					case schema.Uint8FieldType:
+						ProcessNumericFilterOnColumnWithType[uint8](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					case schema.Float32FieldType:
+						ProcessNumericFilterOnColumnWithType[float32](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					case schema.Float64FieldType:
+						ProcessNumericFilterOnColumnWithType[float64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					default:
+						return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
+					}
+
 				}
-
-				// todo fix this
-				// we don't have a per block uids .
-				// all blocks are stored in one slab file with a column id
-				// fieldBlockUid := schema.ConstructUniqueBlockIdForColumn(columnBlock, columnInfo.Id)
-
-				// // block manager code
-				// blockData, blockOk := sm.blocks[fieldBlockUid]
-				// {
-				// 	if !blockOk {
-				// 		return nil, fmt.Errorf("block not found while processing query : %s", fieldBlockUid.MustUid().String())
-				// 	}
-
-				// 	if !(blockData.Synchronized) {
-				// 		return nil, fmt.Errorf("block %s not synchronized from disk", fieldBlockUid.MustUid().String())
-				// 	}
-				// }
-
-				var blockData BlockRuntimeInfo
-
-				// process filter on a block
-				switch columnInfo.Type {
-				case schema.Uint64FieldType:
-					ProcessNumericFilterOnColumnWithType[uint64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-				case schema.Uint8FieldType:
-					ProcessNumericFilterOnColumnWithType[uint8](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-				case schema.Float64FieldType:
-					ProcessNumericFilterOnColumnWithType[float64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-				default:
-					return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
-				}
-
 			}
 
 			// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf

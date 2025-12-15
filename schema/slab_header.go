@@ -1,32 +1,17 @@
 package schema
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/google/uuid"
 )
 
-const SlabBlocks = 32
-
-// slab of blocks on disk
-
-// *--------------------------------*
-// | version        				|
-// *--------------------------------*
-// | slab meta						|
-// *--------------------------------*
-// | unfinished block header		|
-// | unfinished block data			|
-// *--------------------------------*
-// | block headers 2 ... n 			|
-// *--------------------------------*
-// | compressed block data 2... n	|
-// *--------------------------------*
-
 const CurrentSlabVersion = 1
+
+const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + TotalHeaderSize
 
 type DiskSlabHeader struct {
 	Version uint16
@@ -41,12 +26,15 @@ type DiskSlabHeader struct {
 	SchemaFieldId uint8
 	Type          FieldType
 
-	CompressionType uint8
+	CompressionType             uint8
+	UncompressedSlabContentSize uint64
+	CompressedSlabContentSize   uint64
 
-	UnfinishedBlockHeader  DiskHeader
-	CompressedBlockHeaders [SlabBlocks]DiskHeader
+	UnfinishedBlockHeader DiskHeader
 
-	// end of predictable layout
+	// up to this point we have a predictable layout
+
+	CompressedBlockHeaders []DiskHeader
 
 	// UnfinishedBlockData  []byte
 	// BlocksCompressedData []byte
@@ -69,10 +57,19 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		return nil, fmt.Errorf("column '%s' does not exist", fieldName)
 	}
 
+	// calc number of blocks so the slab size would be 2-6 MB when compressed with lz4
+	uncompressedBlockSize := BlockRowsSize * columnDef.Type.Size()
+	targetBlockSizeUncompressed := 10 * 1024 * 1024 / uncompressedBlockSize
+	slabBlocks := targetBlockSizeUncompressed / BlockRowsSize
+
+	if slabBlocks > 65000 {
+		slabBlocks = 65000
+	}
+
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
 		Uid:                 uuid.New(),
-		BlocksTotal:         SlabBlocks,
+		BlocksTotal:         uint16(slabBlocks),
 		SingleBlockRowsSize: BlockRowsSize,
 		SchemaFieldId:       uint8(selectedIdx) + 1,
 		Type:                columnDef.Type,
@@ -83,9 +80,9 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 	}, nil
 }
 
-func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr error) {
+func (header *DiskSlabHeader) FromBytes(input io.Reader) (topErr error) {
 
-	reader := bits.NewReader(bytes.NewBuffer(input), binary.LittleEndian)
+	reader := bits.NewReader(input, binary.LittleEndian)
 
 	header.Version = reader.MustReadU16()
 
@@ -95,7 +92,7 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 
 	var uuidErr error
 	header.Uid, uuidErr = reader.ReadUUID()
-	if topErr != nil {
+	if uuidErr != nil {
 		return uuidErr
 	}
 
@@ -107,14 +104,15 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 	header.Type = FieldType(reader.MustReadU8())
 
 	header.CompressionType = reader.MustReadU8()
+	header.UncompressedSlabContentSize = reader.MustReadU64()
+	header.CompressedSlabContentSize = reader.MustReadU64()
 
-	reader.ReadBytes(int(TotalHeaderSize), cache)
-	header.UnfinishedBlockHeader.FromBytes(cache[:TotalHeaderSize], nil)
+	header.UnfinishedBlockHeader.FromBytes(reader.Buffer())
 
-	for i := 0; i < int(header.BlocksFinalized); i++ {
-		reader.ReadBytes(int(TotalHeaderSize), cache)
-		header.CompressedBlockHeaders[i].FromBytes(cache[:TotalHeaderSize], nil)
-	}
+	// for i := 0; i < int(header.BlocksFinalized); i++ {
+	// 	reader.ReadBytes(int(TotalHeaderSize), cache)
+	// 	header.CompressedBlockHeaders[i].FromBytes(cache[:TotalHeaderSize], nil)
+	// }
 
 	// uncompressedBlockEntriesSize := int(header.SingleBlockRowsSize) * header.Type.Size()
 	// allocate here ?
@@ -144,8 +142,16 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 	bw.WriteByte(uint8(header.Type))
 	bw.WriteByte(header.CompressionType)
 
-	reservedSpace := (SlabBlocks + 1) * TotalHeaderSize
-	bw.EmptyBytes(int(reservedSpace))
+	// size the content of the slab before compression
+	// preallocated on disk upon slab creation
+	bw.PutUint64(header.UncompressedSlabContentSize)
+	bw.PutUint64(header.CompressedSlabContentSize)
+
+	// headersReservedSpace := (int(header.BlocksTotal) + 1) * int(TotalHeaderSize)
+	// bw.EmptyBytes(headersReservedSpace)
+
+	// // reserve space for block entries
+	// bw.EmptyBytes(int(header.UncompressedSlabContentSize))
 
 	return bw.Position(), nil
 

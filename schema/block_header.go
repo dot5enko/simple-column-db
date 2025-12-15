@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/google/uuid"
@@ -34,9 +34,9 @@ type DiskHeader struct {
 	Reserved [ReservedSize]uint8
 }
 
-func (header *DiskHeader) FromBytes(input []byte, cache []byte) (topErr error) {
+func (header *DiskHeader) FromBytes(input io.Reader) (topErr error) {
 
-	reader := bits.NewReader(bytes.NewBuffer(input), binary.LittleEndian)
+	reader := bits.NewReader(input, binary.LittleEndian)
 
 	header.GroupUid, topErr = reader.ReadUUID()
 	if topErr != nil {

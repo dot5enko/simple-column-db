@@ -91,7 +91,7 @@ func (r *BitsReader) ReadI16() (int16, error) {
 }
 
 func (r *BitsReader) ReadUUID() (result uuid.UUID, err error) {
-	err = r.ReadBytes(16, result[:])
+	err = r.ReadBytesInternal(16, result[:])
 	return result, err
 }
 
@@ -166,7 +166,7 @@ func (r *BitsReader) MustReadF64() float64 {
 	return f
 }
 
-func (r *BitsReader) ReadBytes(n int, out []byte) error {
+func (r *BitsReader) ReadBytesInternal(n int, out []byte) error {
 
 	readBytes, err := r.buf.Read(out[:n])
 
@@ -175,6 +175,10 @@ func (r *BitsReader) ReadBytes(n int, out []byte) error {
 	}
 
 	return err
+}
+
+func (r *BitsReader) Buffer() io.Reader {
+	return r.buf
 }
 
 func MapBytesToInt[T any](data []byte, count int) *T {

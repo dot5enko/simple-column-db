@@ -48,6 +48,10 @@ func gen_fake_data(size int, fileName string) {
 
 func main() {
 
+	gen_fake_data(1000, "test1.bin")
+
+	return
+
 	m := manager.New(manager.ManagerConfig{
 		PathToStorage: "./storage",
 		CacheMaxBytes: 0,

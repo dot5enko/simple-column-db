@@ -37,3 +37,14 @@ func NewRuntimeBlockData[T any](cap int) *RuntimeBlockData[T] {
 		Data: make([]T, 0, cap),
 	}
 }
+
+func NewRuntimeBlockDataFromSlice[T any](data []T) *RuntimeBlockData[T] {
+
+	itemCount := len(data)
+
+	return &RuntimeBlockData[T]{
+		Cap:   itemCount,
+		Items: itemCount,
+		Data:  data,
+	}
+}

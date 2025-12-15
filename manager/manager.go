@@ -21,9 +21,12 @@ type Manager struct {
 	blocks  map[schema.BlockUniqueId]BlockRuntimeInfo
 
 	config ManagerConfig
+
+	slabManager SlabManager
 }
 
 func New(config ManagerConfig) *Manager {
+
 	return &Manager{
 		schemas: make(map[string]schema.Schema),
 		blocks:  make(map[schema.BlockUniqueId]BlockRuntimeInfo),
