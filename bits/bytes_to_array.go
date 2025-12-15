@@ -1,19 +1,17 @@
 package bits
 
 import (
-	"reflect"
 	"unsafe"
 )
 
-// []uint64 | []uint16 | []uint8 | []uint32 | []int64 | []int32 | []int16 | []int8 | []int
 func MapBytesToArray[T any](data []byte, count int) []T {
+	var zero T
+	size := int(unsafe.Sizeof(zero))
 
-	var arrSample T
-	valueSize := reflect.ValueOf(arrSample).Type().Elem().Size()
-
-	if len(data) < count*int(valueSize) {
+	if len(data) < count*size {
 		panic("not enough data")
 	}
 
-	return *(*[]T)(unsafe.Pointer(&data[0]))
+	hdr := unsafe.Slice((*T)(unsafe.Pointer(&data[0])), count)
+	return hdr
 }

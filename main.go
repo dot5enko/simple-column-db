@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/manager"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -25,14 +26,20 @@ func testCycles(n int, label string, testSize int, cb func()) {
 	log.Printf(" %s per cycle : %d/ns", label, perCycle)
 }
 
-func gen_fake_data(size int, fileName string) {
+func gen_fake_data[T uint64 | float64](size int, fileName string) {
 
-	data := make([]uint64, size)
+	data := make([]T, size)
 
 	for i := 0; i < size; i++ {
-		val := uint64(rand.Int63n(50000))
+		val := T(rand.Int63n(50000))
 		data[i] = val
 	}
+
+	for i := 0; i < 10; i++ {
+		log.Printf("%d : %v", i, (data)[i])
+	}
+
+	log.Printf("generated %d items ", len(data))
 
 	fw, ferr := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if ferr != nil {
@@ -46,9 +53,40 @@ func gen_fake_data(size int, fileName string) {
 	}
 }
 
+func read_array_data[T any](fileName string, size int, typ schema.FieldType) (data []T) {
+
+	reader := io.NewFileReader(fileName)
+	reader.OpenForReadOnly(true)
+
+	elementSize := typ.Size()
+	blockSize := elementSize * size
+
+	log.Printf(" << about to read %v bytes from file >> ", blockSize)
+
+	buffer := make([]byte, blockSize)
+
+	readErr := reader.ReadAt(buffer, 0, blockSize)
+	if readErr != nil {
+		panic(readErr)
+	}
+
+	return bits.MapBytesToArray[T](buffer, size)
+}
+
 func main() {
 
-	gen_fake_data(1000, "test1.bin")
+	testName := "test1.bin"
+	testSize := 1000
+
+	// gen_fake_data[uint64](testSize, testName)
+
+	elements := read_array_data[uint64](testName, testSize, schema.Uint64FieldType)
+
+	debugN := 10
+
+	for i := 0; i < debugN; i++ {
+		log.Printf("%d : %v", i, (elements)[i])
+	}
 
 	return
 
