@@ -75,21 +75,6 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
-	testName := "test1.bin"
-	testSize := 1000
-
-	// gen_fake_data[uint64](testSize, testName)
-
-	elements := read_array_data[uint64](testName, testSize, schema.Uint64FieldType)
-
-	debugN := 10
-
-	for i := 0; i < debugN; i++ {
-		log.Printf("%d : %v", i, (elements)[i])
-	}
-
-	return
-
 	m := manager.New(manager.ManagerConfig{
 		PathToStorage: "./storage",
 		CacheMaxBytes: 0,

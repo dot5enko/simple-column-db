@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -22,9 +23,14 @@ func (sm *Manager) createStoragePathIfNotExists(segments ...string) (string, err
 	storagePath := sm.getAbsStoragePath(segments...)
 
 	if _, err := os.Stat(storagePath); err != nil {
-		storageFolderErr := os.MkdirAll(storagePath, 0644)
+		storageFolderErr := os.MkdirAll(storagePath, 0755)
 		if storageFolderErr != nil {
+
+			log.Printf("unable to create directory : %s", storagePath)
+
 			return "", storageFolderErr
+		} else {
+			log.Printf(" >> created %s folder", storagePath)
 		}
 	}
 
@@ -32,15 +38,15 @@ func (sm *Manager) createStoragePathIfNotExists(segments ...string) (string, err
 }
 
 func (sm *Manager) GetSlabPath(s schema.Schema, id uuid.UUID) string {
-	return sm.getAbsStoragePath("storage", s.Name, id.String()+".slab")
+	return sm.getAbsStoragePath(s.Name, id.String()+".slab")
 }
 
 func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 
-	_, err := sm.createStoragePathIfNotExists("storage", schemaConfig.Name)
+	_, err := sm.createStoragePathIfNotExists(schemaConfig.Name)
 
 	if err != nil {
-		return fmt.Errorf("unable to create schema folder: %s", err.Error())
+		return fmt.Errorf("unable to create schema folder: `%s`", err.Error())
 	}
 
 	headerBuffer := make([]byte, schema.TotalHeaderSize*3)
@@ -80,7 +86,9 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 			}
 
 			// reserve space for block entries
-			fillContentErr := fileManager.FillZeroes(writtenBytes+headersReservedSpace, int(slabHeader.UncompressedSlabContentSize))
+			// calc
+			reservedSize := int(slabHeader.SingleBlockRowsSize) * int(slabHeader.BlocksTotal) * slabHeader.Type.Size()
+			fillContentErr := fileManager.FillZeroes(writtenBytes+headersReservedSpace, reservedSize)
 
 			return fillContentErr
 		}

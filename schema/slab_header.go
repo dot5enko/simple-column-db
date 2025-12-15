@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/google/uuid"
@@ -59,12 +60,13 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 
 	// calc number of blocks so the slab size would be 2-6 MB when compressed with lz4
 	uncompressedBlockSize := BlockRowsSize * columnDef.Type.Size()
-	targetBlockSizeUncompressed := 10 * 1024 * 1024 / uncompressedBlockSize
-	slabBlocks := targetBlockSizeUncompressed / BlockRowsSize
+	slabBlocks := 10 * 1024 * 1024 / uncompressedBlockSize
 
 	if slabBlocks > 65000 {
 		slabBlocks = 65000
 	}
+
+	log.Printf(" slab for %s will contain %d blocks", columnDef.Name, slabBlocks)
 
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
