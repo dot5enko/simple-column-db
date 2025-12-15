@@ -23,10 +23,10 @@ type Manager struct {
 	config ManagerConfig
 }
 
-func New(config ManagerConfig) (*Manager, error) {
+func New(config ManagerConfig) *Manager {
 	return &Manager{
 		schemas: make(map[string]schema.Schema),
 		blocks:  make(map[schema.BlockUniqueId]BlockRuntimeInfo),
 		config:  config,
-	}, nil
+	}
 }

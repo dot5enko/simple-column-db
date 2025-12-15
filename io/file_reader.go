@@ -9,17 +9,20 @@ type FileReader struct {
 	path   string
 	file   *os.File
 	opened bool
+
+	exists bool
 }
 
-func NewFileReader(path string) (*FileReader, error) {
+func NewFileReader(path string) *FileReader {
 
 	_, err := os.Stat(path)
 
 	freader := &FileReader{
-		path: path,
+		path:   path,
+		exists: err == nil,
 	}
 
-	return freader, err
+	return freader
 }
 
 func (f *FileReader) OpenForReadOnly(v bool) (topErr error) {

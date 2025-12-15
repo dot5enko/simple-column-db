@@ -65,9 +65,15 @@ func (sm *Manager) Get(
 		// check fields before filtering data
 		for _, filter := range query.Filter {
 
-			var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
+			found := false
+			for _, it := range schemaObject.Columns {
+				if it.Name == filter.Field {
+					found = true
+					break
+				}
+			}
 
-			if columnInfo.Id == 0 {
+			if !found {
 				return nil, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
 			}
 		}
@@ -75,30 +81,40 @@ func (sm *Manager) Get(
 		// todo cache
 		// this is a blockmanager responsibility to load blocks from disk if they are not loaded yet
 
-		for _, columnBlock := range schemaObject.Blocks {
+		for _, slab := range schemaObject.Slabs {
 
 			blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
 
 			for _, filter := range query.Filter {
 
-				var columnInfo schema.SchemaColumn = schemaObject.Columns[filter.Field]
+				var columnInfo schema.SchemaColumn
+
+				// cache
+				for _, it := range schemaObject.Columns {
+					if it.Name == filter.Field {
+						columnInfo = it
+						break
+					}
+				}
 
 				// todo fix this
 				// we don't have a per block uids .
 				// all blocks are stored in one slab file with a column id
-				fieldBlockUid := schema.ConstructUniqueBlockIdForColumn(columnBlock, columnInfo.Id)
+				// fieldBlockUid := schema.ConstructUniqueBlockIdForColumn(columnBlock, columnInfo.Id)
 
-				// block manager code
-				blockData, blockOk := sm.blocks[fieldBlockUid]
-				{
-					if !blockOk {
-						return nil, fmt.Errorf("block not found while processing query : %s", fieldBlockUid.MustUid().String())
-					}
+				// // block manager code
+				// blockData, blockOk := sm.blocks[fieldBlockUid]
+				// {
+				// 	if !blockOk {
+				// 		return nil, fmt.Errorf("block not found while processing query : %s", fieldBlockUid.MustUid().String())
+				// 	}
 
-					if !(blockData.Synchronized) {
-						return nil, fmt.Errorf("block %s not synchronized from disk", fieldBlockUid.MustUid().String())
-					}
-				}
+				// 	if !(blockData.Synchronized) {
+				// 		return nil, fmt.Errorf("block %s not synchronized from disk", fieldBlockUid.MustUid().String())
+				// 	}
+				// }
+
+				var blockData BlockRuntimeInfo
 
 				// process filter on a block
 				switch columnInfo.Type {

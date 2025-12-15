@@ -6,7 +6,7 @@ type Schema struct {
 	Name string `json:"name"`
 	Uid  string `json:"uuid"`
 
-	Columns map[string]SchemaColumn
+	Columns []SchemaColumn
 
-	Blocks []uuid.UUID
+	Slabs []uuid.UUID
 }

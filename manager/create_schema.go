@@ -37,17 +37,28 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 		return err
 	}
 
+	headerBuffer := make([]byte, schema.TotalHeaderSize*(schema.SlabBlocks+3))
+
 	// for each column create slab on disk
 	for _, col := range schemaConfig.Columns {
 
-		slabHeader := schema.NewDiskSlab(schemaConfig, col.Name)
+		slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
+		if slabError != nil {
+			return slabError
+		}
 
-		// write to
+		slabPath := sm.getAbsStoragePath(path, col.Name, slabHeader.Uid.String()+".slab")
 
-		fileManager := io.NewFileReader(path, col.Id.String())
+		writtenBytes, writeErr := slabHeader.WriteTo(headerBuffer)
+		if writeErr != nil {
+			return writeErr
+		}
 
-		slabHeader.WriteTo()
-
+		fileManager := io.NewFileReader(slabPath)
+		fileWriteErr := fileManager.WriteAt(headerBuffer[:writtenBytes], 0, writtenBytes)
+		if fileWriteErr != nil {
+			return fileWriteErr
+		}
 	}
 
 	return nil

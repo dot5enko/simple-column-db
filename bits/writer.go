@@ -35,6 +35,10 @@ func (this BitWriter) Reset() {
 	this.pos = 0
 }
 
+func (this BitWriter) Position() int {
+	return this.pos
+}
+
 func (this BitWriter) ReadByte() (n byte, err error) {
 
 	n = this.data[this.pos]

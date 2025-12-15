@@ -52,22 +52,35 @@ type DiskSlabHeader struct {
 	// BlocksCompressedData []byte
 }
 
-func NewDiskSlab(schemaObject Schema, fieldName string) *DiskSlabHeader {
+func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error) {
 
-	columnDef := schemaObject.Columns[fieldName]
+	var columnDef SchemaColumn
+	selectedIdx := -1
+
+	for idx, it := range schemaObject.Columns {
+		if it.Name == fieldName {
+			columnDef = it
+			selectedIdx = idx
+			break
+		}
+	}
+
+	if selectedIdx == -1 {
+		return nil, fmt.Errorf("column '%s' does not exist", fieldName)
+	}
 
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
 		Uid:                 uuid.New(),
 		BlocksTotal:         SlabBlocks,
 		SingleBlockRowsSize: BlockRowsSize,
-		SchemaFieldId:       columnDef.Id,
+		SchemaFieldId:       uint8(selectedIdx) + 1,
 		Type:                columnDef.Type,
 
 		//  block is new, so it's empty
 		BlocksFinalized: 0,
 		CompressionType: 0,
-	}
+	}, nil
 }
 
 func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr error) {
@@ -112,18 +125,29 @@ func (header *DiskSlabHeader) FromBytes(input []byte, cache []byte) (topErr erro
 
 }
 
-func (header *DiskSlabHeader) WriteTo(buffer []byte) error {
-	bw := bits.NewEncodeBuffer(1024, binary.LittleEndian)
+func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
+	bw := bits.NewEncodeBuffer(buffer, binary.LittleEndian)
 
 	// Write basic fields
 	bw.PutUint16(header.Version)
-	bw.Write(header.Uid[:]) // UUID assumed to be [16]byte
+
+	uuidLength := 16
+	n, _ := bw.Write(header.Uid[:])
+	if n != uuidLength {
+		return 0, fmt.Errorf("failed to write UUID")
+	}
+
 	bw.PutUint16(header.BlocksTotal)
 	bw.PutUint16(header.BlocksFinalized)
 	bw.PutUint16(header.SingleBlockRowsSize)
 	bw.WriteByte(header.SchemaFieldId)
 	bw.WriteByte(uint8(header.Type))
 	bw.WriteByte(header.CompressionType)
+
+	reservedSpace := (SlabBlocks + 1) * TotalHeaderSize
+	bw.EmptyBytes(int(reservedSpace))
+
+	return bw.Position(), nil
 
 	// // Write unfinished block header
 	// cache := make([]byte, TotalHeaderSize)
@@ -142,5 +166,5 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) error {
 
 	// // Flush to the writer
 	// _, err := writer.Write(bw.Bytes())
-	return nil
+	return 0, nil
 }

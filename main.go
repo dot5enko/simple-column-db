@@ -6,8 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
+	"github.com/dot5enko/simple-column-db/manager"
+	"github.com/dot5enko/simple-column-db/schema"
 )
 
 func testCycles(n int, label string, testSize int, cb func()) {
@@ -24,50 +25,44 @@ func testCycles(n int, label string, testSize int, cb func()) {
 	log.Printf(" %s per cycle : %d/ns", label, perCycle)
 }
 
+func gen_fake_data(size int, fileName string) {
+
+	data := make([]uint64, size)
+
+	for i := 0; i < size; i++ {
+		val := uint64(rand.Int63n(50000))
+		data[i] = val
+	}
+
+	fw, ferr := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if ferr != nil {
+		panic(ferr)
+	}
+
+	dumpErr := io.DumpNumbersArrayBlock(fw, data)
+
+	if dumpErr != nil {
+		panic(dumpErr)
+	}
+}
+
 func main() {
 
-	isDump := false
+	m := manager.New(manager.ManagerConfig{
+		PathToStorage: "./storage",
+		CacheMaxBytes: 0,
+	})
 
-	const size = 4000
-	testSize := 10
-	fileName := "test.bin"
+	shemaCreatedErr := m.CreateSchema(schema.Schema{
+		Name: "health_cheks",
+		Columns: []schema.SchemaColumn{
+			{Name: "created_at", Type: schema.Uint64FieldType},
+			{Name: "value", Type: schema.Uint64FieldType},
+		},
+	})
 
-	if isDump {
-		data := make([]uint64, size)
-
-		for i := 0; i < size; i++ {
-			val := uint64(rand.Int63n(50000))
-			data[i] = val
-			if i < testSize {
-				log.Printf("%d %v", i, val)
-			}
-		}
-
-		fw, ferr := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if ferr != nil {
-			panic(ferr)
-		}
-
-		dumpErr := io.DumpNumbersArrayBlock(fw, data)
-
-		if dumpErr != nil {
-			panic(dumpErr)
-		}
+	if shemaCreatedErr != nil {
+		panic(shemaCreatedErr)
 	}
 
-	readBackData, readErr := os.ReadFile(fileName)
-	if readErr != nil {
-		panic(readErr)
-	}
-
-	// log.Printf("read %d bytes of input", len(readBackData))
-	arrResult := bits.MapBytesToArray[[size]uint64](readBackData, size)
-	// log.Printf("result pointer : %d", len(arrResult))
-
-	for i := 0; i < testSize; i++ {
-		val := arrResult[i]
-		if i < 10 {
-			log.Printf(" >> test %d %v", i, val)
-		}
-	}
 }
