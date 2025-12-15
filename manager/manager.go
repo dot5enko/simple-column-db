@@ -22,7 +22,7 @@ type Manager struct {
 
 	config ManagerConfig
 
-	slabManager SlabManager
+	Slabs SlabManager
 }
 
 func New(config ManagerConfig) *Manager {

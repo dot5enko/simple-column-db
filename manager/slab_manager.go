@@ -47,6 +47,9 @@ type SlabManager struct {
 	BufferForCompressedData10Mb [10 * 1024 * 1024]byte // 10mb buffer for decompression
 }
 
+func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *SlabCacheItem {
+	return m.getSlabFromCache(uid)
+}
 func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 	m.slabCacheLocker.Lock()
 	defer m.slabCacheLocker.Unlock()
