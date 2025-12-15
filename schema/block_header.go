@@ -34,7 +34,7 @@ type DiskHeader struct {
 	Reserved [ReservedSize]uint8
 }
 
-func (header *DiskHeader) FromBytes(input io.Reader) (topErr error) {
+func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 	reader := bits.NewReader(input, binary.LittleEndian)
 

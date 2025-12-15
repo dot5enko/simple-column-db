@@ -3,9 +3,9 @@ package bits
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"math"
-	"unsafe"
 
 	"github.com/google/uuid"
 )
@@ -20,19 +20,39 @@ const MaxBinReaderBufferSize = 256
 type BitsReader struct {
 	readBuffer [MaxBinReaderBufferSize]byte
 
-	buf   io.Reader
+	buf   io.ReadSeeker
 	order binary.ByteOrder
 }
 
-func NewReader(buf io.Reader, order binary.ByteOrder) *BitsReader {
+func NewReader(buf io.ReadSeeker, order binary.ByteOrder) *BitsReader {
 	return &BitsReader{buf: buf, order: order}
+}
+
+func (r *BitsReader) Reset() error {
+	_, err := r.buf.Seek(0, io.SeekStart)
+	return err
+}
+
+func (r *BitsReader) Position() (int64, error) {
+	return r.buf.Seek(0, io.SeekCurrent)
+}
+
+// skip bytes
+func (r *BitsReader) Skip(bytesToSkip int) error {
+	_, err := r.buf.Seek(int64(bytesToSkip), io.SeekCurrent)
+	return err
 }
 
 func (r *BitsReader) readNextBytesIntoReadBuffer(size int) error {
 	readBytes, err := r.buf.Read(r.readBuffer[:size])
 
 	if err != nil {
-		return err
+		currentPos, curPosErr := r.buf.Seek(0, io.SeekCurrent)
+		if curPosErr != nil {
+			panic(curPosErr)
+		}
+
+		return fmt.Errorf("unable to read bytes into buffer , while trying to read %d. cur pos = %d", size, currentPos)
 	}
 
 	if readBytes != size {
@@ -117,13 +137,26 @@ func (r *BitsReader) ReadU64() (uint64, error) {
 	}
 
 	v := r.order.Uint64(r.readBuffer[:8])
+
+	// offset, offsetErr := r.buf.Seek(0, io.SeekCurrent)
+	// if offsetErr != nil {
+	// 	panic(offsetErr)
+	// }
+
+	// log.Printf("read %d bytes from reader [:%d]", 8, offset)
+
 	return v, nil
 }
 
 func (r *BitsReader) MustReadU64() uint64 {
 	u, er := r.ReadU64()
 	if er != nil {
-		panic(er)
+		curPos, posErr := r.Position()
+		if posErr != nil {
+			panic(fmt.Sprintf("error reading U64 at position: %s: %s", posErr.Error(), er.Error()))
+		} else {
+			panic(fmt.Sprintf("error reading U64 at position %d: %s", curPos, er.Error()))
+		}
 	}
 	return u
 }
@@ -177,15 +210,6 @@ func (r *BitsReader) ReadBytesInternal(n int, out []byte) error {
 	return err
 }
 
-func (r *BitsReader) Buffer() io.Reader {
+func (r *BitsReader) Buffer() io.ReadSeeker {
 	return r.buf
-}
-
-func MapBytesToInt[T any](data []byte, count int) *T {
-	if len(data) < count*8 {
-		panic("not enough data")
-	}
-
-	// Convert slice header to *[count]uint64
-	return (*T)(unsafe.Pointer(&data[0]))
 }

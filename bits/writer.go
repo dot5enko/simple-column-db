@@ -3,6 +3,7 @@ package bits
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 )
 
@@ -27,11 +28,11 @@ func NewEncodeBuffer(buf []byte, order binary.ByteOrder) BitWriter {
 	return result
 }
 
-func (this BitWriter) EnableGrowing() {
+func (this *BitWriter) EnableGrowing() {
 	this.growingEnabled = true
 }
 
-func (this BitWriter) Reset() {
+func (this *BitWriter) Reset() {
 	this.pos = 0
 }
 
@@ -39,7 +40,7 @@ func (this BitWriter) Position() int {
 	return this.pos
 }
 
-func (this BitWriter) ReadByte() (n byte, err error) {
+func (this *BitWriter) ReadByte() (n byte, err error) {
 
 	n = this.data[this.pos]
 	this.pos++
@@ -47,7 +48,7 @@ func (this BitWriter) ReadByte() (n byte, err error) {
 	return
 }
 
-func (this BitWriter) grow(atLeast int) {
+func (this *BitWriter) grow(atLeast int) {
 
 	newSize := this.size * 2
 	if atLeast > newSize {
@@ -60,17 +61,17 @@ func (this BitWriter) grow(atLeast int) {
 	this.data = newBuf
 	this.size = newSize
 }
-func (this BitWriter) tryGrow(n int) {
-	if (this.pos + n) >= this.size {
+func (this *BitWriter) tryGrow(n int) {
+	if (this.pos + n) > this.size {
 		if this.growingEnabled {
 			this.grow(n)
 		} else {
-			panic("bit writer growing is disabled")
+			panic(fmt.Sprintf("bit writer growing is disabled on pos : %d, try grow %d, from size : %d", this.pos, n, this.size))
 		}
 	}
 }
 
-func (this BitWriter) Write(p []byte) (n int, err error) {
+func (this *BitWriter) Write(p []byte) (n int, err error) {
 
 	oldl := len(p)
 	this.tryGrow(oldl)
@@ -86,46 +87,46 @@ func (this BitWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (this BitWriter) EmptyBytes(i int) {
+func (this *BitWriter) EmptyBytes(i int) {
 	this.tryGrow(i)
 	this.pos += i
 }
 
-func (this BitWriter) Bytes() []byte {
+func (this *BitWriter) Bytes() []byte {
 	return this.data[:this.pos]
 }
 
-func (this BitWriter) PutInt32(v int32) {
+func (this *BitWriter) PutInt32(v int32) {
 	this.tryGrow(4)
 	this.order.PutUint32(this.data[this.pos:], uint32(v))
 	this.pos += 4
 }
 
-func (this BitWriter) PutUint64(v uint64) {
+func (this *BitWriter) PutUint64(v uint64) {
 	this.tryGrow(4)
 	this.order.PutUint64(this.data[this.pos:], v)
 	this.pos += 8
 }
 
-func (this BitWriter) PutFloat32(v float32) {
+func (this *BitWriter) PutFloat32(v float32) {
 	this.tryGrow(4)
 	this.order.PutUint32(this.data[this.pos:], math.Float32bits(v))
 	this.pos += 4
 }
 
-func (this BitWriter) PutUint16(v uint16) {
+func (this *BitWriter) PutUint16(v uint16) {
 	this.tryGrow(2)
 	this.order.PutUint16(this.data[this.pos:], v)
 	this.pos += 2
 }
 
-func (this BitWriter) WriteByte(u uint8) {
+func (this *BitWriter) WriteByte(u uint8) {
 	this.tryGrow(1)
 	this.data[this.pos] = u
 	this.pos++
 }
 
-func (this BitWriter) PutFloat64(f float64) {
+func (this *BitWriter) PutFloat64(f float64) {
 	this.tryGrow(8)
 	this.order.PutUint64(this.data[this.pos:], math.Float64bits(f))
 	this.pos += 8

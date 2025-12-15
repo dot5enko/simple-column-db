@@ -82,7 +82,7 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 	}, nil
 }
 
-func (header *DiskSlabHeader) FromBytes(input io.Reader) (topErr error) {
+func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 	reader := bits.NewReader(input, binary.LittleEndian)
 
