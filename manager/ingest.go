@@ -15,12 +15,13 @@ type layoutFieldInfo struct {
 	index int
 	typ   schema.FieldType
 
-	slab *SlabCacheItem
+	slab       *SlabCacheItem
+	dataOffset int
 
 	Data any
 }
 
-func (m *Manager) Ingest(data []any, layout []string, schemaName string) error {
+func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) error {
 
 	// get the schema object from name
 	schemaObject, exists := m.schemas[schemaName]
@@ -29,9 +30,9 @@ func (m *Manager) Ingest(data []any, layout []string, schemaName string) error {
 		return errors.New("schema not found")
 	}
 
-	var fieldsLayout []layoutFieldInfo = make([]layoutFieldInfo, len(layout))
+	var fieldsLayout []*layoutFieldInfo = make([]*layoutFieldInfo, len(layout))
 
-	// itemsCount := len(data)
+	rowSize := 0
 
 	// check layout matches schema columns names
 	for idx, col := range schemaObject.Columns {
@@ -62,43 +63,72 @@ func (m *Manager) Ingest(data []any, layout []string, schemaName string) error {
 				return fmt.Errorf("no active slab found for column %s", col.Name)
 			}
 
+			rowSize += col.Type.Size()
+
 			fInfo := layoutFieldInfo{
-				index: idx,
-				typ:   col.Type,
-				slab:  slabHeader,
+				index:      idx,
+				typ:        col.Type,
+				slab:       slabHeader,
+				dataOffset: rowSize,
 			}
 
-			fieldsLayout[idx] = fInfo
+			fieldsLayout[idx] = &fInfo
 		}
 	}
 
-	panic("not implemented")
+	itemsCount := len(dataBuffer) / rowSize
 
-	// for idx, field := range fieldsLayout {
+	for _, field := range fieldsLayout {
+		switch field.typ {
+		case schema.Uint64FieldType:
 
-	// 	switch field.typ {
-	// 	case schema.Uint64FieldType:
-	// 		resultColumn, collectErr := CollectTypedDataToArray[uint64](data, field.typ, idx)
-	// 		if collectErr != nil {
-	// 			return collectErr
-	// 		}
+			collectErr := CollectColumnsFromRow[uint64](itemsCount, field, dataBuffer, rowSize)
+			if collectErr != nil {
+				return collectErr
+			}
 
-	// 		field.Data = resultColumn
+		case schema.Float32FieldType:
 
-	// 	}
+			collectErr := CollectColumnsFromRow[float32](itemsCount, field, dataBuffer, rowSize)
+			if collectErr != nil {
+				return collectErr
+			}
 
-	// }
+		default:
+			panic(fmt.Sprintf("unsupported type: %s when ingest", field.typ.String()))
+		}
+	}
 
-	// for i := 0; i < len(data); i++ {
+	for _, field := range fieldsLayout {
+		// block := field.slab.Block(field.index).(*runtimeBlockData[T])
+		// m.Slabs.LoadBlockToRuntimeBlockData()
+	}
 
-	// 	block := m.GetLastUnfinishedBlock(schema.Uid)
+	return nil
 
-	// 	if block == nil {
-	// 		return errors.New("no unfinished block")
-	// 	}
-	// }
+}
 
-	// if no unfinished block create one
+func CollectColumnsFromRow[T any](
+	itemsCount int,
+	field *layoutFieldInfo,
+	dataBuffer []byte,
+	rowSize int,
+) error {
+
+	outputInts := make([]T, itemsCount)
+	outBuffer := make([]byte, itemsCount*field.typ.Size())
+
+	collectErr := CollectTypedDataToArrayFromBinaryBufferFast[T](dataBuffer,
+		outputInts[:], field.typ,
+		field.dataOffset, rowSize, itemsCount,
+		outBuffer[:],
+	)
+
+	if collectErr != nil {
+		return collectErr
+	}
+
+	field.Data = outputInts
 
 	return nil
 
@@ -160,7 +190,7 @@ func CollectTypedDataToArrayFromBinaryBuffer[T uint64](
 	return nil
 }
 
-func CollectTypedDataToArrayFromBinaryBufferFast[T uint64](
+func CollectTypedDataToArrayFromBinaryBufferFast[T any](
 	binReader []byte,
 	outputColumn any,
 	typ schema.FieldType,
@@ -171,7 +201,7 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T uint64](
 	switch typ {
 	case schema.Uint64FieldType:
 
-		converted, convertOk := outputColumn.([]uint64)
+		converted, convertOk := outputColumn.([]T)
 
 		if !convertOk {
 			panic("output column must be array of Ouput")
@@ -199,7 +229,7 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T uint64](
 
 		// using unsafe copy because we know that buffer size is correct
 
-		hdr := unsafe.Slice((*uint64)(unsafe.Pointer(&buf[0])), rows)
+		hdr := unsafe.Slice((*T)(unsafe.Pointer(&buf[0])), rows)
 		copiedN := copy(converted[:], hdr[:])
 
 		if copiedN != rows {

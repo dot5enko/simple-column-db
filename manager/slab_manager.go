@@ -262,14 +262,14 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (any, error) {
 
 	switch bheader.DataType {
-	case schema.Int8FieldType:
-		return nil, errors.New("not implemented")
-	case schema.Int16FieldType:
-		return nil, errors.New("not implemented")
-	case schema.Int32FieldType:
-		return nil, errors.New("not implemented")
-	case schema.Int64FieldType:
-		return nil, errors.New("not implemented")
+	// case schema.Int8FieldType:
+	// 	return nil, errors.New("not implemented")
+	// case schema.Int16FieldType:
+	// 	return nil, errors.New("not implemented")
+	// case schema.Int32FieldType:
+	// 	return nil, errors.New("not implemented")
+	// case schema.Int64FieldType:
+	// 	return nil, errors.New("not implemented")
 	case schema.Float64FieldType:
 		result := bits.MapBytesToArray[float64](blockData, schema.BlockRowsSize)
 		runtimeData := schema.NewRuntimeBlockDataFromSlice(result)
@@ -289,12 +289,12 @@ func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (any, error
 		runtimeData.Header = bheader
 
 		return runtimeData, nil
-	case schema.Uint8FieldType:
-		return nil, errors.New("not implemented")
-	case schema.Uint32FieldType:
-		return nil, errors.New("not implemented")
-	case schema.Uint16FieldType:
-		return nil, errors.New("not implemented")
+	// case schema.Uint8FieldType:
+	// 	return nil, errors.New("not implemented")
+	// case schema.Uint32FieldType:
+	// 	return nil, errors.New("not implemented")
+	// case schema.Uint16FieldType:
+	// 	return nil, errors.New("not implemented")
 	default:
 		return nil, fmt.Errorf("unknown type while decoding raw block data: %s", bheader.DataType.String())
 	}

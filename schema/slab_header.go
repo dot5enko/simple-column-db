@@ -34,7 +34,6 @@ type DiskSlabHeader struct {
 	UnfinishedBlockHeader DiskHeader
 
 	// up to this point we have a predictable layout
-
 	CompressedBlockHeaders []DiskHeader
 
 	// UnfinishedBlockData  []byte
