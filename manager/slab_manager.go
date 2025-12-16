@@ -78,10 +78,19 @@ func (m *SlabManager) IngestIntoBlock(
 	if err != nil {
 		return 0, err
 	} else {
-		written, writeErr := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
+		written, writeErr, bounds := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
 		if writeErr != nil {
 			return written, writeErr
 		} else {
+
+			// calc min/max bound for newly data
+
+			// morph to slab bounds
+			// store changes to disk if needed
+
+			// update block bounds
+
+			data.Header.Bounds.Morph(bounds)
 
 			// update block header
 			log.Printf(" block %s header not updated ", block.String())
@@ -96,8 +105,15 @@ func (m *SlabManager) IngestIntoBlock(
 
 			// write update block content to disk
 
-			bytes.NewBuffer(m.BufferForCompressedData10Mb[:0])
-			// io.DumpNumbersArrayBlockAny(data.DataTypedArray)
+			writeBuf := bytes.NewBuffer(m.BufferForCompressedData10Mb[:0])
+			writeErr := io.DumpNumbersArrayBlockAny(writeBuf, data.DataTypedArray)
+			if writeErr != nil {
+				return written, fmt.Errorf("unable to finalize block : %s", writeErr.Error())
+			}
+
+			// m.WriteBlockHeaderToDisk(slab, block, data)
+			// m.WriteSlabDataToDisk(slab, block, data, writeBuf.Bytes())
+			// m.WriteSlabHeader(slab)
 
 			return written, nil
 		}

@@ -12,7 +12,7 @@ import (
 
 const CurrentSlabVersion = 1
 
-const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + TotalHeaderSize
+const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + TotalHeaderSize + BoundsSize
 
 type DiskSlabHeader struct {
 	Version uint16
@@ -30,6 +30,8 @@ type DiskSlabHeader struct {
 	CompressionType             uint8
 	UncompressedSlabContentSize uint64
 	CompressedSlabContentSize   uint64
+
+	Bounds BoundsFloat
 
 	// up to this point we have a predictable layout
 	BlockHeaders []DiskHeader
@@ -106,17 +108,7 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	header.UncompressedSlabContentSize = reader.MustReadU64()
 	header.CompressedSlabContentSize = reader.MustReadU64()
 
-	// header.UnfinishedBlockHeader.FromBytes(reader.Buffer())
-
-	// for i := 0; i < int(header.BlocksFinalized); i++ {
-	// 	reader.ReadBytes(int(TotalHeaderSize), cache)
-	// 	header.CompressedBlockHeaders[i].FromBytes(cache[:TotalHeaderSize], nil)
-	// }
-
-	// uncompressedBlockEntriesSize := int(header.SingleBlockRowsSize) * header.Type.Size()
-	// allocate here ?
-
-	// uncompressedBlockValues := make([]byte, uncompressedBlockEntriesSize)
+	header.Bounds.FromBytes(reader)
 
 	return nil
 
@@ -145,6 +137,8 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 	// preallocated on disk upon slab creation
 	bw.PutUint64(header.UncompressedSlabContentSize)
 	bw.PutUint64(header.CompressedSlabContentSize)
+
+	header.Bounds.WriteTo(&bw)
 
 	return bw.Position(), nil
 

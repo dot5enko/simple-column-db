@@ -16,37 +16,39 @@ type RuntimeBlockData struct {
 	Items          int
 }
 
-func writeTypedArray[T any](b *RuntimeBlockData, dataArray any, startOffset int) (int, error) {
+func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOffset int) (int, error, BoundsFloat) {
 	typedArray, typedOk := b.DataTypedArray.([]T)
 	inputArray, inputOk := dataArray.([]T)
 
 	inputArray = inputArray[startOffset:]
 
 	if !typedOk || !inputOk {
-		return 0, fmt.Errorf("wrong type in runtime block: input type: %s, expected type : %s", reflect.TypeOf(inputArray), reflect.TypeOf(typedArray))
+		return 0, fmt.Errorf("wrong type in runtime block: input type: %s, expected type : %s", reflect.TypeOf(inputArray), reflect.TypeOf(typedArray)), BoundsFloat{}
 	}
 
 	copied := copy(typedArray[b.Items:], inputArray)
-	return copied, nil
+	bounds := GetMaxMinBoundsFloat(inputArray[:copied])
+
+	return copied, nil, bounds
 }
 
-func (b *RuntimeBlockData) Write(dataArray any, dataArrayStartOffset int, typ FieldType) (written int, topErr error) {
+func (b *RuntimeBlockData) Write(dataArray any, dataArrayStartOffset int, typ FieldType) (written int, topErr error, bounds BoundsFloat) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	switch typ {
 	case Uint64FieldType:
-		written, topErr = writeTypedArray[uint64](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint64](b, dataArray, dataArrayStartOffset)
 	case Uint8FieldType:
-		written, topErr = writeTypedArray[uint8](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint8](b, dataArray, dataArrayStartOffset)
 	case Float32FieldType:
-		written, topErr = writeTypedArray[float32](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[float32](b, dataArray, dataArrayStartOffset)
 	case Uint16FieldType:
-		written, topErr = writeTypedArray[uint16](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint16](b, dataArray, dataArrayStartOffset)
 	case Float64FieldType:
-		written, topErr = writeTypedArray[float64](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[float64](b, dataArray, dataArrayStartOffset)
 	case Uint32FieldType:
-		written, topErr = writeTypedArray[uint32](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint32](b, dataArray, dataArrayStartOffset)
 	default:
 		panic(fmt.Sprintf("unsupported type when writing to RuntimeBlockData: %s", typ.String()))
 	}
