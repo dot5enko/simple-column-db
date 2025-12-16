@@ -104,18 +104,20 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 					// read the rest of headers, and their content
 
-					result.CompressedBlockHeaders = make([]schema.DiskHeader, result.BlocksFinalized)
+					numberOfBlocks := result.BlocksFinalized + 1
 
-					nonZeroHeadersSize := int(result.BlocksFinalized) * int(schema.TotalHeaderSize)
+					result.BlockHeaders = make([]schema.DiskHeader, numberOfBlocks) // finalized + current
+
+					nonZeroHeadersSize := int(numberOfBlocks) * int(schema.TotalHeaderSize) // finalized + current
 					headersReadErr := fileReader.ReadAt(m.SlabBlockHeadersReadBuffer[:], int(schema.SlabHeaderFixedSize), nonZeroHeadersSize)
 
 					if headersReadErr != nil {
 						e = headersReadErr
 						return
 					} else {
-						for i := 0; i < len(result.CompressedBlockHeaders); i++ {
+						for i := 0; i < len(result.BlockHeaders); i++ {
 							headerBuffer := m.SlabBlockHeadersReadBuffer[i*int(schema.TotalHeaderSize):]
-							headerDecodeErr := result.CompressedBlockHeaders[i].FromBytes(bytes.NewReader(headerBuffer))
+							headerDecodeErr := result.BlockHeaders[i].FromBytes(bytes.NewReader(headerBuffer))
 
 							if headerDecodeErr != nil {
 								e = headerDecodeErr
@@ -205,7 +207,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 		var blockHeader schema.DiskHeader
 		blockIdx := -1
 
-		for idx, it := range slab.CompressedBlockHeaders {
+		for idx, it := range slab.BlockHeaders {
 			if it.GroupUid == block {
 				blockHeader = it
 				blockIdx = idx

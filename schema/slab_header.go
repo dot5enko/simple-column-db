@@ -31,10 +31,8 @@ type DiskSlabHeader struct {
 	UncompressedSlabContentSize uint64
 	CompressedSlabContentSize   uint64
 
-	UnfinishedBlockHeader DiskHeader
-
 	// up to this point we have a predictable layout
-	CompressedBlockHeaders []DiskHeader
+	BlockHeaders []DiskHeader
 
 	// UnfinishedBlockData  []byte
 	// BlocksCompressedData []byte
@@ -108,7 +106,7 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	header.UncompressedSlabContentSize = reader.MustReadU64()
 	header.CompressedSlabContentSize = reader.MustReadU64()
 
-	header.UnfinishedBlockHeader.FromBytes(reader.Buffer())
+	// header.UnfinishedBlockHeader.FromBytes(reader.Buffer())
 
 	// for i := 0; i < int(header.BlocksFinalized); i++ {
 	// 	reader.ReadBytes(int(TotalHeaderSize), cache)
@@ -148,30 +146,6 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 	bw.PutUint64(header.UncompressedSlabContentSize)
 	bw.PutUint64(header.CompressedSlabContentSize)
 
-	// headersReservedSpace := (int(header.BlocksTotal) + 1) * int(TotalHeaderSize)
-	// bw.EmptyBytes(headersReservedSpace)
-
-	// // reserve space for block entries
-	// bw.EmptyBytes(int(header.UncompressedSlabContentSize))
-
 	return bw.Position(), nil
 
-	// // Write unfinished block header
-	// cache := make([]byte, TotalHeaderSize)
-	// if err := header.UnfinishedBlockHeader.WriteTo(cache); err != nil {
-	// 	return err
-	// }
-	// bw.Write(cache)
-
-	// // Write finalized block headers
-	// for i := 0; i < int(header.BlocksFinalized); i++ {
-	// 	if err := header.CompressedBlockHeaders[i].WriteTo(cache); err != nil {
-	// 		return err
-	// 	}
-	// 	bw.Write(cache)
-	// }
-
-	// // Flush to the writer
-	// _, err := writer.Write(bw.Bytes())
-	return 0, nil
 }

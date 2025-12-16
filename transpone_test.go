@@ -134,7 +134,7 @@ func BenchmarkTransponeFastest(b *testing.B) {
 
 	for b.Loop() {
 
-		manager.CollectTypedDataToArrayFromBinaryBufferFast(bigBuffer,
+		manager.CollectTypedDataToArrayFromBinaryBufferFast[uint64](bigBuffer,
 			outputInts[:], schema.Uint64FieldType,
 			0, singleRowSize, size,
 			outBuffer[:],

@@ -78,7 +78,7 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 			}
 
 			// last unfinished block + headers for all blocks inside
-			headersReservedSpace := (int(slabHeader.BlocksTotal) + 1) * int(schema.TotalHeaderSize)
+			headersReservedSpace := int(slabHeader.BlocksTotal) * int(schema.TotalHeaderSize)
 			zeroesFilledErr := fileManager.FillZeroes(writtenBytes, headersReservedSpace)
 
 			if zeroesFilledErr != nil {

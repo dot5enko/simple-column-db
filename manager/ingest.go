@@ -99,10 +99,10 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 		}
 	}
 
-	for _, field := range fieldsLayout {
-		// block := field.slab.Block(field.index).(*runtimeBlockData[T])
-		// m.Slabs.LoadBlockToRuntimeBlockData()
-	}
+	// for _, field := range fieldsLayout {
+	// 	// block := field.slab.Block(field.index).(*runtimeBlockData[T])
+	// 	m.Slabs.LoadBlockToRuntimeBlockData()
+	// }
 
 	return nil
 
