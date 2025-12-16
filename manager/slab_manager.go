@@ -83,12 +83,7 @@ func (m *SlabManager) IngestIntoBlock(
 			return written, writeErr
 		} else {
 
-			// calc min/max bound for newly data
-
-			// morph to slab bounds
-			// store changes to disk if needed
-
-			// update block bounds
+			slabHeaderChanged := slab.Bounds.Morph(bounds)
 
 			data.Header.Bounds.Morph(bounds)
 
@@ -101,6 +96,13 @@ func (m *SlabManager) IngestIntoBlock(
 
 				slab.BlocksFinalized += 1
 				// write updated slab header content to disk
+
+				slabHeaderChanged = true
+			}
+
+			if slabHeaderChanged {
+				// write slab header to disk
+
 			}
 
 			// write update block content to disk

@@ -14,6 +14,8 @@ const CurrentSlabVersion = 1
 
 const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + TotalHeaderSize + BoundsSize
 
+const SlabDiskContentsUncompressed = 10 * 1024 * 1024
+
 type DiskSlabHeader struct {
 	Version uint16
 
@@ -59,7 +61,7 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 
 	// calc number of blocks so the slab size would be 2-6 MB when compressed with lz4
 	uncompressedBlockSize := BlockRowsSize * columnDef.Type.Size()
-	slabBlocks := 10 * 1024 * 1024 / uncompressedBlockSize
+	slabBlocks := SlabDiskContentsUncompressed / uncompressedBlockSize
 
 	if slabBlocks > 65000 {
 		slabBlocks = 65000

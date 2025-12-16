@@ -41,6 +41,38 @@ func (sm *Manager) GetSlabPath(s schema.Schema, id uuid.UUID) string {
 	return sm.getAbsStoragePath(s.Name, id.String()+".slab")
 }
 
+func (sm *Manager) preallocateSlab(s schema.Schema, uid uuid.UUID) error {
+
+	slabPath := sm.GetSlabPath(s, uid)
+
+	fileManager := io.NewFileReader(slabPath)
+	fileManager.OpenForReadOnly(false)
+
+	defer fileManager.Close()
+
+	// hard guess
+	return fileManager.FillZeroes(0, int(float64(schema.SlabDiskContentsUncompressed)*1.2))
+}
+
+func (sm *Manager) UpdateSlabHeader(s schema.Schema, slab *schema.DiskSlabHeader) error {
+
+	serializedBytes, headerBytesErr := slab.WriteTo(sm.Slabs.SlabHeaderReaderBuffer[:0])
+	if headerBytesErr != nil {
+		return fmt.Errorf("unable to finalize block, slab header won't serialize : %s", headerBytesErr.Error())
+	} else {
+
+		slabPath := sm.GetSlabPath(s, slab.Uid)
+
+		fileManager := io.NewFileReader(slabPath)
+		fileManager.OpenForReadOnly(false)
+
+		defer fileManager.Close()
+
+		return fileManager.WriteAt(sm.Slabs.SlabHeaderReaderBuffer[:serializedBytes], 0, serializedBytes)
+	}
+
+}
+
 func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 
 	_, err := sm.createStoragePathIfNotExists(schemaConfig.Name)
@@ -49,35 +81,26 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 		return fmt.Errorf("unable to create schema folder: `%s`", err.Error())
 	}
 
-	headerBuffer := make([]byte, schema.TotalHeaderSize*3)
-
 	// for each column create slab on disk
 	for _, col := range schemaConfig.Columns {
-
 		createOneSlabForColumn := func() error {
+
 			slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
 			if slabError != nil {
 				return slabError
 			}
 
-			slabPath := sm.GetSlabPath(schemaConfig, slabHeader.Uid)
-
-			writtenBytes, writeErr := slabHeader.WriteTo(headerBuffer)
-			if writeErr != nil {
-				return writeErr
+			preallocateErr := sm.preallocateSlab(schemaConfig, slabHeader.Uid)
+			if preallocateErr != nil {
+				return fmt.Errorf("unable to preallocate slab : %s", preallocateErr.Error())
 			}
 
-			fileManager := io.NewFileReader(slabPath)
-			fileManager.OpenForReadOnly(false)
-
-			defer fileManager.Close()
-
-			fileWriteErr := fileManager.WriteAt(headerBuffer[:writtenBytes], 0, writtenBytes)
-			if fileWriteErr != nil {
-				return fileWriteErr
+			slabHeaderWriteErr := sm.UpdateSlabHeader(schemaConfig, slabHeader)
+			if slabHeaderWriteErr != nil {
+				return slabHeaderWriteErr
 			}
 
-			// last unfinished block + headers for all blocks inside
+			// headers for blocks inside
 			headersReservedSpace := int(slabHeader.BlocksTotal) * int(schema.TotalHeaderSize)
 			zeroesFilledErr := fileManager.FillZeroes(writtenBytes, headersReservedSpace)
 
