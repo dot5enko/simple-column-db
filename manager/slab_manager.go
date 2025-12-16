@@ -21,7 +21,7 @@ type CacheStats struct {
 
 type BlockCacheItem struct {
 	header  *schema.DiskHeader
-	runtime any // RuntimeBlockData
+	runtime *schema.RuntimeBlockData
 
 	rtStats *CacheStats
 }
@@ -61,6 +61,49 @@ func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 	}
 
 	return nil
+}
+
+// IngestIntoBlock(field.slab, curBlock, field.Data[field.ingested:])
+func (m *SlabManager) IngestIntoBlock(
+	sc schema.Schema,
+	slab *schema.DiskSlabHeader,
+	block uuid.UUID,
+	tm *Manager,
+	columnDataArray any,
+	dataArrayStartOffset int,
+) (int, error) {
+
+	data, err := m.LoadBlockToRuntimeBlockData(sc, slab, block, tm)
+
+	if err != nil {
+		return 0, err
+	} else {
+		written, writeErr := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
+		if writeErr != nil {
+			return written, writeErr
+		} else {
+
+			// update block header
+			log.Printf(" block %s header not updated ", block.String())
+			// recalc max/min values
+
+			if data.Items == data.Cap {
+				// finalize block
+
+				slab.BlocksFinalized += 1
+				// write updated slab header content to disk
+			}
+
+			// write update block content to disk
+
+			bytes.NewBuffer(m.BufferForCompressedData10Mb[:0])
+			// io.DumpNumbersArrayBlockAny(data.DataTypedArray)
+
+			return written, nil
+		}
+
+	}
+
 }
 
 func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID, mm *Manager) (result *schema.DiskSlabHeader, e error) {
@@ -195,7 +238,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 	slab *schema.DiskSlabHeader,
 	block uuid.UUID,
 	mm *Manager,
-) (any, error) {
+) (*schema.RuntimeBlockData, error) {
 
 	cached := m.getBlockFromCache(slab.Uid, block)
 
@@ -261,44 +304,36 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 }
 
-func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (any, error) {
+// return RuntimeBlockData
+func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (*schema.RuntimeBlockData, error) {
+
+	var runtimeData *schema.RuntimeBlockData
 
 	switch bheader.DataType {
-	// case schema.Int8FieldType:
-	// 	return nil, errors.New("not implemented")
-	// case schema.Int16FieldType:
-	// 	return nil, errors.New("not implemented")
-	// case schema.Int32FieldType:
-	// 	return nil, errors.New("not implemented")
-	// case schema.Int64FieldType:
-	// 	return nil, errors.New("not implemented")
+
 	case schema.Float64FieldType:
 		result := bits.MapBytesToArray[float64](blockData, schema.BlockRowsSize)
-		runtimeData := schema.NewRuntimeBlockDataFromSlice(result)
-		runtimeData.Header = bheader
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
 
-		return runtimeData, nil
 	case schema.Float32FieldType:
 		result := bits.MapBytesToArray[float32](blockData, schema.BlockRowsSize)
-		runtimeData := schema.NewRuntimeBlockDataFromSlice(result)
-		runtimeData.Header = bheader
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
 
-		return runtimeData, nil
 	case schema.Uint64FieldType:
 
 		result := bits.MapBytesToArray[uint64](blockData, schema.BlockRowsSize)
-		runtimeData := schema.NewRuntimeBlockDataFromSlice(result)
-		runtimeData.Header = bheader
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
 
-		return runtimeData, nil
-	// case schema.Uint8FieldType:
-	// 	return nil, errors.New("not implemented")
-	// case schema.Uint32FieldType:
-	// 	return nil, errors.New("not implemented")
-	// case schema.Uint16FieldType:
-	// 	return nil, errors.New("not implemented")
+	case schema.Uint8FieldType:
+		result := bits.MapBytesToArray[uint8](blockData, schema.BlockRowsSize)
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
+
 	default:
 		return nil, fmt.Errorf("unknown type while decoding raw block data: %s", bheader.DataType.String())
 	}
+
+	runtimeData.Header = bheader
+
+	return runtimeData, nil
 
 }

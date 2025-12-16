@@ -1,6 +1,7 @@
 package io
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"reflect"
@@ -25,6 +26,30 @@ func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
 	log.Printf(" >> written %d bytes", writtenBytes)
 
 	return err
+}
+
+func DumpNumbersArrayBlockAny(writer io.Writer, arr any) error {
+	switch v := arr.(type) {
+
+	case []uint8:
+		_, err := writer.Write(v)
+		return err
+	case []int8:
+		return DumpNumbersArrayBlock[int8](writer, v)
+	case []uint16:
+		return DumpNumbersArrayBlock[uint16](writer, v)
+	case []uint32:
+		return DumpNumbersArrayBlock[uint32](writer, v)
+	case []uint64:
+		return DumpNumbersArrayBlock[uint64](writer, v)
+	case []float32:
+		return DumpNumbersArrayBlock[float32](writer, v)
+	case []float64:
+		return DumpNumbersArrayBlock[float64](writer, v)
+
+	default:
+		return fmt.Errorf("unsupported type %T while dumping to disk (any array) ", arr)
+	}
 }
 
 // func DumpRuntimeBlockToDisk[T BlockTypes](path string, block *schema.RuntimeBlockData[T]) error {

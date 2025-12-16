@@ -18,7 +18,7 @@ type layoutFieldInfo struct {
 	slab       *SlabCacheItem
 	dataOffset int
 
-	Data any
+	DataArray any
 
 	ingested int
 	leftover int
@@ -117,6 +117,27 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 			sh := field.slab.header
 			curBlock := sh.BlockHeaders[sh.BlocksFinalized]
 
+			// check if slab has free blocks
+			if sh.BlocksFinalized >= sh.BlocksTotal {
+				panic("slab full, moving to next slab is not implemented yet")
+			}
+
+			ingestedToBlock, blockErr := m.Slabs.IngestIntoBlock(
+				schemaObject,
+				field.slab.header,
+				curBlock.Uid,
+				m,
+				field.DataArray,
+				field.ingested,
+			)
+
+			if blockErr != nil {
+				return blockErr
+			} else {
+				field.ingested += ingestedToBlock
+				field.leftover -= ingestedToBlock
+			}
+
 		}
 	}
 
@@ -144,7 +165,7 @@ func CollectColumnsFromRow[T any](
 		return collectErr
 	}
 
-	field.Data = outputInts
+	field.DataArray = outputInts
 	field.ingested = 0
 	field.leftover = len(outputInts)
 
