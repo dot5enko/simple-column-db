@@ -67,7 +67,7 @@ func (sm *Manager) preallocateSlab(s schema.Schema, uid uuid.UUID) error {
 	return fileManager.FillZeroes(0, int(float64(schema.SlabDiskContentsUncompressed)*1.2))
 }
 
-func (sm *Manager) UpdateSlabHeader(s schema.Schema, slab *schema.DiskSlabHeader) error {
+func (sm *Manager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlabHeader) error {
 
 	serializedBytes, headerBytesErr := slab.WriteTo(sm.Slabs.SlabHeaderReaderBuffer[:0])
 	if headerBytesErr != nil {
@@ -80,10 +80,8 @@ func (sm *Manager) UpdateSlabHeader(s schema.Schema, slab *schema.DiskSlabHeader
 		}
 
 		defer fileManager.Close()
-
 		return fileManager.WriteAt(sm.Slabs.SlabHeaderReaderBuffer[:serializedBytes], 0, serializedBytes)
 	}
-
 }
 
 func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
@@ -108,7 +106,7 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 				return fmt.Errorf("unable to preallocate slab : %s", preallocateErr.Error())
 			}
 
-			slabHeaderWriteErr := sm.UpdateSlabHeader(schemaConfig, slabHeader)
+			slabHeaderWriteErr := sm.UpdateSlabHeaderOnDisk(schemaConfig, slabHeader)
 			if slabHeaderWriteErr != nil {
 				return slabHeaderWriteErr
 			}

@@ -32,7 +32,8 @@ type DiskHeader struct {
 
 func NewBlockHeader() *DiskHeader {
 	return &DiskHeader{
-		Uid: uuid.New(),
+		Uid:   uuid.New(),
+		Items: 0,
 	}
 }
 

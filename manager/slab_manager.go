@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
-	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
@@ -44,7 +43,7 @@ type SlabManager struct {
 	SlabHeaderReaderBuffer     [schema.SlabHeaderFixedSize]byte
 	SlabBlockHeadersReadBuffer [256 * schema.TotalHeaderSize]byte // max blocks per slab ? TODO: check
 
-	BufferForCompressedData10Mb [10 * 1024 * 1024]byte // 10mb buffer for decompression
+	BufferForCompressedData10Mb [schema.SlabDiskContentsUncompressed]byte // 10mb buffer for decompression
 }
 
 func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *SlabCacheItem {
@@ -64,65 +63,6 @@ func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 }
 
 // IngestIntoBlock(field.slab, curBlock, field.Data[field.ingested:])
-func (m *SlabManager) IngestIntoBlock(
-	sc schema.Schema,
-	slab *schema.DiskSlabHeader,
-	block uuid.UUID,
-	tm *Manager,
-	columnDataArray any,
-	dataArrayStartOffset int,
-) (int, error) {
-
-	data, err := m.LoadBlockToRuntimeBlockData(sc, slab, block, tm)
-
-	if err != nil {
-		return 0, err
-	} else {
-		written, writeErr, bounds := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
-		if writeErr != nil {
-			return written, writeErr
-		} else {
-
-			slabHeaderChanged := slab.Bounds.Morph(bounds)
-
-			data.Header.Bounds.Morph(bounds)
-
-			// update block header
-			log.Printf(" block %s header not updated ", block.String())
-			// recalc max/min values
-
-			if data.Items == data.Cap {
-				// finalize block
-
-				slab.BlocksFinalized += 1
-				// write updated slab header content to disk
-
-				slabHeaderChanged = true
-			}
-
-			if slabHeaderChanged {
-				// write slab header to disk
-
-			}
-
-			// write update block content to disk
-
-			writeBuf := bytes.NewBuffer(m.BufferForCompressedData10Mb[:0])
-			writeErr := io.DumpNumbersArrayBlockAny(writeBuf, data.DataTypedArray)
-			if writeErr != nil {
-				return written, fmt.Errorf("unable to finalize block : %s", writeErr.Error())
-			}
-
-			// m.WriteBlockHeaderToDisk(slab, block, data)
-			// m.WriteSlabDataToDisk(slab, block, data, writeBuf.Bytes())
-			// m.WriteSlabHeader(slab)
-
-			return written, nil
-		}
-
-	}
-
-}
 
 func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID, mm *Manager) (result *schema.DiskSlabHeader, e error) {
 
