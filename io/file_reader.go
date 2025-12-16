@@ -25,14 +25,14 @@ func NewFileReader(path string) *FileReader {
 	return freader
 }
 
-func (f *FileReader) OpenForReadOnly(v bool) (topErr error) {
+func (f *FileReader) Open(readOnly bool) (topErr error) {
 
 	var perm os.FileMode = 0644
 
-	if v == true {
+	if readOnly == true {
 		f.file, topErr = os.OpenFile(f.path, os.O_RDONLY, perm)
 	} else {
-		f.file, topErr = os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+		f.file, topErr = os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY, perm)
 	}
 
 	if topErr == nil {

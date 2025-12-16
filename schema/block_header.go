@@ -30,6 +30,12 @@ type DiskHeader struct {
 	Reserved [ReservedSize]uint8
 }
 
+func NewBlockHeader() *DiskHeader {
+	return &DiskHeader{
+		Uid: uuid.New(),
+	}
+}
+
 func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 	reader := bits.NewReader(input, binary.LittleEndian)
@@ -64,8 +70,7 @@ func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 }
 
-func (header *DiskHeader) WriteTo(buffer []byte) (int, error) {
-	bw := bits.NewEncodeBuffer(buffer, binary.LittleEndian)
+func (header *DiskHeader) WriteTo(bw *bits.BitWriter) (int, error) {
 
 	// UUID
 	n, _ := bw.Write(header.Uid[:])
@@ -84,7 +89,7 @@ func (header *DiskHeader) WriteTo(buffer []byte) (int, error) {
 	bw.WriteByte(uint8(header.DataType))
 
 	// bounds
-	header.Bounds.WriteTo(&bw)
+	header.Bounds.WriteTo(bw)
 
 	bw.EmptyBytes(int(ReservedSize))
 

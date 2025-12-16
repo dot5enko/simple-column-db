@@ -140,12 +140,10 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 		tn := time.Now()
 
-		slabStoragePath := mm.GetSlabPath(schemaObject, slabUid)
-
-		fileReader := io.NewFileReader(slabStoragePath)
-		openErr := fileReader.OpenForReadOnly(true)
+		fileReader, openErr := mm.GetSlabFile(schemaObject, slabUid, false)
 		if openErr != nil {
 			e = openErr
+			return
 		} else {
 
 			headerReadErr := fileReader.ReadAt(m.SlabHeaderReaderBuffer[:], 0, int(schema.SlabHeaderFixedSize))

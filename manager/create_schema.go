@@ -1,11 +1,13 @@
 package manager
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -41,12 +43,23 @@ func (sm *Manager) GetSlabPath(s schema.Schema, id uuid.UUID) string {
 	return sm.getAbsStoragePath(s.Name, id.String()+".slab")
 }
 
-func (sm *Manager) preallocateSlab(s schema.Schema, uid uuid.UUID) error {
+func (sm *Manager) GetSlabFile(s schema.Schema, id uuid.UUID, writeAccess bool) (*io.FileReader, error) {
 
-	slabPath := sm.GetSlabPath(s, uid)
+	slabPath := sm.GetSlabPath(s, id)
 
 	fileManager := io.NewFileReader(slabPath)
-	fileManager.OpenForReadOnly(false)
+	openErr := fileManager.Open(!writeAccess)
+
+	return fileManager, openErr
+}
+
+func (sm *Manager) preallocateSlab(s schema.Schema, uid uuid.UUID) error {
+
+	fileManager, err := sm.GetSlabFile(s, uid, true)
+
+	if err != nil {
+		return err
+	}
 
 	defer fileManager.Close()
 
@@ -61,10 +74,10 @@ func (sm *Manager) UpdateSlabHeader(s schema.Schema, slab *schema.DiskSlabHeader
 		return fmt.Errorf("unable to finalize block, slab header won't serialize : %s", headerBytesErr.Error())
 	} else {
 
-		slabPath := sm.GetSlabPath(s, slab.Uid)
-
-		fileManager := io.NewFileReader(slabPath)
-		fileManager.OpenForReadOnly(false)
+		fileManager, slabErr := sm.GetSlabFile(s, slab.Uid, true)
+		if slabErr != nil {
+			return fmt.Errorf("unable to update slab header : %s", slabErr.Error())
+		}
 
 		defer fileManager.Close()
 
@@ -100,8 +113,28 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 				return slabHeaderWriteErr
 			}
 
+			fileManager, slabFileErr := sm.GetSlabFile(schemaConfig, slabHeader.Uid, true)
+
+			if slabFileErr != nil {
+				return fmt.Errorf("unable to open slab file : %s", slabFileErr.Error())
+			}
+
+			// crete first block
+			firstBlock := schema.NewBlockHeader()
+
+			headerWriter := bits.NewEncodeBuffer(sm.BlockBuffer[:], binary.LittleEndian)
+			writtenBytes, writeErr := firstBlock.WriteTo(&headerWriter)
+			if writeErr != nil {
+				return fmt.Errorf("unable to encode block header : %s", writeErr.Error())
+			}
+
+			writeToDiskErr := fileManager.WriteAt(sm.BlockBuffer[:writtenBytes], 0, writtenBytes)
+			if writeToDiskErr != nil {
+				return fmt.Errorf("unable to write block header into slab : %s", writeToDiskErr.Error())
+			}
+
 			// headers for blocks inside
-			headersReservedSpace := int(slabHeader.BlocksTotal) * int(schema.TotalHeaderSize)
+			headersReservedSpace := int(slabHeader.BlocksTotal-1) * int(schema.TotalHeaderSize)
 			zeroesFilledErr := fileManager.FillZeroes(writtenBytes, headersReservedSpace)
 
 			if zeroesFilledErr != nil {

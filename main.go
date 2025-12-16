@@ -56,7 +56,7 @@ func gen_fake_data[T uint64 | float64](size int, fileName string) {
 func read_array_data[T any](fileName string, size int, typ schema.FieldType) (data []T) {
 
 	reader := io.NewFileReader(fileName)
-	reader.OpenForReadOnly(true)
+	reader.Open(true)
 
 	elementSize := typ.Size()
 	blockSize := elementSize * size

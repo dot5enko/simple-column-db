@@ -23,6 +23,8 @@ type Manager struct {
 	config ManagerConfig
 
 	Slabs SlabManager
+
+	BlockBuffer [schema.TotalHeaderSize]byte
 }
 
 func New(config ManagerConfig) *Manager {
