@@ -24,7 +24,7 @@ func BenchmarkMinMaxRand(b *testing.B) {
 		result = schema.GetMaxMinBoundsFloat(input)
 	}
 
-	b.Logf("min : %d, max : %d", result.Min, result.Max)
+	b.Logf("min : %.2f, max : %.2f", result.Min, result.Max)
 }
 
 func TestMinMax(b *testing.T) {
@@ -37,11 +37,11 @@ func TestMinMax(b *testing.T) {
 	result := schema.GetMaxMinBoundsFloat(input[:])
 
 	if result.Max != maxVal {
-		b.Errorf("Expected %d but got %d", maxVal, result.Max)
+		b.Errorf("Expected %.2f but got %.2f", maxVal, result.Max)
 	}
 
 	if result.Min != minVal {
-		b.Errorf("Expected %d but got %d", minVal, result.Min)
+		b.Errorf("Expected %.2f but got %.2f", minVal, result.Min)
 	}
 
 }
