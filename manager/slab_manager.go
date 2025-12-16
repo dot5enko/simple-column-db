@@ -208,7 +208,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 		blockIdx := -1
 
 		for idx, it := range slab.BlockHeaders {
-			if it.GroupUid == block {
+			if it.Uid == block {
 				blockHeader = it
 				blockIdx = idx
 				break

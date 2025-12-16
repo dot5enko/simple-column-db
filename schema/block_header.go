@@ -12,11 +12,13 @@ import (
 const BlockRowsSize = 32 * 1024 // 32k rows per block
 
 const TotalHeaderSize uint64 = 128
-const HeaderSizeUsed uint64 = 16 + 8 + 8 + 8 + 8 + 1 // guid + start offset + compressed size + datatype + [max value + min value] (2xi64)
+const HeaderSizeUsed uint64 = 16 + 2 + 8 + 8 + 8 + 8 + 1 // guid + start offset + compressed size + datatype + [max value + min value] (2xi64)
 const ReservedSize uint64 = TotalHeaderSize - HeaderSizeUsed
 
 type DiskHeader struct {
-	GroupUid uuid.UUID
+	Uid uuid.UUID
+
+	Items uint16
 
 	StartOffset    uint64
 	CompressedSize uint64
@@ -38,10 +40,11 @@ func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 	reader := bits.NewReader(input, binary.LittleEndian)
 
-	header.GroupUid, topErr = reader.ReadUUID()
+	header.Uid, topErr = reader.ReadUUID()
 	if topErr != nil {
 		return fmt.Errorf("unable to decode block header guid: %s", topErr.Error())
 	}
+	header.Items = reader.MustReadU16()
 
 	header.StartOffset, topErr = reader.ReadU64()
 	if topErr != nil {
@@ -71,9 +74,51 @@ func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 		header.MaxFValue = reader.MustReadF64()
 		header.MinFValue = reader.MustReadF64()
 	default:
-		panic(fmt.Sprintf("unsupported field type: %d", columnType.String()))
+		panic(fmt.Sprintf("unsupported field type: %s", columnType.String()))
 	}
 
 	return nil
 
+}
+
+func (header *DiskHeader) WriteTo(buffer []byte) (int, error) {
+	bw := bits.NewEncodeBuffer(buffer, binary.LittleEndian)
+
+	// UUID
+	n, _ := bw.Write(header.Uid[:])
+	if n != 16 {
+		return 0, fmt.Errorf("failed to write GroupUid")
+	}
+
+	// Items
+	bw.PutUint16(header.Items)
+
+	// Offsets and sizes
+	bw.PutUint64(header.StartOffset)
+	bw.PutUint64(header.CompressedSize)
+
+	// Column type
+	bw.WriteByte(uint8(header.DataType))
+
+	// Min / Max values depending on type
+	switch header.DataType {
+	case Int8FieldType, Int16FieldType, Int32FieldType, Int64FieldType:
+		bw.PutInt64(header.MaxIValue)
+		bw.PutInt64(header.MinIValue)
+
+	case Uint8FieldType, Uint16FieldType, Uint32FieldType, Uint64FieldType:
+		bw.PutUint64(uint64(header.MaxIValue))
+		bw.PutUint64(uint64(header.MinIValue))
+
+	case Float32FieldType, Float64FieldType:
+		bw.PutFloat64(header.MaxFValue)
+		bw.PutFloat64(header.MinFValue)
+
+	default:
+		return 0, fmt.Errorf("unsupported field type: %s", header.DataType.String())
+	}
+
+	bw.EmptyBytes(int(ReservedSize))
+
+	return bw.Position(), nil
 }

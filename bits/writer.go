@@ -103,8 +103,13 @@ func (this *BitWriter) PutInt32(v int32) {
 }
 
 func (this *BitWriter) PutUint64(v uint64) {
-	this.tryGrow(4)
+	this.tryGrow(8)
 	this.order.PutUint64(this.data[this.pos:], v)
+	this.pos += 8
+}
+func (this *BitWriter) PutInt64(v int64) {
+	this.tryGrow(8)
+	this.order.PutUint64(this.data[this.pos:], uint64(v))
 	this.pos += 8
 }
 

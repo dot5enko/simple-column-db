@@ -19,6 +19,9 @@ type layoutFieldInfo struct {
 	dataOffset int
 
 	Data any
+
+	ingested int
+	leftover int
 }
 
 func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) error {
@@ -80,6 +83,12 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 
 	for _, field := range fieldsLayout {
 		switch field.typ {
+		case schema.Uint8FieldType:
+
+			collectErr := CollectColumnsFromRow[uint8](itemsCount, field, dataBuffer, rowSize)
+			if collectErr != nil {
+				return collectErr
+			}
 		case schema.Uint64FieldType:
 
 			collectErr := CollectColumnsFromRow[uint64](itemsCount, field, dataBuffer, rowSize)
@@ -99,10 +108,17 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 		}
 	}
 
-	// for _, field := range fieldsLayout {
-	// 	// block := field.slab.Block(field.index).(*runtimeBlockData[T])
-	// 	m.Slabs.LoadBlockToRuntimeBlockData()
-	// }
+	// that should be internal api
+	// ingestColumnarInternal(columnData)
+	for _, field := range fieldsLayout {
+
+		for field.leftover > 0 {
+
+			sh := field.slab.header
+			curBlock := sh.BlockHeaders[sh.BlocksFinalized]
+
+		}
+	}
 
 	return nil
 
@@ -129,6 +145,8 @@ func CollectColumnsFromRow[T any](
 	}
 
 	field.Data = outputInts
+	field.ingested = 0
+	field.leftover = len(outputInts)
 
 	return nil
 
