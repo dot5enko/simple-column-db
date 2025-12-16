@@ -28,7 +28,7 @@ type BlockCacheItem struct {
 type SlabCacheItem struct {
 	header *schema.DiskSlabHeader
 
-	data []byte
+	data [schema.SlabDiskContentsUncompressed]byte
 
 	rtStats *CacheStats
 }
@@ -37,7 +37,7 @@ type SlabManager struct {
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
-	slabCacheItem   map[uuid.UUID]SlabCacheItem
+	slabCacheItem   map[uuid.UUID]*SlabCacheItem
 	slabCacheLocker sync.RWMutex
 
 	SlabHeaderReaderBuffer     [schema.SlabHeaderFixedSize]byte
@@ -56,7 +56,7 @@ func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 	if item, ok := m.slabCacheItem[uid]; ok {
 
 		item.rtStats.Reads++
-		return &item
+		return item
 	}
 
 	return nil
@@ -103,19 +103,26 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 					// read the rest of headers, and their content
 
-					numberOfBlocks := result.BlocksFinalized + 1
+					result.BlockHeaders = make([]schema.DiskHeader, result.BlocksFinalized+1, result.BlocksTotal)
 
-					result.BlockHeaders = make([]schema.DiskHeader, numberOfBlocks) // finalized + current
+					allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
+					nonEmptyHeadersSize := int(result.BlocksFinalized) * int(schema.TotalHeaderSize) // finalized + current
 
-					nonZeroHeadersSize := int(numberOfBlocks) * int(schema.TotalHeaderSize) // finalized + current
-					headersReadErr := fileReader.ReadAt(m.SlabBlockHeadersReadBuffer[:], int(schema.SlabHeaderFixedSize), nonZeroHeadersSize)
+					if result.BlocksFinalized < result.BlocksTotal {
+						nonEmptyHeadersSize += int(schema.TotalHeaderSize)
+					}
+
+					headersReadErr := fileReader.ReadAt(m.SlabBlockHeadersReadBuffer[:], int(schema.SlabHeaderFixedSize), nonEmptyHeadersSize)
 
 					if headersReadErr != nil {
 						e = headersReadErr
 						return
 					} else {
-						for i := 0; i < len(result.BlockHeaders); i++ {
-							headerBuffer := m.SlabBlockHeadersReadBuffer[i*int(schema.TotalHeaderSize):]
+						for i := 0; i <= int(result.BlocksFinalized); i++ {
+
+							blockOffset := i * int(schema.TotalHeaderSize)
+							headerBuffer := m.SlabBlockHeadersReadBuffer[blockOffset:]
+
 							headerDecodeErr := result.BlockHeaders[i].FromBytes(bytes.NewReader(headerBuffer))
 
 							if headerDecodeErr != nil {
@@ -126,10 +133,8 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 					}
 
 					// read compressed data
-					dataOffset := int(schema.SlabHeaderFixedSize) + int(nonZeroHeadersSize)
+					dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
 					readCompressedDataErr := fileReader.ReadAt(m.BufferForCompressedData10Mb[:], dataOffset, int(result.CompressedSlabContentSize))
-
-					dataBuffer := make([]byte, result.UncompressedSlabContentSize)
 
 					if readCompressedDataErr != nil {
 						e = readCompressedDataErr
@@ -139,19 +144,18 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 						// decode compressed data here
 						// todo. as now all the data are stored uncompressed, so just copy them
 
-						copy(dataBuffer, m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize])
+						item := SlabCacheItem{
+							header:  result,
+							rtStats: &CacheStats{Created: tn, Reads: 1},
+						}
+
+						copy(item.data[:], m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize])
+
+						m.slabCacheLocker.Lock()
+						defer m.slabCacheLocker.Unlock()
+
+						m.slabCacheItem[slabUid] = &item
 					}
-
-					item := SlabCacheItem{
-						header:  result,
-						rtStats: &CacheStats{Created: tn, Reads: 1},
-						data:    dataBuffer,
-					}
-
-					m.slabCacheLocker.Lock()
-					defer m.slabCacheLocker.Unlock()
-
-					m.slabCacheItem[slabUid] = item
 
 				}
 			}

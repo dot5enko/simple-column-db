@@ -12,7 +12,7 @@ import (
 
 const CurrentSlabVersion = 1
 
-const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + TotalHeaderSize + BoundsSize
+const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + BoundsSize
 
 const SlabDiskContentsUncompressed = 10 * 1024 * 1024
 
@@ -38,7 +38,6 @@ type DiskSlabHeader struct {
 	// up to this point we have a predictable layout
 	BlockHeaders []DiskHeader
 
-	// UnfinishedBlockData  []byte
 	// BlocksCompressedData []byte
 }
 
@@ -69,6 +68,8 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 
 	log.Printf(" slab for %s will contain %d blocks", columnDef.Name, slabBlocks)
 
+	uncompressedSize := slabBlocks * BlockRowsSize * columnDef.Type.Size()
+
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
 		Uid:                 uuid.New(),
@@ -76,10 +77,13 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		SingleBlockRowsSize: BlockRowsSize,
 		SchemaFieldId:       uint8(selectedIdx) + 1,
 		Type:                columnDef.Type,
-
-		//  block is new, so it's empty
+		// block is new, so it's empt	y
 		BlocksFinalized: 0,
 		CompressionType: 0,
+
+		UncompressedSlabContentSize: uint64(uncompressedSize),
+		CompressedSlabContentSize:   0,
+		Bounds:                      BoundsFloat{},
 	}, nil
 }
 

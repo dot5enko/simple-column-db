@@ -1,11 +1,9 @@
 package manager
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 
-	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
@@ -53,19 +51,10 @@ func (m *SlabManager) IngestIntoBlock(
 				}
 			}
 
-			// write update block content to disk
+			// write block header and data to disk
+			diskBlockUpdateErr := tm.UpdateBlockHeaderAndDataOnDisk(schemaObject, slab, data)
 
-			writeBuf := bytes.NewBuffer(m.BufferForCompressedData10Mb[:0])
-			writeErr := io.DumpNumbersArrayBlockAny(writeBuf, data.DataTypedArray)
-			if writeErr != nil {
-				return written, fmt.Errorf("unable to finalize block : %s", writeErr.Error())
-			}
-
-			// m.WriteBlockHeaderToDisk(slab, block, data)
-			// m.WriteSlabDataToDisk(slab, block, data, writeBuf.Bytes())
-			// m.WriteSlabHeader(slab)
-
-			return written, nil
+			return written, diskBlockUpdateErr
 		}
 
 	}
