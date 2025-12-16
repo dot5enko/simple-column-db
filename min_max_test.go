@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dot5enko/simple-column-db/ops"
+	"github.com/dot5enko/simple-column-db/schema"
 )
 
 func BenchmarkMinMaxRand(b *testing.B) {
@@ -18,10 +18,10 @@ func BenchmarkMinMaxRand(b *testing.B) {
 		input[i] = val
 	}
 
-	var result ops.Bounds[uint64]
+	var result schema.BoundsFloat
 
 	for b.Loop() {
-		result = ops.GetMaxMin(input)
+		result = schema.GetMaxMinBoundsFloat(input)
 	}
 
 	b.Logf("min : %d, max : %d", result.Min, result.Max)
@@ -29,12 +29,12 @@ func BenchmarkMinMaxRand(b *testing.B) {
 
 func TestMinMax(b *testing.T) {
 
-	minVal := uint64(0)
-	maxVal := uint64(7000)
+	minVal := float64(0)
+	maxVal := float64(7000)
 
-	input := []uint64{minVal, maxVal, 1, 2, 3, 4, 5, 6, 0}
+	input := []float64{minVal, maxVal, 1, 2, 3, 4, 5, 6, 0}
 
-	result := ops.GetMaxMin(input[:])
+	result := schema.GetMaxMinBoundsFloat(input[:])
 
 	if result.Max != maxVal {
 		b.Errorf("Expected %d but got %d", maxVal, result.Max)
@@ -53,7 +53,7 @@ func TestMinMaxFloat(b *testing.T) {
 
 	input := []float64{minVal, maxVal, 1, 2, 3, 4, 5, 6, 0.0, 1000}
 
-	result := ops.GetMaxMin(input[:])
+	result := schema.GetMaxMinBoundsFloat(input[:])
 
 	if result.Max != maxVal {
 		b.Errorf("Expected %.2f but got %.2f", maxVal, result.Max)
