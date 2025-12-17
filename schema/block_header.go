@@ -11,7 +11,8 @@ import (
 
 const BlockRowsSize = 32 * 1024 // 32k rows per block
 
-const TotalHeaderSize uint64 = 128
+const TotalHeaderSize = 128
+
 const HeaderSizeUsed uint64 = 16 + 2 + 8 + 8 + 1 + 16 // guid + start offset + compressed size + datatype + [max value + min value] bounds : 16
 const ReservedSize uint64 = TotalHeaderSize - HeaderSizeUsed
 
@@ -30,10 +31,11 @@ type DiskHeader struct {
 	Reserved [ReservedSize]uint8
 }
 
-func NewBlockHeader() *DiskHeader {
+func NewBlockHeader(typ FieldType) *DiskHeader {
 	return &DiskHeader{
-		Uid:   uuid.New(),
-		Items: 0,
+		Uid:      uuid.New(),
+		DataType: typ,
+		Items:    0,
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 
 const CurrentSlabVersion = 1
 
-const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + 8 + BoundsSize
+const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
 
 const SlabDiskContentsUncompressed = 10 * 1024 * 1024
 
@@ -29,9 +29,9 @@ type DiskSlabHeader struct {
 	SchemaFieldId uint8
 	Type          FieldType
 
-	CompressionType             uint8
-	UncompressedSlabContentSize uint64
-	CompressedSlabContentSize   uint64
+	CompressionType uint8
+	// UncompressedSlabContentSize uint64
+	CompressedSlabContentSize uint64
 
 	Bounds BoundsFloat
 
@@ -81,9 +81,9 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		BlocksFinalized: 0,
 		CompressionType: 0,
 
-		UncompressedSlabContentSize: uint64(uncompressedSize),
-		CompressedSlabContentSize:   0,
-		Bounds:                      BoundsFloat{},
+		// UncompressedSlabContentSize: uint64(uncompressedSize),
+		CompressedSlabContentSize: uint64(uncompressedSize),
+		Bounds:                    BoundsFloat{},
 	}, nil
 }
 
@@ -92,9 +92,10 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	reader := bits.NewReader(input, binary.LittleEndian)
 
 	header.Version = reader.MustReadU16()
+	log.Printf(" >> reading version of a slab: %d", header.Version)
 
 	if header.Version != CurrentSlabVersion {
-		return fmt.Errorf("invalid version. Supported versions: %d ", CurrentSlabVersion)
+		return fmt.Errorf("invalid version (%d). Supported versions: %d ", header.Version, CurrentSlabVersion)
 	}
 
 	var uuidErr error
@@ -111,7 +112,7 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	header.Type = FieldType(reader.MustReadU8())
 
 	header.CompressionType = reader.MustReadU8()
-	header.UncompressedSlabContentSize = reader.MustReadU64()
+	// header.UncompressedSlabContentSize = reader.MustReadU64()
 	header.CompressedSlabContentSize = reader.MustReadU64()
 
 	header.Bounds.FromBytes(reader)
@@ -121,10 +122,17 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 }
 
 func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
+
 	bw := bits.NewEncodeBuffer(buffer, binary.LittleEndian)
+
+	defer func() {
+		fmt.Printf(" >> wsh writing slab header %s : \n >> wsh %v\n", header.Uid.String(), buffer[:SlabHeaderFixedSize])
+	}()
 
 	// Write basic fields
 	bw.PutUint16(header.Version)
+
+	log.Printf(" -- writing version of a slab: %d", header.Version)
 
 	uuidLength := 16
 	n, _ := bw.Write(header.Uid[:])
@@ -141,7 +149,7 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 
 	// size the content of the slab before compression
 	// preallocated on disk upon slab creation
-	bw.PutUint64(header.UncompressedSlabContentSize)
+	// bw.PutUint64(header.UncompressedSlabContentSize)
 	bw.PutUint64(header.CompressedSlabContentSize)
 
 	header.Bounds.WriteTo(&bw)

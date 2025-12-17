@@ -2,6 +2,7 @@ package io
 
 import (
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -58,10 +59,10 @@ func (f *FileReader) ReadAt(out []byte, off, length int) (err error) {
 	}
 
 	var readBytes int
-	readBytes, err = f.file.ReadAt(out, int64(off))
+	readBytes, err = f.file.ReadAt(out[:length], int64(off))
 
 	if readBytes != length {
-		err = errors.New("read bytes mismatch")
+		err = fmt.Errorf("read bytes mismatch, wanted %d, got %d", length, readBytes)
 		return err
 	}
 
@@ -81,6 +82,8 @@ func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
 		return err
 	}
 
+	fmt.Printf(" ~~~ writing: %d bytes from offset %d to %s\n", len(in), off, f.path)
+
 	return nil
 }
 
@@ -99,6 +102,8 @@ func (f *FileReader) FillZeroes(offset, size int) (err error) {
 		err = errors.New("written bytes mismatch")
 		return err
 	}
+
+	fmt.Printf(" ~~~ zeroing: %d bytes from offset %d to %s\n", size, offset, f.path)
 
 	return nil
 }

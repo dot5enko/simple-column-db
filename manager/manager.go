@@ -2,6 +2,7 @@ package manager
 
 import (
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/google/uuid"
 )
 
 type BlockRuntimeInfo struct {
@@ -35,5 +36,9 @@ func New(config ManagerConfig) *Manager {
 		schemas: make(map[string]*schema.Schema),
 		blocks:  make(map[schema.BlockUniqueId]BlockRuntimeInfo),
 		config:  config,
+		Slabs: SlabManager{
+			cache:         map[[32]byte]BlockCacheItem{},
+			slabCacheItem: map[uuid.UUID]*SlabCacheItem{},
+		},
 	}
 }

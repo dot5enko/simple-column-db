@@ -240,6 +240,7 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T any](
 
 	switch typ {
 	case schema.Uint64FieldType:
+	case schema.Float32FieldType:
 
 		converted, convertOk := outputColumn.([]T)
 
@@ -250,7 +251,7 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T any](
 		curOffset := 0
 		readOffset := 0
 
-		const readSize = 8
+		readSize := typ.Size()
 
 		for index := 0; index < rows; index++ {
 
@@ -259,9 +260,9 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T any](
 			copy(buf[curOffset:], binReader[readOffset:readOffset+readSize])
 
 			readOffset += readSize
-			curOffset += 8
+			curOffset += readSize
 
-			curOffset := colOffset + 8
+			curOffset := colOffset + readSize
 			offsetToMove := rowSize - curOffset
 
 			readOffset += offsetToMove

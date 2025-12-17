@@ -20,7 +20,7 @@ func (m *SlabManager) IngestIntoBlock(
 	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block, tm)
 
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("unable to load block into runtime: %s", err.Error())
 	} else {
 		written, writeErr, bounds := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
 		if writeErr != nil {

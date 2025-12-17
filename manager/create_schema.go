@@ -51,6 +51,8 @@ func (sm *Manager) GetSlabFile(s schema.Schema, id uuid.UUID, writeAccess bool) 
 	fileManager := io.NewFileReader(slabPath)
 	openErr := fileManager.Open(!writeAccess)
 
+	// log.Printf(" --- opening[write:%v] : %s", writeAccess, slabPath)
+
 	return fileManager, openErr
 }
 
@@ -144,7 +146,7 @@ func (sm *Manager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlab
 		}
 
 		defer fileManager.Close()
-		return fileManager.WriteAt(sm.Slabs.SlabHeaderReaderBuffer[:serializedBytes], 0, serializedBytes)
+		return fileManager.WriteAt(sm.Slabs.SlabHeaderReaderBuffer[:], 0, serializedBytes)
 	}
 }
 
@@ -186,38 +188,36 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 				return slabHeaderWriteErr
 			}
 
-			fileManager, slabFileErr := sm.GetSlabFile(schemaConfig, slabHeader.Uid, true)
+			f, slabFileErr := sm.GetSlabFile(schemaConfig, slabHeader.Uid, true)
 
 			if slabFileErr != nil {
 				return fmt.Errorf("unable to open slab file : %s", slabFileErr.Error())
 			}
 
 			// crete first block
-			firstBlock := schema.NewBlockHeader()
-
+			firstBlock := schema.NewBlockHeader(col.Type)
 			headerWriter := bits.NewEncodeBuffer(sm.BlockBuffer[:], binary.LittleEndian)
 			writtenBytes, writeErr := firstBlock.WriteTo(&headerWriter)
 			if writeErr != nil {
 				return fmt.Errorf("unable to encode block header : %s", writeErr.Error())
 			}
 
-			writeToDiskErr := fileManager.WriteAt(sm.BlockBuffer[:writtenBytes], 0, writtenBytes)
+			writeToDiskErr := f.WriteAt(sm.BlockBuffer[:writtenBytes], schema.SlabHeaderFixedSize, writtenBytes)
 			if writeToDiskErr != nil {
 				return fmt.Errorf("unable to write block header into slab : %s", writeToDiskErr.Error())
 			}
 
 			// headers for blocks inside
 			headersReservedSpace := int(slabHeader.BlocksTotal-1) * int(schema.TotalHeaderSize)
-			zeroesFilledErr := fileManager.FillZeroes(writtenBytes, headersReservedSpace)
+			reservedSize := int(slabHeader.SingleBlockRowsSize) * int(slabHeader.BlocksTotal) * slabHeader.Type.Size()
+
+			totalZeroSize := headersReservedSpace + reservedSize
+
+			zeroesFilledErr := f.FillZeroes(schema.SlabHeaderFixedSize+schema.TotalHeaderSize, totalZeroSize)
 
 			if zeroesFilledErr != nil {
 				return zeroesFilledErr
 			}
-
-			// reserve space for block entries
-			// calc
-			reservedSize := int(slabHeader.SingleBlockRowsSize) * int(slabHeader.BlocksTotal) * slabHeader.Type.Size()
-			fillContentErr := fileManager.FillZeroes(writtenBytes+headersReservedSpace, reservedSize)
 
 			curCol := &schemaConfig.Columns[colIdx]
 
@@ -225,7 +225,7 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 			curCol.ActiveSlab = slabHeader.Uid
 			// load from disk upon start
 
-			return fillContentErr
+			return nil
 		}
 
 		slabCreationErr := createOneSlabForColumn()

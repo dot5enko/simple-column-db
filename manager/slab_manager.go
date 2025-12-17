@@ -89,13 +89,16 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 			headerReadErr := fileReader.ReadAt(m.SlabHeaderReaderBuffer[:], 0, int(schema.SlabHeaderFixedSize))
 
 			if headerReadErr != nil {
-				e = headerReadErr
+				e = fmt.Errorf("unable to read slab header : %s", headerReadErr.Error())
 				return
 			} else {
 
 				result = &schema.DiskSlabHeader{}
 
-				headerParseErr := result.FromBytes(bytes.NewReader(m.SlabHeaderReaderBuffer[:]))
+				fmt.Printf(" >> rsh reading slab header %s : \n >> rsh %v\n", slabUid.String(), m.SlabHeaderReaderBuffer[:schema.SlabHeaderFixedSize])
+
+				headerBytes := bytes.NewReader(m.SlabHeaderReaderBuffer[:schema.SlabHeaderFixedSize])
+				headerParseErr := result.FromBytes(headerBytes)
 				if headerParseErr != nil {
 					e = headerParseErr
 					return
@@ -115,7 +118,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 					headersReadErr := fileReader.ReadAt(m.SlabBlockHeadersReadBuffer[:], int(schema.SlabHeaderFixedSize), nonEmptyHeadersSize)
 
 					if headersReadErr != nil {
-						e = headersReadErr
+						e = fmt.Errorf("unable to read data while LoadSlabToCache: %s", headersReadErr.Error())
 						return
 					} else {
 						for i := 0; i <= int(result.BlocksFinalized); i++ {
@@ -242,7 +245,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, blockHeader)
 
 			if runtimeDecodeErr != nil {
-				return nil, runtimeDecodeErr
+				return nil, fmt.Errorf("unable to decoded raw block data for slab %s. block %s: %s", slab.Uid.String(), block.String(), runtimeDecodeErr.Error())
 			} else {
 				m.locker.Lock()
 				defer m.locker.Unlock()
@@ -273,20 +276,20 @@ func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (*schema.Ru
 
 	case schema.Float64FieldType:
 		result := bits.MapBytesToArray[float64](blockData, schema.BlockRowsSize)
-		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, int(bheader.Items))
 
 	case schema.Float32FieldType:
 		result := bits.MapBytesToArray[float32](blockData, schema.BlockRowsSize)
-		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, int(bheader.Items))
 
 	case schema.Uint64FieldType:
 
 		result := bits.MapBytesToArray[uint64](blockData, schema.BlockRowsSize)
-		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, int(bheader.Items))
 
 	case schema.Uint8FieldType:
 		result := bits.MapBytesToArray[uint8](blockData, schema.BlockRowsSize)
-		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, len(result))
+		runtimeData = schema.NewRuntimeBlockDataFromSlice(result, int(bheader.Items))
 
 	default:
 		return nil, fmt.Errorf("unknown type while decoding raw block data: %s", bheader.DataType.String())
