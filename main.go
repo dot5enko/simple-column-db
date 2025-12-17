@@ -47,7 +47,7 @@ func gen_fake_data[T uint64 | float64](size int, fileName string) {
 		panic(ferr)
 	}
 
-	dumpErr := io.DumpNumbersArrayBlock(fw, data)
+	_, dumpErr := io.DumpNumbersArrayBlock(fw, data)
 
 	if dumpErr != nil {
 		panic(dumpErr)
@@ -101,15 +101,23 @@ func main() {
 	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
 	binWriter.EnableGrowing()
 
-	frameStart := time.Hour * 24 * 30 * 365
-	startTime := uint64(time.Now().Add(-frameStart).Unix())
+	frameStart := time.Hour * 24 * 30 * 12 * 5
+	startTime := time.Now().Add(-frameStart).Unix()
+
+	showTest := 20
 
 	for i := 0; i < testRows; i++ {
 
-		timeOffset := i * 60
+		timeOffset := uint64(i * 60)
+		timeVal := uint64(startTime) + timeOffset
+		randVal := rand.Float32()
 
-		binWriter.PutUint64(startTime + uint64(timeOffset))
-		binWriter.PutFloat32(rand.Float32())
+		binWriter.PutUint64(timeVal)
+		binWriter.PutFloat32(randVal)
+
+		if i < showTest {
+			log.Printf("row %d : %d", i, timeVal)
+		}
 	}
 
 	before := time.Now()

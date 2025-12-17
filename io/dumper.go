@@ -11,7 +11,7 @@ type BlockTypes interface {
 	uint64 | uint16 | uint8 | uint32 | int64 | int32 | int16 | int8 | int | float64 | float32
 }
 
-func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
+func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) (int, error) {
 
 	var arrSample T
 	valueSize := reflect.ValueOf(arrSample).Type().Size()
@@ -23,15 +23,15 @@ func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
 	_, err := writer.Write(b)
 	// log.Printf(" >> written %d bytes", writtenBytes)
 
-	return err
+	return byteLen, err
 }
 
-func DumpNumbersArrayBlockAny(writer io.Writer, arr any) error {
+func DumpNumbersArrayBlockAny(writer io.Writer, arr any) (int, error) {
 	switch v := arr.(type) {
 
 	case []uint8:
 		_, err := writer.Write(v)
-		return err
+		return 0, err
 	case []int8:
 		return DumpNumbersArrayBlock[int8](writer, v)
 	case []uint16:
@@ -46,7 +46,7 @@ func DumpNumbersArrayBlockAny(writer io.Writer, arr any) error {
 		return DumpNumbersArrayBlock[float64](writer, v)
 
 	default:
-		return fmt.Errorf("unsupported type %T while dumping to disk (any array) ", arr)
+		return 0, fmt.Errorf("unsupported type %T while dumping to disk (any array) ", arr)
 	}
 }
 

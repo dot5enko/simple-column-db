@@ -28,8 +28,7 @@ type DiskSlabHeader struct {
 	SchemaFieldId uint8
 	Type          FieldType
 
-	CompressionType uint8
-	// UncompressedSlabContentSize uint64
+	CompressionType           uint8
 	CompressedSlabContentSize uint64
 
 	Bounds BoundsFloat

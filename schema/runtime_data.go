@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"sync"
 )
@@ -16,7 +17,7 @@ type RuntimeBlockData struct {
 	Items          int
 }
 
-func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOffset int) (int, error, BoundsFloat) {
+func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOffset int, debug bool) (int, error, BoundsFloat) {
 	typedArray, typedOk := b.DataTypedArray.([]T)
 	inputArray, inputOk := dataArray.([]T)
 
@@ -30,6 +31,10 @@ func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOf
 
 	bounds := GetMaxMinBoundsFloat(inputArray[:copied])
 
+	if debug {
+		log.Printf(">>>> bounds after copying data from [:%d] into typed array: {min:%.2f, max:%.2f}", startOffset, bounds.Min, bounds.Max)
+	}
+
 	return copied, nil, bounds
 }
 
@@ -39,17 +44,17 @@ func (b *RuntimeBlockData) Write(dataArray any, dataArrayStartOffset int, typ Fi
 
 	switch typ {
 	case Uint64FieldType:
-		written, topErr, bounds = writeTypedArray[uint64](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint64](b, dataArray, dataArrayStartOffset, true)
 	case Uint8FieldType:
-		written, topErr, bounds = writeTypedArray[uint8](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint8](b, dataArray, dataArrayStartOffset, false)
 	case Float32FieldType:
-		written, topErr, bounds = writeTypedArray[float32](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[float32](b, dataArray, dataArrayStartOffset, false)
 	case Uint16FieldType:
-		written, topErr, bounds = writeTypedArray[uint16](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint16](b, dataArray, dataArrayStartOffset, false)
 	case Float64FieldType:
-		written, topErr, bounds = writeTypedArray[float64](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[float64](b, dataArray, dataArrayStartOffset, false)
 	case Uint32FieldType:
-		written, topErr, bounds = writeTypedArray[uint32](b, dataArray, dataArrayStartOffset)
+		written, topErr, bounds = writeTypedArray[uint32](b, dataArray, dataArrayStartOffset, false)
 	default:
 		panic(fmt.Sprintf("unsupported type when writing to RuntimeBlockData: %s", typ.String()))
 	}

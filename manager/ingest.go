@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"time"
 	"unsafe"
@@ -69,8 +70,6 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				return fmt.Errorf("no active slab found for column %s", col.Name)
 			}
 
-			rowSize += col.Type.Size()
-
 			fInfo := layoutFieldInfo{
 				index:      idx,
 				typ:        col.Type,
@@ -79,12 +78,18 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				name:       col.Name,
 			}
 
+			rowSize += col.Type.Size()
+
+			log.Printf("field %s (%d bytes) at offset %d", col.Name, col.Type.Size(), fInfo.dataOffset)
+
 			fieldsLayout[idx] = &fInfo
 		}
 	}
 
 	dataBuffer := data.dataBuffer
 	itemsCount := len(dataBuffer) / rowSize
+
+	color.Red(" -- row size: %d. rows = %d", rowSize, itemsCount)
 
 	for _, field := range fieldsLayout {
 		switch field.typ {
@@ -131,7 +136,13 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 			if sh.BlocksFinalized >= sh.BlocksTotal {
 
-				color.Yellow(" > [%s/%s] slab  full (finalized %d, total = %d), creating new one...", sh.Uid.String(), field.name, sh.BlocksFinalized, sh.BlocksTotal)
+				// color.Yellow(" > [%s/%s] slab  full (finalized %d, total = %d), creating new one...", sh.Uid.String(), field.name, sh.BlocksFinalized, sh.BlocksTotal)
+
+				// trim finalized slab here
+				trimErr := m.Slabs.TrimFinalizedBlocksSize(*schemaObject, sh)
+				if trimErr != nil {
+					return fmt.Errorf("unable to trim finalized slab: %s", trimErr.Error())
+				}
 
 				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index])
 				if newSlabCreationErr != nil {
@@ -185,7 +196,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				field.ingested += stats.Written
 				field.leftover -= stats.Written
 
-				color.Green(" > [%s] ingested %d, left %d. slab %s", field.name, stats.Written, field.leftover, sh.Uid.String())
+				// color.Green(" > [%s] ingested %d, left %d. slab %s", field.name, stats.Written, field.leftover, sh.Uid.String())
 
 				if stats.BlockFinished {
 					if sh.BlocksFinalized < sh.BlocksTotal {
@@ -212,6 +223,8 @@ func CollectColumnsFromRow[T any](
 	outputInts := make([]T, itemsCount)
 	outBuffer := make([]byte, itemsCount*field.typ.Size())
 
+	color.Red(" -- collecting columns from row: %T. data offset : %d, row size: %d", outputInts, field.dataOffset, rowSize)
+
 	collectErr := CollectTypedDataToArrayFromBinaryBufferFast[T](dataBuffer,
 		outputInts[:], field.typ,
 		field.dataOffset, rowSize, itemsCount,
@@ -220,6 +233,12 @@ func CollectColumnsFromRow[T any](
 
 	if collectErr != nil {
 		return collectErr
+	}
+
+	testN := 10
+
+	for idx, i := range outputInts[:testN] {
+		fmt.Printf(" -- %d read columns from row: %v\n", idx, i)
 	}
 
 	field.DataArray = outputInts

@@ -3,7 +3,6 @@ package manager
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -67,11 +66,11 @@ func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 
 func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
-	before := time.Now()
-	defer func() {
-		loadTook := time.Since(before).Microseconds()
-		log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
-	}()
+	// before := time.Now()
+	// defer func() {
+	// 	loadTook := time.Since(before).Microseconds()
+	// 	log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
+	// }()
 
 	slabHeader := m.getSlabFromCache(slabUid)
 
@@ -96,7 +95,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 				result = &schema.DiskSlabHeader{}
 
-				fmt.Printf(" >> rsh reading slab header %s : \n >> rsh %v\n", slabUid.String(), m.SlabHeaderReaderBuffer[:schema.SlabHeaderFixedSize])
+				// fmt.Printf(" >> rsh reading slab header %s : \n >> rsh %v\n", slabUid.String(), m.SlabHeaderReaderBuffer[:schema.SlabHeaderFixedSize])
 
 				headerBytes := bytes.NewReader(m.SlabHeaderReaderBuffer[:schema.SlabHeaderFixedSize])
 				headerParseErr := result.FromBytes(headerBytes)

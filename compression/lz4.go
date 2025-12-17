@@ -1,20 +1,12 @@
 package compression
 
 import (
-	"bytes"
-
 	"github.com/pierrec/lz4/v4"
 )
 
-func CompressLz4(src []byte, output *bytes.Buffer) error {
-	zw := lz4.NewWriter(output)
+func CompressLz4(src []byte, output []byte) (int, error) {
 
-	zw.Write(src)
-	flushErr := zw.Flush()
+	var c lz4.Compressor
+	return c.CompressBlock(src, output)
 
-	if flushErr != nil {
-		return flushErr
-	}
-
-	return zw.Close()
 }
