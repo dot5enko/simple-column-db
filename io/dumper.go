@@ -3,7 +3,6 @@ package io
 import (
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"unsafe"
 )
@@ -21,9 +20,8 @@ func DumpNumbersArrayBlock[T BlockTypes](writer io.Writer, arr []T) error {
 	byteLen := len(arr) * int(valueSize)
 	b := unsafe.Slice((*byte)(unsafe.Pointer(&arr[0])), byteLen)
 
-	writtenBytes, err := writer.Write(b)
-
-	log.Printf(" >> written %d bytes", writtenBytes)
+	_, err := writer.Write(b)
+	// log.Printf(" >> written %d bytes", writtenBytes)
 
 	return err
 }

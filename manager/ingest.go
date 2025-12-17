@@ -8,6 +8,7 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -123,7 +124,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				panic("slab full, moving to next slab is not implemented yet")
 			}
 
-			ingestedToBlock, blockErr := m.Slabs.IngestIntoBlock(
+			ingestedToBlock, blockFinished, blockErr := m.Slabs.IngestIntoBlock(
 				*schemaObject,
 				field.slab.header,
 				curBlock.Uid,
@@ -137,6 +138,13 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 			} else {
 				field.ingested += ingestedToBlock
 				field.leftover -= ingestedToBlock
+
+				color.Green(" > ingested %d, left %d ", ingestedToBlock, field.leftover)
+
+				if blockFinished {
+					sh.BlockHeaders[field.slab.header.BlocksFinalized] = schema.NewBlockHeader(field.typ)
+				}
+
 			}
 
 		}

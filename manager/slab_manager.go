@@ -106,7 +106,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 					// read the rest of headers, and their content
 
-					result.BlockHeaders = make([]schema.DiskHeader, result.BlocksFinalized+1, result.BlocksTotal)
+					result.BlockHeaders = make([]schema.DiskHeader, result.BlocksTotal)
 
 					allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
 					nonEmptyHeadersSize := int(result.BlocksFinalized) * int(schema.TotalHeaderSize) // finalized + current

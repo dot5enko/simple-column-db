@@ -15,16 +15,16 @@ func (m *SlabManager) IngestIntoBlock(
 	tm *Manager,
 	columnDataArray any,
 	dataArrayStartOffset int,
-) (int, error) {
+) (int, bool, error) {
 
 	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block, tm)
 
 	if err != nil {
-		return 0, fmt.Errorf("unable to load block into runtime: %s", err.Error())
+		return 0, false, fmt.Errorf("unable to load block into runtime: %s", err.Error())
 	} else {
 		written, writeErr, bounds := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
 		if writeErr != nil {
-			return written, writeErr
+			return written, false, writeErr
 		} else {
 
 			slabHeaderChanged := slab.Bounds.Morph(bounds)
@@ -35,6 +35,8 @@ func (m *SlabManager) IngestIntoBlock(
 			log.Printf(" block %s header not updated ", block.String())
 			// recalc max/min values
 
+			blockFinished := false
+
 			if data.Items == data.Cap {
 				// finalize block
 
@@ -42,19 +44,20 @@ func (m *SlabManager) IngestIntoBlock(
 				// write updated slab header content to disk
 
 				slabHeaderChanged = true
+				blockFinished = true
 			}
 
 			if slabHeaderChanged {
 				updateSlabHeaderErr := tm.UpdateSlabHeaderOnDisk(schemaObject, slab)
 				if updateSlabHeaderErr != nil {
-					return written, fmt.Errorf("unable to update slab info: %s", updateSlabHeaderErr.Error())
+					return written, blockFinished, fmt.Errorf("unable to update slab info: %s", updateSlabHeaderErr.Error())
 				}
 			}
 
 			// write block header and data to disk
 			diskBlockUpdateErr := tm.UpdateBlockHeaderAndDataOnDisk(schemaObject, slab, data)
 
-			return written, diskBlockUpdateErr
+			return written, blockFinished, diskBlockUpdateErr
 		}
 
 	}

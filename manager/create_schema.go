@@ -88,7 +88,7 @@ func (sm *Manager) UpdateBlockHeaderAndDataOnDisk(
 		return fmt.Errorf("block with uid `%s` doesn't exist in slab", block.Header.Uid.String())
 	}
 
-	buf := bits.NewEncodeBuffer(sm.BlockBuffer[:0], binary.LittleEndian)
+	buf := bits.NewEncodeBuffer(sm.BlockBuffer[:], binary.LittleEndian)
 	serializedBytes, headerBytesErr := block.Header.WriteTo(&buf)
 
 	if headerBytesErr != nil {

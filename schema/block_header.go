@@ -31,8 +31,8 @@ type DiskHeader struct {
 	Reserved [ReservedSize]uint8
 }
 
-func NewBlockHeader(typ FieldType) *DiskHeader {
-	return &DiskHeader{
+func NewBlockHeader(typ FieldType) DiskHeader {
+	return DiskHeader{
 		Uid:      uuid.New(),
 		DataType: typ,
 		Items:    0,
