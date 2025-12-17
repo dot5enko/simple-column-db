@@ -112,7 +112,11 @@ func main() {
 		binWriter.PutFloat32(rand.Float32())
 	}
 
+	before := time.Now()
 	ingestErr := m.Ingest(testSchemaName, manager.IngestBufferFromBinary(binWriter.Bytes(), fields))
+	after := time.Since(before)
+
+	log.Printf("ingested %d rows in %.2f ms", testRows, after.Seconds()*1000)
 
 	if ingestErr != nil {
 		panic(ingestErr)

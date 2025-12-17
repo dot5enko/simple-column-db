@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 	"unsafe"
 
 	"github.com/dot5enko/simple-column-db/bits"
@@ -114,11 +115,24 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 	// that should be internal api
 	// ingestColumnarInternal(columnData)
+
+	var ioTime time.Duration
+	var ioCalls int
+
+	defer func() {
+		color.Green(" > [%s] finished ingestion, IO took %.2fms/%d io syscalls", schemaName, ioTime.Seconds()*1000, ioCalls)
+	}()
+
 	for _, field := range fieldsLayout {
 
 		for field.leftover > 0 {
+
 			sh := field.slab.header
+
 			if sh.BlocksFinalized >= sh.BlocksTotal {
+
+				color.Yellow(" > [%s/%s] slab  full (finalized %d, total = %d), creating new one...", sh.Uid.String(), field.name, sh.BlocksFinalized, sh.BlocksTotal)
+
 				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index])
 				if newSlabCreationErr != nil {
 					return newSlabCreationErr
@@ -143,6 +157,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 				var loadErr error
 				sh, loadErr = m.Slabs.LoadSlabToCache(*schemaObject, newSlab.Uid)
+				field.slab.header = sh
 				if loadErr != nil {
 					return fmt.Errorf("unable to load just created slab: %s", loadErr.Error())
 				}
@@ -152,26 +167,29 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 			// check if slab has free blocks
 
-			ingestedToBlock, blockFinished, blockErr := m.Slabs.IngestIntoBlock(
+			stats, blockErr := m.Slabs.IngestIntoBlock(
 				*schemaObject,
-				field.slab.header,
+				sh,
 				curBlock.Uid,
 				field.DataArray,
 				field.ingested,
 			)
 
+			ioTime += stats.IoTime
+			ioCalls += stats.IoCalls
+
 			if blockErr != nil {
 				return blockErr
 			} else {
-				field.ingested += ingestedToBlock
-				field.leftover -= ingestedToBlock
 
-				color.Green(" > [%s] ingested %d, left %d ", field.name, ingestedToBlock, field.leftover)
+				field.ingested += stats.Written
+				field.leftover -= stats.Written
 
-				if blockFinished {
+				color.Green(" > [%s] ingested %d, left %d. slab %s", field.name, stats.Written, field.leftover, sh.Uid.String())
 
+				if stats.BlockFinished {
 					if sh.BlocksFinalized < sh.BlocksTotal {
-						sh.BlockHeaders[field.slab.header.BlocksFinalized] = schema.NewBlockHeader(field.typ)
+						sh.BlockHeaders[sh.BlocksFinalized] = schema.NewBlockHeader(field.typ)
 					}
 				}
 

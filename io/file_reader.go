@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
-	"runtime"
 )
 
 type FileReader struct {
@@ -88,12 +86,12 @@ func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
 		return err
 	}
 
-	_, file, fline, _ := runtime.Caller(1)
-	getInvokedAt := func() string {
-		return fmt.Sprintf("%s:%d", path.Base(file), fline)
-	}
+	// _, file, fline, _ := runtime.Caller(1)
+	// getInvokedAt := func() string {
+	// 	return fmt.Sprintf("%s:%d", path.Base(file), fline)
+	// }
 
-	fmt.Printf(" ~~~ writing %-40s : %10d bytes from offset %d to %s \n", getInvokedAt(), len(in), off, f.path)
+	// fmt.Printf(" ~~~ writing %-40s : %10d bytes from offset %d to %s \n", getInvokedAt(), len(in), off, f.path)
 
 	return nil
 }
@@ -114,7 +112,7 @@ func (f *FileReader) FillZeroes(offset, size int) (err error) {
 		return err
 	}
 
-	fmt.Printf(" ~~~ zeroing: %d bytes from offset %d to %s\n", size, offset, f.path)
+	// fmt.Printf(" ~~~ zeroing: %d bytes from offset %d to %s\n", size, offset, f.path)
 
 	return nil
 }

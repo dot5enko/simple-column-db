@@ -9,7 +9,6 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -71,7 +70,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 	before := time.Now()
 	defer func() {
 		loadTook := time.Since(before).Microseconds()
-		log.Printf("slab load took %dus", loadTook)
+		log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
 	}()
 
 	slabHeader := m.getSlabFromCache(slabUid)
@@ -129,7 +128,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 							blocksToIterate = int(result.BlocksTotal)
 						}
 
-						color.Red("iterate blocks : %d (finalized: %d/ total : %d)", blocksToIterate, result.BlocksFinalized, result.BlocksTotal)
+						// color.Red("iterate blocks : %d (finalized: %d/ total : %d)", blocksToIterate, result.BlocksFinalized, result.BlocksTotal)
 
 						for i := 0; i < blocksToIterate; i++ {
 

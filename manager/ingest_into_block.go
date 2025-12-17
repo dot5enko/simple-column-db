@@ -2,10 +2,19 @@ package manager
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
+
+type IngestStats struct {
+	Written       int
+	BlockFinished bool
+
+	IoTime  time.Duration
+	IoCalls int
+}
 
 func (m *SlabManager) IngestIntoBlock(
 	schemaObject schema.Schema,
@@ -13,16 +22,21 @@ func (m *SlabManager) IngestIntoBlock(
 	block uuid.UUID,
 	columnDataArray any,
 	dataArrayStartOffset int,
-) (int, bool, error) {
+) (IngestStats, error) {
+
+	stats := IngestStats{}
+
+	// color.Yellow(" ++ ingesting into block %s, slab %s", block.String(), slab.Uid.String())
 
 	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block)
 
 	if err != nil {
-		return 0, false, fmt.Errorf("unable to load block into runtime: %s", err.Error())
+		return stats, fmt.Errorf("unable to load block into runtime: %s", err.Error())
 	} else {
 		written, writeErr, bounds := data.Write(columnDataArray, dataArrayStartOffset, slab.Type)
 		if writeErr != nil {
-			return written, false, writeErr
+			stats.Written = written
+			return stats, writeErr
 		} else {
 
 			slabHeaderChanged := slab.Bounds.Morph(bounds)
@@ -41,17 +55,34 @@ func (m *SlabManager) IngestIntoBlock(
 				blockFinished = true
 			}
 
+			stats.BlockFinished = blockFinished
+
 			if slabHeaderChanged {
+
+				ioStart := time.Now()
 				updateSlabHeaderErr := m.UpdateSlabHeaderOnDisk(schemaObject, slab)
+				ioTook := time.Since(ioStart)
+
+				stats.IoTime += ioTook
+
 				if updateSlabHeaderErr != nil {
-					return written, blockFinished, fmt.Errorf("unable to update slab info: %s", updateSlabHeaderErr.Error())
+
+					stats.Written = written
+
+					return stats, fmt.Errorf("unable to update slab info: %s", updateSlabHeaderErr.Error())
 				}
 			}
 
 			// write block header and data to disk
+			ioStart := time.Now()
 			diskBlockUpdateErr := m.UpdateBlockHeaderAndDataOnDisk(schemaObject, slab, data)
+			ioTook := time.Since(ioStart)
 
-			return written, blockFinished, diskBlockUpdateErr
+			stats.Written = written
+			stats.IoTime += ioTook
+			stats.IoCalls = 2
+
+			return stats, diskBlockUpdateErr
 		}
 
 	}
