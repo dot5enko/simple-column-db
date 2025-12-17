@@ -96,7 +96,7 @@ func main() {
 	}
 
 	fields := []string{"created_at", "value"}
-	testRows := 100_000
+	testRows := 1_000_000
 
 	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
 	binWriter.EnableGrowing()

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 )
 
 type FileReader struct {
@@ -86,7 +87,12 @@ func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
 		return err
 	}
 
-	fmt.Printf(" ~~~ writing: %d bytes from offset %d to %s\n", len(in), off, f.path)
+	_, file, fline, _ := runtime.Caller(1)
+	getInvokedAt := func() string {
+		return fmt.Sprintf("(%s:%d)", file, fline)
+	}
+
+	fmt.Printf(" ~~~ writing [%s] : %d bytes from offset %d to %s \n", getInvokedAt, len(in), off, f.path, file, fline)
 
 	return nil
 }

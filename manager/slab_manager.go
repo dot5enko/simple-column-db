@@ -10,6 +10,7 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -34,6 +35,8 @@ type SlabCacheItem struct {
 }
 
 type SlabManager struct {
+	storagePath string
+
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
@@ -64,7 +67,7 @@ func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
 
 // IngestIntoBlock(field.slab, curBlock, field.Data[field.ingested:])
 
-func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID, mm *Manager) (result *schema.DiskSlabHeader, e error) {
+func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
 	before := time.Now()
 	defer func() {
@@ -80,7 +83,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 		tn := time.Now()
 
-		fileReader, openErr := mm.GetSlabFile(schemaObject, slabUid, false)
+		fileReader, openErr := m.GetSlabFile(schemaObject, slabUid, false)
 		if openErr != nil {
 			e = openErr
 			return
@@ -121,7 +124,17 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 						e = fmt.Errorf("unable to read data while LoadSlabToCache: %s", headersReadErr.Error())
 						return
 					} else {
-						for i := 0; i <= int(result.BlocksFinalized); i++ {
+
+						blocksToIterate := int(result.BlocksFinalized) + 1
+						if blocksToIterate >= int(result.BlocksTotal) {
+							blocksToIterate = int(result.BlocksTotal)
+						}
+
+						color.Red("iterate blocks : %d (finalized: %d/ total : %d)", blocksToIterate, result.BlocksFinalized, result.BlocksTotal)
+
+						for i := 0; i < blocksToIterate; i++ {
+
+							// func(i int) {
 
 							blockOffset := i * int(schema.TotalHeaderSize)
 							headerBuffer := m.SlabBlockHeadersReadBuffer[blockOffset:]
@@ -132,6 +145,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 								e = headerDecodeErr
 								return
 							}
+							// }(j)
 						}
 					}
 
@@ -200,7 +214,6 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 	schemaObject schema.Schema,
 	slab *schema.DiskSlabHeader,
 	block uuid.UUID,
-	mm *Manager,
 ) (*schema.RuntimeBlockData, error) {
 
 	cached := m.getBlockFromCache(slab.Uid, block)
@@ -230,7 +243,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 			slabCache := m.getSlabFromCache(slab.Uid)
 			if slabCache == nil {
-				_, loadSlabErr := m.LoadSlabToCache(schemaObject, slab.Uid, mm)
+				_, loadSlabErr := m.LoadSlabToCache(schemaObject, slab.Uid)
 				if loadSlabErr != nil {
 					return nil, loadSlabErr
 				}

@@ -15,6 +15,7 @@ import (
 type layoutFieldInfo struct {
 	index int
 	typ   schema.FieldType
+	name  string
 
 	slab       *SlabCacheItem
 	dataOffset int
@@ -57,7 +58,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 			// slab exists
 			if col.ActiveSlab != uuid.Nil {
 
-				_, loadSlabErr := m.Slabs.LoadSlabToCache(*schemaObject, col.ActiveSlab, m)
+				_, loadSlabErr := m.Slabs.LoadSlabToCache(*schemaObject, col.ActiveSlab)
 				if loadSlabErr != nil {
 					return loadSlabErr
 				}
@@ -74,6 +75,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				typ:        col.Type,
 				slab:       slabHeader,
 				dataOffset: rowSize,
+				name:       col.Name,
 			}
 
 			fieldsLayout[idx] = &fInfo
@@ -117,18 +119,41 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 		for field.leftover > 0 {
 
 			sh := field.slab.header
+
+			if sh.BlocksFinalized >= sh.BlocksTotal {
+				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index])
+				if newSlabCreationErr != nil {
+					return newSlabCreationErr
+				}
+
+				{
+					col := &schemaObject.Columns[field.index]
+
+					if col.Slabs == nil {
+						col.Slabs = []uuid.UUID{}
+					}
+
+					col.Slabs = append(col.Slabs, newSlab.Uid)
+					col.ActiveSlab = newSlab.Uid
+
+					storeErr := m.storeSchemeToDisk(*schemaObject)
+					if storeErr != nil {
+						return fmt.Errorf("unable to update schema config on disk: %s", storeErr.Error())
+					}
+
+				}
+
+				sh = newSlab
+			}
+
 			curBlock := sh.BlockHeaders[sh.BlocksFinalized]
 
 			// check if slab has free blocks
-			if sh.BlocksFinalized >= sh.BlocksTotal {
-				panic("slab full, moving to next slab is not implemented yet")
-			}
 
 			ingestedToBlock, blockFinished, blockErr := m.Slabs.IngestIntoBlock(
 				*schemaObject,
 				field.slab.header,
 				curBlock.Uid,
-				m,
 				field.DataArray,
 				field.ingested,
 			)
@@ -139,10 +164,13 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				field.ingested += ingestedToBlock
 				field.leftover -= ingestedToBlock
 
-				color.Green(" > ingested %d, left %d ", ingestedToBlock, field.leftover)
+				color.Green(" > [%s] ingested %d, left %d ", field.name, ingestedToBlock, field.leftover)
 
 				if blockFinished {
-					sh.BlockHeaders[field.slab.header.BlocksFinalized] = schema.NewBlockHeader(field.typ)
+
+					if sh.BlocksFinalized < sh.BlocksTotal {
+						sh.BlockHeaders[field.slab.header.BlocksFinalized] = schema.NewBlockHeader(field.typ)
+					}
 				}
 
 			}

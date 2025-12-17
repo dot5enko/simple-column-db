@@ -3,6 +3,8 @@ package manager
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
+	"log"
 	"os"
 
 	"github.com/dot5enko/simple-column-db/io"
@@ -34,11 +36,12 @@ type Manager struct {
 }
 
 func (m *Manager) storeSchemeToDisk(schemeObject schema.Schema) error {
-	schemesPath := m.getAbsStoragePath("schemes.json")
+	schemesPath := m.Slabs.getAbsStoragePath(schemeObject.Name, "schema.json")
 
 	fr := io.NewFileReader(schemesPath)
 	createFileErr := fr.Open(false)
-	if createFileErr != nil { // file not exists - create new one
+
+	if createFileErr != nil {
 		return createFileErr
 	}
 
@@ -48,40 +51,45 @@ func (m *Manager) storeSchemeToDisk(schemeObject schema.Schema) error {
 
 	linesWriter := bufio.NewWriter(fr.Raw())
 	linesWriter.Write(jschemeBytes)
-	linesWriter.WriteByte('\n')
 	return linesWriter.Flush()
 
 }
 func (m *Manager) loadSchemesFromDisk() error {
 
-	schemesPath := m.getAbsStoragePath("schemes.json")
+	entries, err := os.ReadDir(m.config.PathToStorage)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) { // no schemes yet
+			return nil
+		} else {
+			log.Printf(" >>>>>>> %v", err)
+			return err
+		}
+	}
 
-	f, err := os.Open(schemesPath)
+	loadSingleSchemeFileFromDisk := func(path string) error {
 
-	if err == nil {
+		schemaFilePathName := m.Slabs.getAbsStoragePath(path, "schema.json")
 
-		defer f.Close()
+		fullContent, contentErr := os.ReadFile(schemaFilePathName)
+		if contentErr != nil {
+			return contentErr
+		}
 
-		sc := bufio.NewScanner(f)
-		sc.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+		var schema schema.Schema
+		err = json.Unmarshal(fullContent, &schema)
+		if err != nil {
+			return err
+		} else {
+			m.schemas[schema.Name] = &schema
+			color.Yellow(" >> loaded schema from disk : %s", schema)
+		}
 
-		for {
+		return nil
+	}
 
-			if !sc.Scan() {
-				if err := sc.Err(); err != nil {
-					return err
-				}
-				return nil
-			}
-
-			var schema schema.Schema
-			err = json.Unmarshal(sc.Bytes(), &schema)
-			if err != nil {
-				return err
-			} else {
-				m.schemas[schema.Name] = &schema
-				color.Yellow(" >> loaded schema from disk : %s", schema)
-			}
+	for _, e := range entries {
+		if e.IsDir() {
+			loadSingleSchemeFileFromDisk(e.Name())
 		}
 	}
 
@@ -94,6 +102,8 @@ func New(config ManagerConfig) *Manager {
 		schemas: make(map[string]*schema.Schema),
 		config:  config,
 		Slabs: SlabManager{
+			storagePath: config.PathToStorage,
+			// caches
 			cache:         map[[32]byte]BlockCacheItem{},
 			slabCacheItem: map[uuid.UUID]*SlabCacheItem{},
 		},

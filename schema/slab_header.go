@@ -78,10 +78,8 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		SchemaFieldId:       uint8(selectedIdx) + 1,
 		Type:                columnDef.Type,
 		// block is new, so it's empt	y
-		BlocksFinalized: 0,
-		CompressionType: 0,
-
-		// UncompressedSlabContentSize: uint64(uncompressedSize),
+		BlocksFinalized:           0,
+		CompressionType:           0,
 		CompressedSlabContentSize: uint64(uncompressedSize),
 		Bounds:                    BoundsFloat{},
 	}, nil

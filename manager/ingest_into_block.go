@@ -12,12 +12,11 @@ func (m *SlabManager) IngestIntoBlock(
 	schemaObject schema.Schema,
 	slab *schema.DiskSlabHeader,
 	block uuid.UUID,
-	tm *Manager,
 	columnDataArray any,
 	dataArrayStartOffset int,
 ) (int, bool, error) {
 
-	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block, tm)
+	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block)
 
 	if err != nil {
 		return 0, false, fmt.Errorf("unable to load block into runtime: %s", err.Error())
@@ -48,14 +47,14 @@ func (m *SlabManager) IngestIntoBlock(
 			}
 
 			if slabHeaderChanged {
-				updateSlabHeaderErr := tm.UpdateSlabHeaderOnDisk(schemaObject, slab)
+				updateSlabHeaderErr := m.UpdateSlabHeaderOnDisk(schemaObject, slab)
 				if updateSlabHeaderErr != nil {
 					return written, blockFinished, fmt.Errorf("unable to update slab info: %s", updateSlabHeaderErr.Error())
 				}
 			}
 
 			// write block header and data to disk
-			diskBlockUpdateErr := tm.UpdateBlockHeaderAndDataOnDisk(schemaObject, slab, data)
+			diskBlockUpdateErr := m.UpdateBlockHeaderAndDataOnDisk(schemaObject, slab, data)
 
 			return written, blockFinished, diskBlockUpdateErr
 		}
