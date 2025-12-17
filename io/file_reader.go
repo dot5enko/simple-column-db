@@ -26,6 +26,10 @@ func NewFileReader(path string) *FileReader {
 	return freader
 }
 
+func (f *FileReader) Raw() *os.File {
+	return f.file
+}
+
 func (f *FileReader) Open(readOnly bool) (topErr error) {
 
 	var perm os.FileMode = 0644

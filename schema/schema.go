@@ -1,10 +1,6 @@
 package schema
 
 type Schema struct {
-	Name string `json:"name"`
-	Uid  string `json:"uuid"`
-
-	// runtime
-	Rows    int
-	Columns []SchemaColumn
+	Name    string         `json:"name"`
+	Columns []SchemaColumn `json:"columns"`
 }

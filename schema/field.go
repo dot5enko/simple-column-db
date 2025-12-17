@@ -3,10 +3,10 @@ package schema
 import "github.com/google/uuid"
 
 type SchemaColumn struct {
-	Name string
-	Type FieldType
+	Name string    `json:"name"`
+	Type FieldType `json:"type"`
 
 	// runtime
-	ActiveSlab uuid.UUID
-	Slabs      []uuid.UUID
+	ActiveSlab uuid.UUID   `json:"active_slab"`
+	Slabs      []uuid.UUID `json:"slabs"`
 }

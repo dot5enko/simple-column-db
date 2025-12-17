@@ -11,7 +11,6 @@ import (
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/manager"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/google/uuid"
 )
 
 func testCycles(n int, label string, testSize int, cb func()) {
@@ -82,7 +81,7 @@ func main() {
 		CacheMaxBytes: 0,
 	})
 
-	testSchemaName := "health_cheks_" + uuid.NewString()[:8]
+	testSchemaName := "health_cheks_"
 
 	shemaCreatedErr := m.CreateSchemaIfNotExists(schema.Schema{
 		Name: testSchemaName,

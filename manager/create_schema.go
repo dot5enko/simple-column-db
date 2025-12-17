@@ -220,9 +220,9 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 			}
 
 			curCol := &schemaConfig.Columns[colIdx]
-
 			curCol.Slabs = []uuid.UUID{slabHeader.Uid}
 			curCol.ActiveSlab = slabHeader.Uid
+
 			// load from disk upon start
 
 			return nil
@@ -233,6 +233,11 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 			return slabCreationErr
 		}
 
+	}
+
+	storeErr := sm.storeSchemeToDisk(schemaConfig)
+	if storeErr != nil {
+		return fmt.Errorf("unable to save schema config to disk : %s", storeErr.Error())
 	}
 
 	sm.schemas[schemaConfig.Name] = &schemaConfig
