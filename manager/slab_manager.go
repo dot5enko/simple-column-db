@@ -2,7 +2,6 @@ package manager
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -235,7 +234,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 		}
 
 		if blockIdx < 0 {
-			return nil, errors.New("block not found")
+			return nil, fmt.Errorf("block you are looking for (%s) not found in slab %s", block.String(), slab.Uid.String())
 		} else {
 
 			// blockItemSize := blockHeader.DataType.Size()

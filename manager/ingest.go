@@ -117,9 +117,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 	for _, field := range fieldsLayout {
 
 		for field.leftover > 0 {
-
 			sh := field.slab.header
-
 			if sh.BlocksFinalized >= sh.BlocksTotal {
 				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index])
 				if newSlabCreationErr != nil {
@@ -143,7 +141,11 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 				}
 
-				sh = newSlab
+				var loadErr error
+				sh, loadErr = m.Slabs.LoadSlabToCache(*schemaObject, newSlab.Uid)
+				if loadErr != nil {
+					return fmt.Errorf("unable to load just created slab: %s", loadErr.Error())
+				}
 			}
 
 			curBlock := sh.BlockHeaders[sh.BlocksFinalized]

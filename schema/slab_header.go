@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/google/uuid"
@@ -66,8 +65,6 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		slabBlocks = 65000
 	}
 
-	log.Printf(" slab for %s will contain %d blocks", columnDef.Name, slabBlocks)
-
 	uncompressedSize := slabBlocks * BlockRowsSize * columnDef.Type.Size()
 
 	return &DiskSlabHeader{
@@ -90,7 +87,7 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	reader := bits.NewReader(input, binary.LittleEndian)
 
 	header.Version = reader.MustReadU16()
-	log.Printf(" >> reading version of a slab: %d", header.Version)
+	// log.Printf(" >> reading version of a slab: %d", header.Version)
 
 	if header.Version != CurrentSlabVersion {
 		return fmt.Errorf("invalid version (%d). Supported versions: %d ", header.Version, CurrentSlabVersion)
@@ -123,14 +120,10 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 
 	bw := bits.NewEncodeBuffer(buffer, binary.LittleEndian)
 
-	defer func() {
-		fmt.Printf(" >> wsh writing slab header %s : \n >> wsh %v\n", header.Uid.String(), buffer[:SlabHeaderFixedSize])
-	}()
+	// defer fmt.Printf(" >> wsh writing slab header %s : \n >> wsh %v\n", header.Uid.String(), buffer[:SlabHeaderFixedSize])
 
 	// Write basic fields
 	bw.PutUint16(header.Version)
-
-	log.Printf(" -- writing version of a slab: %d", header.Version)
 
 	uuidLength := 16
 	n, _ := bw.Write(header.Uid[:])

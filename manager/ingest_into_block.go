@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -29,10 +28,6 @@ func (m *SlabManager) IngestIntoBlock(
 			slabHeaderChanged := slab.Bounds.Morph(bounds)
 
 			data.Header.Bounds.Morph(bounds)
-
-			// update block header
-			log.Printf(" block %s header not updated ", block.String())
-			// recalc max/min values
 
 			blockFinished := false
 

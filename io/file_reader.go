@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"runtime"
 )
 
@@ -89,10 +90,10 @@ func (f *FileReader) WriteAt(in []byte, off, length int) (err error) {
 
 	_, file, fline, _ := runtime.Caller(1)
 	getInvokedAt := func() string {
-		return fmt.Sprintf("(%s:%d)", file, fline)
+		return fmt.Sprintf("%s:%d", path.Base(file), fline)
 	}
 
-	fmt.Printf(" ~~~ writing [%s] : %d bytes from offset %d to %s \n", getInvokedAt, len(in), off, f.path, file, fline)
+	fmt.Printf(" ~~~ writing %-40s : %10d bytes from offset %d to %s \n", getInvokedAt(), len(in), off, f.path)
 
 	return nil
 }

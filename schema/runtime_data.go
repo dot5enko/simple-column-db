@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"sync"
 )
@@ -26,7 +25,7 @@ func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOf
 	if !typedOk || !inputOk {
 		return 0, fmt.Errorf("wrong type in runtime block: input type: %s, expected type : %s", reflect.TypeOf(inputArray), reflect.TypeOf(typedArray)), BoundsFloat{}
 	}
-	log.Printf(" >>>> about to copy %d items from array of size. dest len : %d. items : %d. cap : %d", len(inputArray), len(typedArray[b.Items:]), b.Items, b.Cap)
+	// log.Printf(" >>>> about to copy %d items from array of size. dest len : %d. items : %d. cap : %d", len(inputArray), len(typedArray[b.Items:]), b.Items, b.Cap)
 	copied := copy(typedArray[b.Items:b.Cap], inputArray)
 
 	bounds := GetMaxMinBoundsFloat(inputArray[:copied])
