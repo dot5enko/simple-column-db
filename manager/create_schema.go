@@ -133,7 +133,7 @@ func (sm *Manager) UpdateBlockHeaderAndDataOnDisk(
 
 func (sm *Manager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlabHeader) error {
 
-	serializedBytes, headerBytesErr := slab.WriteTo(sm.Slabs.SlabHeaderReaderBuffer[:0])
+	serializedBytes, headerBytesErr := slab.WriteTo(sm.Slabs.SlabHeaderReaderBuffer[:])
 	if headerBytesErr != nil {
 		return fmt.Errorf("unable to finalize block, slab header won't serialize : %s", headerBytesErr.Error())
 	} else {
@@ -148,16 +148,27 @@ func (sm *Manager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlab
 	}
 }
 
-func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
+func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 
-	_, err := sm.createStoragePathIfNotExists(schemaConfig.Name)
+	storagePath := sm.getAbsStoragePath(schemaConfig.Name)
+
+	_, err := os.Stat(storagePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("unable to check schema folder existence : %s", err.Error())
+		} // path does not exist
+	} else {
+		return nil
+	}
+
+	_, err = sm.createStoragePathIfNotExists(schemaConfig.Name)
 
 	if err != nil {
 		return fmt.Errorf("unable to create schema folder: `%s`", err.Error())
 	}
 
 	// for each column create slab on disk
-	for _, col := range schemaConfig.Columns {
+	for colIdx, col := range schemaConfig.Columns {
 		createOneSlabForColumn := func() error {
 
 			slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
@@ -208,6 +219,12 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 			reservedSize := int(slabHeader.SingleBlockRowsSize) * int(slabHeader.BlocksTotal) * slabHeader.Type.Size()
 			fillContentErr := fileManager.FillZeroes(writtenBytes+headersReservedSpace, reservedSize)
 
+			curCol := &schemaConfig.Columns[colIdx]
+
+			curCol.Slabs = []uuid.UUID{slabHeader.Uid}
+			curCol.ActiveSlab = slabHeader.Uid
+			// load from disk upon start
+
 			return fillContentErr
 		}
 
@@ -217,6 +234,8 @@ func (sm *Manager) CreateSchema(schemaConfig schema.Schema) error {
 		}
 
 	}
+
+	sm.schemas[schemaConfig.Name] = &schemaConfig
 
 	return nil
 }

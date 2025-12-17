@@ -17,7 +17,7 @@ type ManagerConfig struct {
 }
 
 type Manager struct {
-	schemas map[string]schema.Schema
+	schemas map[string]*schema.Schema
 	blocks  map[schema.BlockUniqueId]BlockRuntimeInfo
 
 	config ManagerConfig
@@ -27,10 +27,12 @@ type Manager struct {
 	BlockBuffer [schema.TotalHeaderSize]byte
 }
 
+// load_from_storage
+
 func New(config ManagerConfig) *Manager {
 
 	return &Manager{
-		schemas: make(map[string]schema.Schema),
+		schemas: make(map[string]*schema.Schema),
 		blocks:  make(map[schema.BlockUniqueId]BlockRuntimeInfo),
 		config:  config,
 	}

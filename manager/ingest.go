@@ -24,7 +24,7 @@ type layoutFieldInfo struct {
 	leftover int
 }
 
-func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) error {
+func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 	// get the schema object from name
 	schemaObject, exists := m.schemas[schemaName]
@@ -33,14 +33,14 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 		return errors.New("schema not found")
 	}
 
-	var fieldsLayout []*layoutFieldInfo = make([]*layoutFieldInfo, len(layout))
+	var fieldsLayout []*layoutFieldInfo = make([]*layoutFieldInfo, len(data.FieldsLayout))
 
 	rowSize := 0
 
 	// check layout matches schema columns names
 	for idx, col := range schemaObject.Columns {
 		found := false
-		for _, l := range layout {
+		for _, l := range data.FieldsLayout {
 			if col.Name == l {
 				found = true
 				break
@@ -56,7 +56,7 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 			// slab exists
 			if col.ActiveSlab != uuid.Nil {
 
-				_, loadSlabErr := m.Slabs.LoadSlabToCache(schemaObject, col.ActiveSlab, m)
+				_, loadSlabErr := m.Slabs.LoadSlabToCache(*schemaObject, col.ActiveSlab, m)
 				if loadSlabErr != nil {
 					return loadSlabErr
 				}
@@ -79,6 +79,7 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 		}
 	}
 
+	dataBuffer := data.dataBuffer
 	itemsCount := len(dataBuffer) / rowSize
 
 	for _, field := range fieldsLayout {
@@ -123,7 +124,7 @@ func (m *Manager) Ingest(dataBuffer []byte, layout []string, schemaName string) 
 			}
 
 			ingestedToBlock, blockErr := m.Slabs.IngestIntoBlock(
-				schemaObject,
+				*schemaObject,
 				field.slab.header,
 				curBlock.Uid,
 				m,

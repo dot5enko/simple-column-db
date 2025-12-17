@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"log"
 	"math/rand"
 	"os"
@@ -80,11 +81,13 @@ func main() {
 		CacheMaxBytes: 0,
 	})
 
-	shemaCreatedErr := m.CreateSchema(schema.Schema{
-		Name: "health_cheks",
+	testSchemaName := "health_cheks"
+
+	shemaCreatedErr := m.CreateSchemaIfNotExists(schema.Schema{
+		Name: testSchemaName,
 		Columns: []schema.SchemaColumn{
 			{Name: "created_at", Type: schema.Uint64FieldType},
-			{Name: "value", Type: schema.Uint64FieldType},
+			{Name: "value", Type: schema.Float32FieldType},
 		},
 	})
 
@@ -92,4 +95,26 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
+	fields := []string{"created_at", "value"}
+	testRows := 100_000
+
+	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
+	binWriter.EnableGrowing()
+
+	frameStart := time.Hour * 24 * 30 * 365
+	startTime := uint64(time.Now().Add(-frameStart).Unix())
+
+	for i := 0; i < testRows; i++ {
+
+		timeOffset := i * 60
+
+		binWriter.PutUint64(startTime + uint64(timeOffset))
+		binWriter.PutFloat32(rand.Float32())
+	}
+
+	ingestErr := m.Ingest(testSchemaName, manager.IngestBufferFromBinary(binWriter.Bytes(), fields))
+
+	if ingestErr != nil {
+		panic(ingestErr)
+	}
 }
