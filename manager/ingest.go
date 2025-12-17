@@ -314,8 +314,7 @@ func CollectTypedDataToArrayFromBinaryBufferFast[T any](
 ) error {
 
 	switch typ {
-	case schema.Uint64FieldType:
-	case schema.Float32FieldType:
+	case schema.Uint64FieldType, schema.Float32FieldType:
 
 		converted, convertOk := outputColumn.([]T)
 
