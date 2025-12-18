@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -95,8 +96,29 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
+	result, qerr := m.Get(testSchemaName, manager.Query{
+		Filter: []manager.FilterCondition{
+			manager.FilterCondition{
+				Field:     "created_at",
+				Operand:   manager.RANGE,
+				Arguments: []any{uint64(time.Now().Add(-time.Hour * 24 * 30).Unix()), uint64(time.Now().Unix())},
+			},
+		},
+		Select: []manager.Selector{},
+	})
+
+	if qerr != nil {
+		panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
+	} else {
+		log.Printf("query result : %v", result)
+	}
+
+}
+
+func ingest_data_into_simple_metric_value(m *manager.Manager, testSchemaName string, dataSize int) {
+
 	fields := []string{"created_at", "value"}
-	testRows := 10_000_000
+	testRows := dataSize
 
 	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
 	binWriter.EnableGrowing()
@@ -124,4 +146,5 @@ func main() {
 	if ingestErr != nil {
 		panic(ingestErr)
 	}
+
 }

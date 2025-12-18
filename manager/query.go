@@ -8,6 +8,7 @@ import (
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/google/uuid"
 )
 
 type CondOperand byte
@@ -81,9 +82,20 @@ func (sm *Manager) Get(
 		// todo cache
 		// this is a blockmanager responsibility to load blocks from disk if they are not loaded yet
 
-		for _, slab := range schemaObject.Slabs {
+		slabsFiltered := []uuid.UUID{}
 
-			slabInfo, slabErr := sm.Slabs.LoadSlabToCache(schemaObject, slab, sm)
+		// full scan of all slabs and their blocks
+		for _, it := range schemaObject.Columns {
+			if len(it.Slabs) > 0 {
+
+				// todo filter by header bounds, etc
+				slabsFiltered = append(slabsFiltered, it.Slabs...)
+			}
+		}
+
+		for _, slab := range slabsFiltered {
+
+			slabInfo, slabErr := sm.Slabs.LoadSlabToCache(*schemaObject, slab)
 			if slabErr != nil {
 				return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
 			}
@@ -93,10 +105,10 @@ func (sm *Manager) Get(
 			var blocks []BlockRuntimeInfo
 			// filter slab blocks by filter
 
-			for _, compressedHeader := range slabInfo.CompressedBlockHeaders {
+			for _, blockHeader := range slabInfo.BlockHeaders {
 
 				// filter by headers if possible
-				blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(schemaObject, slabInfo, compressedHeader.GroupUid, sm)
+				blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
 
 				if blockErr != nil {
 					return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
@@ -104,7 +116,7 @@ func (sm *Manager) Get(
 
 				blocks = append(blocks, BlockRuntimeInfo{
 					Val:          blockDecodedInfo,
-					Header:       compressedHeader,
+					Header:       blockHeader,
 					Synchronized: true,
 				})
 			}
@@ -163,30 +175,35 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 
 	var itemsFiltered int
 
-	runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*schema.RuntimeBlockData[T])
+	runtimeBlockInfo, rtBlockInfoOk := blockData.Val.(*schema.RuntimeBlockData)
 	if !rtBlockInfoOk {
 		return ErrRuntimeBlockInfoTypeIsIncorrect
 	}
+
+	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+
+	arrayCasted := directBlockArray.([]T)
+	inputArray := arrayCasted[:arrayEndOffset]
 
 	switch filter.Operand {
 	case RANGE:
 		operandA := filter.Arguments[0].(T)
 		operandB := filter.Arguments[1].(T)
 
-		itemsFiltered = ops.CompareValuesAreInRange(runtimeBlockInfo.DirectAccess(), operandA, operandB, indicesCache)
+		itemsFiltered = ops.CompareValuesAreInRange(inputArray, operandA, operandB, indicesCache)
 
 	case EQ:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareNumericValuesAreEqual(runtimeBlockInfo.DirectAccess(), operand, indicesCache)
+		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
 
 	case GT:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreBigger(runtimeBlockInfo.DirectAccess(), operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand %v", filter.Operand)
+		return fmt.Errorf("unsupported operand %v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered])

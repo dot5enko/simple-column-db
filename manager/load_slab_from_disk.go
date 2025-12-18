@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -113,7 +114,10 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 							case 1:
 								_, decompressErr := compression.DecompressLz4(m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize], item.data[:])
 								if decompressErr != nil {
-									e = fmt.Errorf("unable to decompress slab data: %s", decompressErr.Error())
+
+									spew.Dump("input buffers to decompress ", m.BufferForCompressedData10Mb[:256])
+
+									e = fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.data[:]), decompressErr.Error())
 									return
 								}
 							default:
