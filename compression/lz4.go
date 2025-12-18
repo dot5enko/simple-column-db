@@ -10,3 +10,9 @@ func CompressLz4(src []byte, output []byte) (int, error) {
 	return c.CompressBlock(src, output)
 
 }
+
+func DecompressLz4(src []byte, output []byte) (int, error) {
+
+	return lz4.UncompressBlock(src, output)
+
+}

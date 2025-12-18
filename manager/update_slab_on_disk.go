@@ -63,7 +63,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 		headersHeaderOffset := schema.TotalHeaderSize * uint64(foundIdx)
 		slabHeaderAbsOffset := schema.SlabHeaderFixedSize + headersHeaderOffset
-		headersSize := schema.TotalHeaderSize * uint64(slab.BlocksTotal)
+		headersSize := schema.TotalHeaderSize * int(slab.BlocksTotal)
 
 		writeBuf := bytes.NewBuffer(sm.BufferForCompressedData10Mb[:0])
 		dataSize, writeErr := io.DumpNumbersArrayBlockAny(writeBuf, block.DataTypedArray)
@@ -86,20 +86,25 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 			start := time.Now()
 			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
 
-			compressionTook := time.Since(start)
+			if compressedSize > 0 {
+				compressionTook := time.Since(start)
 
-			if compressErr != nil {
-				return fmt.Errorf("unable to compress slab data : %s", compressErr.Error())
+				if compressErr != nil {
+					return fmt.Errorf("unable to compress slab data : %s", compressErr.Error())
+				}
+
+				// log.Printf(" input : %d -> output %d", dataSize*int(slab.BlocksFinalized+1), compressedSize)
+
+				compressRatio := float64(compressedSize) / float64(compressionSizeTotal)
+				fillRatio := float64(slab.BlocksFinalized) / float64(slab.BlocksTotal)
+
+				color.Yellow(" compressed slab [type=%s][%d/%d] %d -> %d [%.2f%%] fill %.2f%% %.2fms", slab.Type.String(), slab.BlocksFinalized, slab.BlocksTotal, compressionSizeTotal, compressedSize, compressRatio*100.0, fillRatio*100, compressionTook.Seconds()*1000)
+
+				slab.CompressedSlabContentSize = uint64(compressedSize)
+				slab.CompressionType = 1
+			} else {
+				slab.CompressedSlabContentSize = uint64(compressionSizeTotal)
 			}
-
-			// log.Printf(" input : %d -> output %d", dataSize*int(slab.BlocksFinalized+1), compressedSize)
-
-			compressRatio := float64(compressedSize) / float64(compressionSizeTotal)
-			fillRatio := float64(slab.BlocksFinalized) / float64(slab.BlocksTotal)
-
-			color.Yellow(" compressed slab [type=%s][%d/%d] %d -> %d [%.2f%%] fill %.2f%% %.2fms", slab.Type.String(), slab.BlocksFinalized, slab.BlocksTotal, compressionSizeTotal, compressedSize, compressRatio*100.0, fillRatio*100, compressionTook.Seconds()*1000)
-
-			slab.CompressedSlabContentSize = uint64(compressedSize)
 		}
 
 		// header update
@@ -122,9 +127,13 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 			}
 		}
 
-		// log.Printf(" --data size dumped : %d", dataSize)
-		// write compressed data
-		writeDataErr := fileManager.WriteAt(sm.BufferForCompressedData10Mb[:slab.CompressedSlabContentSize], int(schema.SlabHeaderFixedSize+headersSize), int(slab.CompressedSlabContentSize))
+		var writeDataErr error
+
+		if slab.CompressionType != 0 {
+			writeDataErr = fileManager.WriteAt(sm.BufferForCompressedData10Mb[:slab.CompressedSlabContentSize], int(schema.SlabHeaderFixedSize+headersSize), int(slab.CompressedSlabContentSize))
+		} else {
+			writeDataErr = fileManager.WriteAt(slabCacheItem.data[:], schema.SlabHeaderFixedSize+headersSize, int(slab.CompressedSlabContentSize))
+		}
 
 		if writeDataErr != nil {
 			return fmt.Errorf("unable to update block data : %s", writeDataErr.Error())

@@ -96,15 +96,13 @@ func main() {
 	}
 
 	fields := []string{"created_at", "value"}
-	testRows := 1_000_000
+	testRows := 10_000_000
 
 	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
 	binWriter.EnableGrowing()
 
 	frameStart := time.Hour * 24 * 30 * 12 * 5
 	startTime := time.Now().Add(-frameStart).Unix()
-
-	showTest := 20
 
 	for i := 0; i < testRows; i++ {
 
@@ -115,9 +113,6 @@ func main() {
 		binWriter.PutUint64(timeVal)
 		binWriter.PutFloat32(randVal)
 
-		if i < showTest {
-			log.Printf("row %d : %d", i, timeVal)
-		}
 	}
 
 	before := time.Now()
