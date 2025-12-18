@@ -223,8 +223,6 @@ func CollectColumnsFromRow[T any](
 	outputInts := make([]T, itemsCount)
 	outBuffer := make([]byte, itemsCount*field.typ.Size())
 
-	color.Red(" -- collecting columns from row: %T. data offset : %d, row size: %d", outputInts, field.dataOffset, rowSize)
-
 	collectErr := CollectTypedDataToArrayFromBinaryBufferFast[T](dataBuffer,
 		outputInts[:], field.typ,
 		field.dataOffset, rowSize, itemsCount,
@@ -233,12 +231,6 @@ func CollectColumnsFromRow[T any](
 
 	if collectErr != nil {
 		return collectErr
-	}
-
-	testN := 10
-
-	for idx, i := range outputInts[:testN] {
-		fmt.Printf(" -- %d read columns from row: %v\n", idx, i)
 	}
 
 	field.DataArray = outputInts
