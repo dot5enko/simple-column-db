@@ -1,6 +1,6 @@
 package ops
 
-func CompareNumericValuesAreEqual[T uint64 | uint16 | uint8 | uint32 | int64 | int32 | int16 | int8 | int | float64 | float32](arr []T, cmp T, out []uint16) int {
+func CompareNumericValuesAreEqual[T NumericTypes](arr []T, cmp T, out []uint16) int {
 	n := len(arr)
 	var filled int = 0
 	i := 0

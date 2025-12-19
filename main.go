@@ -114,16 +114,16 @@ func main() {
 			// 	Operand:   manager.EQ,
 			// 	Arguments: []any{uint64(0)},
 			// },
-			// {
-			// 	Field:     "value",
-			// 	Operand:   manager.RANGE,
-			// 	Arguments: []any{float32(100), float32(1.601)},
-			// },
 			{
 				Field:     "value",
-				Operand:   manager.LT,
-				Arguments: []any{float32(0.6)},
+				Operand:   manager.RANGE,
+				Arguments: []any{float32(0.799), float32(1.0)},
 			},
+			// {
+			// 	Field:     "value",
+			// 	Operand:   manager.GT,
+			// 	Arguments: []any{float32(0.799)},
+			// },
 		},
 		Select: []manager.Selector{},
 	})
