@@ -93,7 +93,7 @@ func TestRangeBlockAndTail(t *testing.T) {
 
 }
 
-func BenchmarkRange(b *testing.B) {
+func BenchmarkRangeUnsigned(b *testing.B) {
 
 	size := 40000
 
@@ -109,7 +109,7 @@ func BenchmarkRange(b *testing.B) {
 		val := uint64(rand.Int63n(50000))
 		input[i] = val
 
-		if val > fromBounds && val < toBounds {
+		if val >= fromBounds && val <= toBounds {
 			totalCount++
 			totalSum += int(val)
 		}
@@ -145,7 +145,7 @@ func BenchmarkRangeFloats(b *testing.B) {
 		val := float64(rand.Int63n(50000))
 		input[i] = val
 
-		if val > fromBounds && val < toBounds {
+		if val >= fromBounds && val <= toBounds {
 			totalCount++
 			totalSum += int(val)
 		}
