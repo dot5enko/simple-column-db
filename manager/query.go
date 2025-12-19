@@ -8,6 +8,7 @@ import (
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -79,83 +80,119 @@ func (sm *Manager) Get(
 			}
 		}
 
-		// todo cache
-		// this is a blockmanager responsibility to load blocks from disk if they are not loaded yet
+		// slabs
 
 		slabsFiltered := []uuid.UUID{}
 
 		// full scan of all slabs and their blocks
+		slabsByColumns := map[string][]uuid.UUID{}
+
 		for _, it := range schemaObject.Columns {
 			if len(it.Slabs) > 0 {
 
-				// todo filter by header bounds, etc
+				// global
 				slabsFiltered = append(slabsFiltered, it.Slabs...)
+
+				old, isOk := slabsByColumns[it.Name]
+				if !isOk {
+					old = []uuid.UUID{}
+					slabsByColumns[it.Name] = old
+				}
+
+				// todo filter by header bounds, etc
+				slabsByColumns[it.Name] = append(old, it.Slabs...)
 			}
 		}
 
-		for _, slab := range slabsFiltered {
-
-			slabInfo, slabErr := sm.Slabs.LoadSlabToCache(*schemaObject, slab)
-			if slabErr != nil {
-				return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
+		// group filters by columns
+		filtersByColumns := map[string][]FilterCondition{}
+		for _, filter := range query.Filter {
+			old, isOk := filtersByColumns[filter.Field]
+			if !isOk {
+				old = []FilterCondition{}
 			}
 
-			blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
+			filtersByColumns[filter.Field] = append(old, filter)
+		}
 
-			var blocks []BlockRuntimeInfo
-			// filter slab blocks by filter
+		// spew.Dump("filter by columns", filtersByColumns)
+		// spew.Dump("slabs filtered", slabsByColumns)
 
-			for _, blockHeader := range slabInfo.BlockHeaders {
+		for columnName, filterColumn := range filtersByColumns {
+			for _, slab := range slabsByColumns[columnName] {
 
-				// filter by headers if possible
-				blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
+				color.Red(" -- slab processing by field name : %s. slab %s ", columnName, slab.String())
 
-				if blockErr != nil {
-					return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
+				slabInfo, slabErr := sm.Slabs.LoadSlabToCache(*schemaObject, slab)
+				if slabErr != nil {
+					return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
 				}
 
-				blocks = append(blocks, BlockRuntimeInfo{
-					Val:          blockDecodedInfo,
-					Header:       blockHeader,
-					Synchronized: true,
-				})
-			}
+				blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
 
-			for _, blockData := range blocks {
-				for _, filter := range query.Filter {
+				var blocks []BlockRuntimeInfo
+				// filter slab blocks by filter
 
-					var columnInfo schema.SchemaColumn
+				for idx, blockHeader := range slabInfo.BlockHeaders {
+					if idx > int(slabInfo.BlocksFinalized) {
+						break
+					}
 
-					// cache
-					for _, it := range schemaObject.Columns {
-						if it.Name == filter.Field {
-							columnInfo = it
-							break
+					// filter by headers if possible
+					blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
+
+					if blockErr != nil {
+						return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
+					}
+
+					blocks = append(blocks, BlockRuntimeInfo{
+						Val:          blockDecodedInfo,
+						Header:       blockHeader,
+						Synchronized: true,
+					})
+				}
+
+				for _, blockData := range blocks {
+					for _, filter := range filterColumn {
+
+						var columnInfo schema.SchemaColumn
+
+						// cache
+						for _, it := range schemaObject.Columns {
+							if it.Name == filter.Field {
+								columnInfo = it
+								break
+							}
 						}
-					}
 
-					// process filter on a block
-					switch columnInfo.Type {
-					case schema.Uint64FieldType:
-						ProcessNumericFilterOnColumnWithType[uint64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-					case schema.Uint8FieldType:
-						ProcessNumericFilterOnColumnWithType[uint8](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-					case schema.Float32FieldType:
-						ProcessNumericFilterOnColumnWithType[float32](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-					case schema.Float64FieldType:
-						ProcessNumericFilterOnColumnWithType[float64](filter, &blockData, blockGroupMerger, indicesResultCache[:])
-					default:
-						return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
-					}
+						// if filter.Field != columnInfo.Name {
+						// 	continue
+						// }
 
+						// process filter on a block
+						switch columnInfo.Type {
+						case schema.Uint64FieldType:
+							ProcessNumericFilterOnColumnWithType[uint64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+						case schema.Uint8FieldType:
+							ProcessNumericFilterOnColumnWithType[uint8](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+						case schema.Float32FieldType:
+							ProcessNumericFilterOnColumnWithType[float32](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+						case schema.Float64FieldType:
+							ProcessNumericFilterOnColumnWithType[float64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+						default:
+							return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
+						}
+
+					}
 				}
+
+				// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
+				mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
+				mergedIndices := indicesResultCache[:mergedSize]
+
+				log.Printf("filterd indices in block: %v", mergedIndices)
 			}
 
-			// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
-			mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
-			mergedIndices := indicesResultCache[:mergedSize]
-
-			log.Printf("filterd indices in block: %v", mergedIndices)
 		}
 	}
 
@@ -167,6 +204,7 @@ var (
 )
 
 func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
+	slab *schema.DiskSlabHeader,
 	filter FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
@@ -182,6 +220,8 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
+	// log.Printf("[slab %s] processing numeric filter on column %v, type = %s", slab.Uid.String(), filter.Field, blockData.Header.DataType.String())
+
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
 
@@ -190,7 +230,17 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 		operandA := filter.Arguments[0].(T)
 		operandB := filter.Arguments[1].(T)
 
+		if operandA > operandB {
+			temp := operandB
+			operandB = operandA
+			operandA = temp
+
+			color.Red("swapped operands %v <-> %v. block range : [%.2f: max %.2f]", operandA, operandB, blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
+		}
+
 		itemsFiltered = ops.CompareValuesAreInRange(inputArray, operandA, operandB, indicesCache)
+
+		log.Printf("filtered %v items from block %s", itemsFiltered, blockData.Header.Uid.String())
 
 	case EQ:
 		operand := filter.Arguments[0].(T)

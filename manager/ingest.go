@@ -3,7 +3,6 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 	"unsafe"
@@ -80,7 +79,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 			rowSize += col.Type.Size()
 
-			log.Printf("field %s (%d bytes) at offset %d", col.Name, col.Type.Size(), fInfo.dataOffset)
+			// log.Printf("field %s (%d bytes) at offset %d", col.Name, col.Type.Size(), fInfo.dataOffset)
 
 			fieldsLayout[idx] = &fInfo
 		}
@@ -88,8 +87,6 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 	dataBuffer := data.dataBuffer
 	itemsCount := len(dataBuffer) / rowSize
-
-	color.Red(" -- row size: %d. rows = %d", rowSize, itemsCount)
 
 	for _, field := range fieldsLayout {
 		switch field.typ {

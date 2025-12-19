@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/compression"
 	"github.com/dot5enko/simple-column-db/io"
@@ -80,14 +81,19 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 		// compress whole slab
 
-		{
-			compressionSizeTotal := dataSize * int(slabCacheItem.header.BlocksTotal)
+		compressionSizeTotal := dataSize * int(slabCacheItem.header.BlocksTotal)
+
+		if false {
 
 			start := time.Now()
-			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
 
+			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
 			if compressedSize > 0 {
 				compressionTook := time.Since(start)
+
+				showSize := 128
+
+				spew.Dump("compression input ", slabCacheItem.data[:showSize], slabCacheItem.data[compressionSizeTotal-showSize:compressionSizeTotal])
 
 				if compressErr != nil {
 					return fmt.Errorf("unable to compress slab data : %s", compressErr.Error())
@@ -100,11 +106,15 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 				color.Yellow(" compressed slab [type=%s][%d/%d] %d -> %d [%.2f%%] fill %.2f%% %.2fms", slab.Type.String(), slab.BlocksFinalized, slab.BlocksTotal, compressionSizeTotal, compressedSize, compressRatio*100.0, fillRatio*100, compressionTook.Seconds()*1000)
 
+				spew.Dump("compressed data", sm.BufferForCompressedData10Mb[:showSize], sm.BufferForCompressedData10Mb[compressedSize-showSize:compressedSize])
+
 				slab.CompressedSlabContentSize = uint64(compressedSize)
 				slab.CompressionType = 1
 			} else {
 				slab.CompressedSlabContentSize = uint64(compressionSizeTotal)
 			}
+		} else {
+			slab.CompressedSlabContentSize = uint64(compressionSizeTotal)
 		}
 
 		// header update

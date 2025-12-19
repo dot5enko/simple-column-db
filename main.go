@@ -83,6 +83,7 @@ func main() {
 	})
 
 	testSchemaName := "health_cheks_"
+	//+ uuid.NewString()[:5]
 
 	shemaCreatedErr := m.CreateSchemaIfNotExists(schema.Schema{
 		Name: testSchemaName,
@@ -96,16 +97,28 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
+	ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
+
+	beforeIndex := time.Hour * 24 * 30 * 12
+
+	before := time.Now()
 	result, qerr := m.Get(testSchemaName, manager.Query{
 		Filter: []manager.FilterCondition{
-			manager.FilterCondition{
+			{
 				Field:     "created_at",
 				Operand:   manager.RANGE,
-				Arguments: []any{uint64(time.Now().Add(-time.Hour * 24 * 30).Unix()), uint64(time.Now().Unix())},
+				Arguments: []any{uint64(time.Now().Add(beforeIndex).Unix()), uint64(time.Now().Unix())},
 			},
+			// {
+			// 	Field:     "created_at",
+			// 	Operand:   manager.EQ,
+			// 	Arguments: []any{uint64(0)},
+			// },
 		},
 		Select: []manager.Selector{},
 	})
+	end := time.Since(before)
+	log.Printf("query took %.2fms", end.Seconds()*1000)
 
 	if qerr != nil {
 		panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))

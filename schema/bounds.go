@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"log"
+
 	"github.com/dot5enko/simple-column-db/bits"
 )
 
@@ -69,6 +71,9 @@ func (header *BoundsFloat) FromBytes(reader *bits.BitsReader) (topErr error) {
 func (header *BoundsFloat) WriteTo(bw *bits.BitWriter) (int, error) {
 
 	bw.PutFloat64(header.Max)
+
+	log.Printf("write bounds %.2f <-> %.2f", header.Min, header.Max)
+
 	bw.PutFloat64(header.Min)
 
 	return bw.Position(), nil

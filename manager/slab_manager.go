@@ -25,7 +25,7 @@ type BlockCacheItem struct {
 type SlabCacheItem struct {
 	header *schema.DiskSlabHeader
 
-	data [schema.SlabDiskContentsUncompressed * 3]byte
+	data [schema.SlabDiskContentsUncompressed]byte
 
 	rtStats *CacheStats
 }

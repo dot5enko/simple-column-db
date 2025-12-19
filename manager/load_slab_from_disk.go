@@ -3,6 +3,7 @@ package manager
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -13,11 +14,11 @@ import (
 
 func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
-	// before := time.Now()
-	// defer func() {
-	// 	loadTook := time.Since(before).Microseconds()
-	// 	log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
-	// }()
+	before := time.Now()
+	defer func() {
+		loadTook := time.Since(before).Microseconds()
+		log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
+	}()
 
 	slabHeader := m.getSlabFromCache(slabUid)
 

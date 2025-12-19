@@ -53,7 +53,7 @@ func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.Sc
 
 	zeroesFilledErr := f.FillZeroes(schema.SlabHeaderFixedSize+schema.TotalHeaderSize, totalZeroSize)
 
-	color.Green(" +++ created new slab with id %v, size %d bytes, type = %s", slabHeader.Uid.String(), slabHeader.CompressedSlabContentSize, slabHeader.Type.String())
+	color.Green(" +++ created new slab with id %v, size %d bytes, type = %s, field = %s", slabHeader.Uid.String(), slabHeader.CompressedSlabContentSize, slabHeader.Type.String(), schemaConfig.Columns[slabHeader.SchemaFieldId-1].Name)
 
 	if zeroesFilledErr != nil {
 		return nil, zeroesFilledErr
