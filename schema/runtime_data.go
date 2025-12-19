@@ -12,8 +12,10 @@ type RuntimeBlockData struct {
 	lock sync.RWMutex
 
 	DataTypedArray any
-	Cap            int
-	Items          int
+
+	// why dup ?
+	Cap   int
+	Items int
 }
 
 func writeTypedArray[T NumericTypes](b *RuntimeBlockData, dataArray any, startOffset int) (int, error, BoundsFloat) {
@@ -55,7 +57,13 @@ func (b *RuntimeBlockData) Write(dataArray any, dataArrayStartOffset int, typ Fi
 	}
 
 	if topErr == nil {
+		// change block runtimr
 		b.Items += written
+
+		// change block header
+		b.Header.Items += uint16(written)
+		b.Header.Bounds.Morph(bounds)
+
 	}
 
 	return
@@ -75,8 +83,8 @@ func (b *RuntimeBlockData) DirectAccess() (typedDataArray any, endOffset int) {
 func NewRuntimeBlockDataFromSlice(dataArray any, itemCount int) *RuntimeBlockData {
 
 	return &RuntimeBlockData{
-		Cap:            BlockRowsSize,
-		Items:          itemCount, // todo make it possible to have different sizes for different blocks ?
+		Cap:            BlockRowsSize, // todo make it possible to have different sizes for different blocks ?
+		Items:          itemCount,
 		DataTypedArray: dataArray,
 	}
 }

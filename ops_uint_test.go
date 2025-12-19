@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"math/rand"
 	"testing"
 
@@ -51,20 +52,34 @@ func BenchmarkRange(b *testing.B) {
 
 	size := 40000
 
+	var fromBounds uint64 = 4096
+	var toBounds uint64 = 8192
+
+	totalCount := 0
+	totalSum := 0
+
 	input := make([]uint64, size)
 
 	for i := 0; i < size; i++ {
 		val := uint64(rand.Int63n(50000))
 		input[i] = val
-	}
 
-	var fromBounds uint64 = 4096
-	var toBounds uint64 = 8192
+		if val > fromBounds && val < toBounds {
+			totalCount++
+			totalSum += int(val)
+		}
+
+	}
 
 	out := make([]uint16, size)
 
+	log.Printf("amount %d", totalCount)
+
 	for b.Loop() {
-		ops.CompareValuesAreInRange(input[:], fromBounds, toBounds, out)
+		totalBenchCount := ops.CompareValuesAreInRange(input[:], fromBounds, toBounds, out)
+		if totalCount != totalBenchCount {
+			b.Fatalf("Benchmark failed: expected %d but got %d", totalCount, totalBenchCount)
+		}
 	}
 
 }

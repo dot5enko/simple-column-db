@@ -18,7 +18,11 @@ func CompareValuesAreInRange[T NumericTypes](arr []T, cmpFrom, cmpTo T, out []ui
 
 	rng := cmpTo - cmpFrom
 
+	// log.Printf(" n items in array : %d", n)
+
 	for ; i+7 < n; i += 8 {
+
+		// log.Printf(" -- %d compare tail: from:%v > %v > to:%v\n", i, cmpFrom, arr[i], cmpTo)
 
 		a0 := arr[i+0]
 		a1 := arr[i+1]
@@ -63,7 +67,6 @@ func CompareValuesAreInRange[T NumericTypes](arr []T, cmpFrom, cmpTo T, out []ui
 		filled += im6
 		out[filled] = uint16(i + 7)
 		filled += im7
-
 	}
 
 	// Tail element

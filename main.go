@@ -97,23 +97,33 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
-	ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
+	// ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
 
-	beforeIndex := time.Hour * 24 * 30 * 12
+	// beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
 	before := time.Now()
 	result, qerr := m.Get(testSchemaName, manager.Query{
 		Filter: []manager.FilterCondition{
-			{
-				Field:     "created_at",
-				Operand:   manager.RANGE,
-				Arguments: []any{uint64(time.Now().Add(beforeIndex).Unix()), uint64(time.Now().Unix())},
-			},
+			// {
+			// 	Field:     "created_at",
+			// 	Operand:   manager.RANGE,
+			// 	Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
+			// },
 			// {
 			// 	Field:     "created_at",
 			// 	Operand:   manager.EQ,
 			// 	Arguments: []any{uint64(0)},
 			// },
+			// {
+			// 	Field:     "value",
+			// 	Operand:   manager.RANGE,
+			// 	Arguments: []any{float32(100), float32(1.601)},
+			// },
+			{
+				Field:     "value",
+				Operand:   manager.LT,
+				Arguments: []any{float32(0.6)},
+			},
 		},
 		Select: []manager.Selector{},
 	})
@@ -143,7 +153,7 @@ func ingest_data_into_simple_metric_value(m *manager.Manager, testSchemaName str
 
 		timeOffset := uint64(i * 60)
 		timeVal := uint64(startTime) + timeOffset
-		randVal := rand.Float32()
+		randVal := 0.5 + rand.Float32()*(0.8-0.5)
 
 		binWriter.PutUint64(timeVal)
 		binWriter.PutFloat32(randVal)

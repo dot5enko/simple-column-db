@@ -128,8 +128,6 @@ func (sm *Manager) Get(
 					return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
 				}
 
-				blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
-
 				var blocks []BlockRuntimeInfo
 				// filter slab blocks by filter
 
@@ -153,6 +151,9 @@ func (sm *Manager) Get(
 				}
 
 				for _, blockData := range blocks {
+
+					blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
+
 					for _, filter := range filterColumn {
 
 						var columnInfo schema.SchemaColumn
@@ -169,28 +170,35 @@ func (sm *Manager) Get(
 						// 	continue
 						// }
 
+						var processFilterErr error
+
 						// process filter on a block
 						switch columnInfo.Type {
 						case schema.Uint64FieldType:
-							ProcessNumericFilterOnColumnWithType[uint64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessNumericFilterOnColumnWithType[uint64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Uint8FieldType:
-							ProcessNumericFilterOnColumnWithType[uint8](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessNumericFilterOnColumnWithType[uint8](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Float32FieldType:
-							ProcessNumericFilterOnColumnWithType[float32](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessNumericFilterOnColumnWithType[float32](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Float64FieldType:
-							ProcessNumericFilterOnColumnWithType[float64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessNumericFilterOnColumnWithType[float64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						default:
 							return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
 						}
 
+						if processFilterErr != nil {
+							return nil, fmt.Errorf("error filter processing : %s", processFilterErr.Error())
+						}
+
 					}
+
+					// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
+					mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
+					mergedIndices := indicesResultCache[:mergedSize]
+
+					log.Printf("filterd indices in block: %v", len(mergedIndices))
 				}
 
-				// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
-				mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
-				mergedIndices := indicesResultCache[:mergedSize]
-
-				log.Printf("filterd indices in block: %v", mergedIndices)
 			}
 
 		}
@@ -235,13 +243,15 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 			operandB = operandA
 			operandA = temp
 
-			color.Red("swapped operands %v <-> %v. block range : [%.2f: max %.2f]", operandA, operandB, blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
 		}
 
 		itemsFiltered = ops.CompareValuesAreInRange(inputArray, operandA, operandB, indicesCache)
+		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
-		log.Printf("filtered %v items from block %s", itemsFiltered, blockData.Header.Uid.String())
-
+		// if itemsFiltered > 0 {
+		// 	log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
+		// 	color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
+		// }
 	case EQ:
 		operand := filter.Arguments[0].(T)
 
@@ -253,7 +263,7 @@ func ProcessNumericFilterOnColumnWithType[T ops.NumericTypes](
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand %v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered])

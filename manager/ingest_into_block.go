@@ -42,7 +42,7 @@ func (m *SlabManager) IngestIntoBlock(
 
 			slabHeaderChanged := slab.Bounds.Morph(bounds)
 
-			data.Header.Bounds.Morph(bounds)
+			// move to write function above
 
 			blockFinished := false
 

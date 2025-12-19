@@ -77,7 +77,7 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 		BlocksFinalized:           0,
 		CompressionType:           0,
 		CompressedSlabContentSize: uint64(uncompressedSize),
-		Bounds:                    BoundsFloat{},
+		Bounds:                    NewBounds(),
 	}, nil
 }
 

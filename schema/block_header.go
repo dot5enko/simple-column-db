@@ -36,6 +36,7 @@ func NewBlockHeader(typ FieldType) DiskHeader {
 		Uid:      uuid.New(),
 		DataType: typ,
 		Items:    0,
+		Bounds:   NewBounds(),
 	}
 }
 
@@ -68,6 +69,8 @@ func (header *DiskHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 
 	// read max/min values
 	header.Bounds.FromBytes(reader)
+
+	// log.Printf(" -- block %s bounds loaded : %e : %e", header.Uid.String(), header.Bounds.Min, header.Bounds.Max)
 
 	return nil
 
