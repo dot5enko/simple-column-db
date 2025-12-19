@@ -97,7 +97,7 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
-	// ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
+	ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
@@ -115,7 +115,16 @@ func main() {
 				Arguments: []any{float32(0.7)},
 			},
 		},
-		Select: []manager.Selector{},
+		Select: []manager.Selector{
+			{
+				Arguments: []any{"avg", "value"},
+				Alias:     "avg_value",
+			},
+			{
+				Arguments: []any{"count"},
+				Alias:     "total_count",
+			},
+		},
 	})
 	end := time.Since(before)
 	log.Printf("query took %.2fms", end.Seconds()*1000)

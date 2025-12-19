@@ -7,7 +7,6 @@ import (
 
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -135,7 +134,7 @@ func (sm *Manager) Get(
 		for columnName, filterColumn := range filtersByColumns {
 			for _, slab := range slabsByColumns[columnName] {
 
-				color.Red(" -- slab processing by field name : %s. slab %s ", columnName, slab.String())
+				// color.Red(" -- slab processing by field name : %s. slab %s ", columnName, slab.String())
 
 				slabInfo, slabErr := sm.Slabs.LoadSlabToCache(*schemaObject, slab)
 				if slabErr != nil {

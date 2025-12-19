@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -82,6 +83,19 @@ func (m *Manager) loadSchemesFromDisk() error {
 		} else {
 			m.schemas[schema.Name] = &schema
 			color.Yellow(" >> loaded schema from disk : %s", schema)
+
+			for _, column := range schema.Columns {
+				for _, colSlab := range column.Slabs {
+
+					uidTime := colSlab.Time()
+					seconds, ns := uidTime.UnixTime()
+
+					oTime := time.Unix(seconds, ns)
+
+					log.Printf(" >> column %s slab : %s", column.Name, oTime.String())
+				}
+			}
+
 		}
 
 		return nil

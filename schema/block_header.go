@@ -32,8 +32,11 @@ type DiskHeader struct {
 }
 
 func NewBlockHeader(typ FieldType) DiskHeader {
+
+	uid, _ := uuid.NewV7()
+
 	return DiskHeader{
-		Uid:      uuid.New(),
+		Uid:      uid,
 		DataType: typ,
 		Items:    0,
 		Bounds:   NewBounds(),

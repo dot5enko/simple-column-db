@@ -66,9 +66,11 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 
 	uncompressedSize := slabBlocks * BlockRowsSize * columnDef.Type.Size()
 
+	uid, _ := uuid.NewV7()
+
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
-		Uid:                 uuid.New(),
+		Uid:                 uid,
 		BlocksTotal:         uint16(slabBlocks),
 		SingleBlockRowsSize: BlockRowsSize,
 		SchemaFieldId:       uint8(selectedIdx) + 1,
