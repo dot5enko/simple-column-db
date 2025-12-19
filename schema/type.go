@@ -61,3 +61,17 @@ func (f FieldType) Size() int {
 		panic("unknown field type " + f.String())
 	}
 }
+
+func (f FieldType) BlockSize() int {
+	elementSize := f.Size()
+	return elementSize * BlockRowsSize
+}
+
+func (f FieldType) BlocksPerSlab() int16 {
+	blockSize := f.BlockSize()
+	result := SlabDiskContentsUncompressed / blockSize
+	if result > 32000 {
+		return int16(32000)
+	}
+	return int16(result)
+}

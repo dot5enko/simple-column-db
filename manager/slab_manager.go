@@ -124,9 +124,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			return nil, fmt.Errorf("block you are looking for (%s) not found in slab %s", block.String(), slab.Uid.String())
 		} else {
 
-			blockItemSize := blockHeader.DataType.Size()
-			blockSize := blockItemSize * int(schema.BlockRowsSize)
-
+			blockSize := blockHeader.DataType.BlockSize()
 			blockStartOffset = blockIdx * blockSize
 
 			slabCache := m.getSlabFromCache(slab.Uid)

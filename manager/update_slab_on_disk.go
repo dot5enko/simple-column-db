@@ -59,7 +59,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 	}
 
 	{
-		singleBlockUncompressedSize := slab.Type.Size() * schema.BlockRowsSize
+		singleBlockUncompressedSize := slab.Type.BlockSize()
 		blockDataOffset := singleBlockUncompressedSize * foundIdx
 
 		headersHeaderOffset := schema.TotalHeaderSize * uint64(foundIdx)

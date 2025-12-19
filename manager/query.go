@@ -165,7 +165,7 @@ func (sm *Manager) Get(
 					})
 				}
 
-				for _, blockData := range blocks {
+				for blockIdx, blockData := range blocks {
 
 					blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
 
@@ -211,7 +211,7 @@ func (sm *Manager) Get(
 					mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
 					mergedIndices := indicesResultCache[:mergedSize]
 
-					log.Printf("filterd indices in block: %v", len(mergedIndices))
+					log.Printf("filterd indices in block[%d]: %v", blockIdx, len(mergedIndices))
 				}
 
 			}

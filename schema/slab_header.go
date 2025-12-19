@@ -57,14 +57,8 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 	}
 
 	// calc number of blocks so the slab size would be 2-6 MB when compressed with lz4
-	uncompressedBlockSize := BlockRowsSize * columnDef.Type.Size()
-	slabBlocks := SlabDiskContentsUncompressed / uncompressedBlockSize
-
-	if slabBlocks > 65000 {
-		slabBlocks = 65000
-	}
-
-	uncompressedSize := slabBlocks * BlockRowsSize * columnDef.Type.Size()
+	slabBlocks := columnDef.Type.BlocksPerSlab()
+	uncompressedSize := int(slabBlocks) * columnDef.Type.BlockSize()
 
 	uid, _ := uuid.NewV7()
 
