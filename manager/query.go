@@ -20,6 +20,21 @@ const (
 	RANGE
 )
 
+func (c CondOperand) String() string {
+	switch c {
+	case EQ:
+		return "EQ"
+	case GT:
+		return "GT"
+	case LT:
+		return "LT"
+	case RANGE:
+		return "RANGE"
+	default:
+		panic(fmt.Sprintf("unknown operand %v", c))
+	}
+}
+
 type FilterCondition struct {
 	Field     string
 	Operand   CondOperand

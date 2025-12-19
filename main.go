@@ -99,31 +99,21 @@ func main() {
 
 	// ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
 
-	// beforeIndex := time.Hour * 24 * 30 * 12 * 4
+	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
 	before := time.Now()
 	result, qerr := m.Get(testSchemaName, manager.Query{
 		Filter: []manager.FilterCondition{
-			// {
-			// 	Field:     "created_at",
-			// 	Operand:   manager.RANGE,
-			// 	Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
-			// },
-			// {
-			// 	Field:     "created_at",
-			// 	Operand:   manager.EQ,
-			// 	Arguments: []any{uint64(0)},
-			// },
+			{
+				Field:     "created_at",
+				Operand:   manager.RANGE,
+				Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
+			},
 			{
 				Field:     "value",
-				Operand:   manager.RANGE,
-				Arguments: []any{float32(0.7999), float32(1.0)},
+				Operand:   manager.GT,
+				Arguments: []any{float32(0.7)},
 			},
-			// {
-			// 	Field:     "value",
-			// 	Operand:   manager.GT,
-			// 	Arguments: []any{float32(0.799)},
-			// },
 		},
 		Select: []manager.Selector{},
 	})

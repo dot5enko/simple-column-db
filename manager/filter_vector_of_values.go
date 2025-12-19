@@ -43,7 +43,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		itemsFiltered = ops.CompareValuesAreInRangeUnsignedInts(inputArray, operandA, operandB, indicesCache)
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
-		if itemsFiltered > 0 {
+		if false && itemsFiltered > 0 {
 			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
 			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
 		}
@@ -56,9 +56,13 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+	case LT:
+		operand := filter.Arguments[0].(T)
+
+		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.Header.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered])
@@ -100,7 +104,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 		itemsFiltered = ops.CompareValuesAreInRangeSignedInts(inputArray, operandA, operandB, indicesCache)
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
-		if itemsFiltered > 0 {
+		if false && itemsFiltered > 0 {
 			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
 			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
 		}
@@ -113,6 +117,10 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+	case LT:
+		operand := filter.Arguments[0].(T)
+
+		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
 		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
@@ -177,14 +185,18 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 		}
 
 	case EQ:
-		operand := filter.Arguments[0].(T)
 
+		operand := filter.Arguments[0].(T)
 		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
 
 	case GT:
-		operand := filter.Arguments[0].(T)
 
+		operand := filter.Arguments[0].(T)
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+	case LT:
+
+		operand := filter.Arguments[0].(T)
+		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
 		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
