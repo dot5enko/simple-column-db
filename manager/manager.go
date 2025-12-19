@@ -14,7 +14,7 @@ import (
 )
 
 type BlockRuntimeInfo struct {
-	Val          any
+	Val          *schema.RuntimeBlockData
 	Synchronized bool
 	Header       schema.DiskHeader
 }

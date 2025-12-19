@@ -117,7 +117,7 @@ func main() {
 			{
 				Field:     "value",
 				Operand:   manager.RANGE,
-				Arguments: []any{float32(0.799), float32(1.0)},
+				Arguments: []any{float32(0.7999), float32(1.0)},
 			},
 			// {
 			// 	Field:     "value",

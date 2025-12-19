@@ -138,6 +138,8 @@ func (sm *Manager) Get(
 					// filter by headers if possible
 					blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
 
+					// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
+
 					if blockErr != nil {
 						return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
 					}

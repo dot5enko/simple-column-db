@@ -107,6 +107,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 		var blockHeader schema.DiskHeader
 		blockIdx := -1
+		blockStartOffset := 0
 
 		for idx, it := range slab.BlockHeaders {
 			if it.Uid == block {
@@ -120,8 +121,10 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			return nil, fmt.Errorf("block you are looking for (%s) not found in slab %s", block.String(), slab.Uid.String())
 		} else {
 
-			// blockItemSize := blockHeader.DataType.Size()
-			// blockSize := blockItemSize * int(schema.BlockRowsSize)
+			blockItemSize := blockHeader.DataType.Size()
+			blockSize := blockItemSize * int(schema.BlockRowsSize)
+
+			blockStartOffset = blockIdx * blockSize
 
 			slabCache := m.getSlabFromCache(slab.Uid)
 			if slabCache == nil {
@@ -135,7 +138,9 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				}
 			}
 
-			blockRawData := slabCache.data[blockHeader.StartOffset:]
+			blockRawData := slabCache.data[blockStartOffset:]
+
+			// log.Printf(" --- loading %s block. blockHeader.StartOffset:%d", blockHeader.Uid.String(), blockHeader.StartOffset)
 
 			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, blockHeader)
 
