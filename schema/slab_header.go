@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -61,6 +62,8 @@ func NewDiskSlab(
 	// calc number of blocks so the slab size would be 2-6 MB when compressed with lz4
 	slabBlocks := columnDef.Type.BlocksPerSlab()
 	uncompressedSize := int(slabBlocks) * columnDef.Type.BlockSize()
+
+	color.Red(" --- new slab creation with offset blocks : %d", slabOffsetBlocks)
 
 	uid, _ := uuid.NewV7()
 

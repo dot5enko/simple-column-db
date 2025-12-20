@@ -210,7 +210,9 @@ func (sm *Manager) Get(
 					mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
 					mergedIndices := indicesResultCache[:mergedSize]
 
-					log.Printf("filterd indices in block[%d]: %v", blockIdx, len(mergedIndices))
+					absBlockOffset := int(slabInfo.SlabOffsetBlocks) + blockIdx
+
+					log.Printf("filterd indices in block[%s][%d]: %v. [abs block offset : %d]", columnName, blockIdx, len(mergedIndices), absBlockOffset)
 				}
 
 			}
