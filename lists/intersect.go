@@ -69,10 +69,34 @@ func convertArrayIndicesToBitset(arr []uint16) (bitset bits.Bitfield) {
 	return bitset
 }
 
+func convertArrayIndicesToBitsetWithBounds(arr []uint16, boundsStart, boundsEnd uint16) (bitset bits.Bitfield) {
+
+	bitset.FromSortedWithBounds(arr, boundsStart, boundsEnd)
+
+	return bitset
+}
+
 func IntersectIndicesFastTwoListBitset(a, b, out []uint16) int {
 
 	aBitset := convertArrayIndicesToBitset(a)
 	bBitset := convertArrayIndicesToBitset(b)
+
+	// t.StopTimer()
+	// defer t.StartTimer()
+
+	resultBitset := bits.MergeAND(aBitset, bBitset)
+
+	if resultBitset.Any() {
+		return resultBitset.ToIndices(out)
+	}
+
+	return resultBitset.ToIndices(out)
+}
+
+func IntersectIndicesFastTwoListBitsetOptimized(a, b, out []uint16, aStart, bStart, aEnd, bEnd uint16) int {
+
+	aBitset := convertArrayIndicesToBitsetWithBounds(a, aStart, aEnd)
+	bBitset := convertArrayIndicesToBitsetWithBounds(b, bStart, bEnd)
 
 	// t.StopTimer()
 	// defer t.StartTimer()

@@ -40,6 +40,38 @@ type FilterCondition struct {
 	Arguments []any
 }
 
+func (fc FilterCondition) ArgumentFloatValue(idx int) float64 {
+
+	arg := fc.Arguments[idx]
+
+	switch v := arg.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int16:
+		return float64(v)
+	case int8:
+		return float64(v)
+	case uint64:
+		return float64(v)
+	case uint32:
+		return float64(v)
+	case uint16:
+		return float64(v)
+	case uint8:
+		return float64(v)
+	case float32:
+		return float64(v)
+	default:
+		panic(fmt.Sprintf("filter cond argument is not numeric: %T", arg))
+	}
+}
+
 type SelectorType byte
 
 const (
@@ -117,21 +149,47 @@ func (sm *Manager) Get(
 			}
 		}
 
+		type RuntimeFilterCache struct {
+			column schema.SchemaColumn
+		}
+
+		type FilterConditionRuntime struct {
+			filter  FilterCondition
+			runtime *RuntimeFilterCache
+		}
+
 		// group filters by columns
-		filtersByColumns := map[string][]FilterCondition{}
+		filtersByColumns := map[string][]FilterConditionRuntime{}
 		for _, filter := range query.Filter {
 			old, isOk := filtersByColumns[filter.Field]
 			if !isOk {
-				old = []FilterCondition{}
+				old = []FilterConditionRuntime{}
 			}
 
-			filtersByColumns[filter.Field] = append(old, filter)
+			filtersByColumns[filter.Field] = append(old, FilterConditionRuntime{
+				filter:  filter,
+				runtime: &RuntimeFilterCache{},
+			})
 		}
 
 		// spew.Dump("filter by columns", filtersByColumns)
 		// spew.Dump("slabs filtered", slabsByColumns)
 
 		for columnName, filterColumn := range filtersByColumns {
+
+			var columnInfo schema.SchemaColumn
+
+			// cache
+			for _, it := range schemaObject.Columns {
+				if it.Name == columnName {
+					columnInfo = it
+
+					break
+				}
+			}
+
+			filtersSize := len(filterColumn)
+
 			for _, slab := range slabsByColumns[columnName] {
 
 				// color.Red(" -- slab processing by field name : %s. slab %s ", columnName, slab.String())
@@ -147,6 +205,41 @@ func (sm *Manager) Get(
 				for idx, blockHeader := range slabInfo.BlockHeaders {
 					if idx > int(slabInfo.BlocksFinalized) {
 						break
+					}
+
+					skipFilters := 0
+
+					for _, filter := range filterColumn {
+						var processFilterErr error
+
+						skipSingleBlock := false
+
+						// process filter on a block header
+						switch columnInfo.Type {
+						case schema.Uint64FieldType:
+							skipSingleBlock, processFilterErr = ProcessFilterOnBlockHEader[uint64](filter.filter, blockHeader)
+						case schema.Uint8FieldType:
+							skipSingleBlock, processFilterErr = ProcessFilterOnBlockHEader[uint8](filter.filter, blockHeader)
+						case schema.Float32FieldType:
+							skipSingleBlock, processFilterErr = ProcessFilterOnBlockHEader[float32](filter.filter, blockHeader)
+						case schema.Float64FieldType:
+							skipSingleBlock, processFilterErr = ProcessFilterOnBlockHEader[float64](filter.filter, blockHeader)
+						default:
+							return nil, fmt.Errorf("unsupported type %v while filtering block headers", columnInfo.Type.String())
+						}
+
+						if processFilterErr != nil {
+							return nil, fmt.Errorf("error filter processing : %s", processFilterErr.Error())
+						} else {
+							if skipSingleBlock {
+								skipFilters++
+							}
+						}
+					}
+
+					if skipFilters == filtersSize {
+						// color.Yellow("skipping block %s on header filtering step", blockHeader.Uid.String())
+						continue
 					}
 
 					// filter by headers if possible
@@ -174,28 +267,18 @@ func (sm *Manager) Get(
 
 					for _, filter := range filterColumn {
 
-						var columnInfo schema.SchemaColumn
-
-						// cache
-						for _, it := range schemaObject.Columns {
-							if it.Name == filter.Field {
-								columnInfo = it
-								break
-							}
-						}
-
 						var processFilterErr error
 
 						// process filter on a block
 						switch columnInfo.Type {
 						case schema.Uint64FieldType:
-							processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Uint8FieldType:
-							processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Float32FieldType:
-							processFilterErr = ProcessFloatFilterOnColumnWithType[float32](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessFloatFilterOnColumnWithType[float32](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						case schema.Float64FieldType:
-							processFilterErr = ProcessFloatFilterOnColumnWithType[float64](slabInfo, filter, &blockData, blockGroupMerger, indicesResultCache[:])
+							processFilterErr = ProcessFloatFilterOnColumnWithType[float64](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
 						default:
 							return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
 						}

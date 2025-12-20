@@ -207,3 +207,48 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	return nil
 
 }
+
+func ProcessFilterOnBlockHEader[T ops.NumericTypes](
+	filter FilterCondition,
+	block schema.DiskHeader,
+) (blockShouldBeSkipped bool, err error) {
+
+	blockBounds := block.Bounds
+
+	switch filter.Operand {
+	case RANGE:
+		operandFrom := float64(filter.Arguments[0].(T))
+		operandTo := float64(filter.Arguments[1].(T))
+
+		if operandFrom > operandTo {
+			temp := operandTo
+			operandTo = operandFrom
+			operandFrom = temp
+		}
+
+		if !blockBounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo)) {
+			return true, nil
+		}
+
+	case EQ:
+
+		operand := float64(filter.Arguments[0].(T))
+		return !blockBounds.Contains(operand), nil
+
+	case GT:
+
+		operand := float64(filter.Arguments[0].(T))
+		return !(blockBounds.Min < operand), nil
+
+	case LT:
+
+		operand := float64(filter.Arguments[0].(T))
+		return !(blockBounds.Max > operand), nil
+
+	default:
+		return false, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBlockHEader[%s]", filter.Operand, block.DataType.String())
+	}
+
+	return false, nil
+
+}

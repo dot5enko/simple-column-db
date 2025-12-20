@@ -25,6 +25,22 @@ type BoundsFloat struct {
 	Max float64
 }
 
+func (b *BoundsFloat) Intersects(other BoundsFloat) bool {
+	return !(other.Max <= b.Min || other.Min >= b.Max)
+}
+
+func (b BoundsFloat) Contains(value float64) bool {
+	return value >= b.Min && value <= b.Max
+}
+
+func NewBoundsFromValues(min, max float64) BoundsFloat {
+	return BoundsFloat{
+		initialized: true,
+		Min:         min,
+		Max:         max,
+	}
+}
+
 func NewBounds() BoundsFloat {
 	return BoundsFloat{
 		initialized: true,

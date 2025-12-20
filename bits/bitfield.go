@@ -48,6 +48,28 @@ func (b *Bitfield) FromSorted(bits []uint16) {
 	arr[currWord] |= mask
 }
 
+func (b *Bitfield) FromSortedWithBounds(bits []uint16, start, end uint16) {
+	arr := b[:] // removes bounds checks in indexing
+	if len(bits) == 0 {
+		return
+	}
+
+	currWord := bits[0] >> 6
+	mask := uint64(0)
+
+	for _, bit := range bits {
+		w := bit >> 6
+		if w != currWord {
+			arr[currWord] |= mask
+			currWord = w
+			mask = 0
+		}
+		mask |= 1 << (bit & 63)
+	}
+
+	arr[currWord] |= mask
+}
+
 func (b *Bitfield) Get(bit int) uint64 {
 	word := bit >> 6
 	return (b[word] >> (bit & 63)) & 1
