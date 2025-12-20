@@ -9,9 +9,9 @@ import (
 	"github.com/fatih/color"
 )
 
-func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.SchemaColumn) (*schema.DiskSlabHeader, error) {
+func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.SchemaColumn, slabOffsetBlocks uint64) (*schema.DiskSlabHeader, error) {
 
-	slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name)
+	slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name, slabOffsetBlocks)
 	if slabError != nil {
 		return nil, slabError
 	}

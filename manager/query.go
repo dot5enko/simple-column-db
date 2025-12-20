@@ -165,6 +165,9 @@ func (sm *Manager) Get(
 					})
 				}
 
+				// get slab bounds
+				// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
+
 				for blockIdx, blockData := range blocks {
 
 					blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
@@ -180,10 +183,6 @@ func (sm *Manager) Get(
 								break
 							}
 						}
-
-						// if filter.Field != columnInfo.Name {
-						// 	continue
-						// }
 
 						var processFilterErr error
 

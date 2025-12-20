@@ -30,7 +30,7 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 	// for each column create slab on disk
 	for colIdx := range schemaConfig.Columns {
 
-		newSlab, slabCreationErr := sm.Slabs.NewSlabForColumn(schemaConfig, schemaConfig.Columns[colIdx])
+		newSlab, slabCreationErr := sm.Slabs.NewSlabForColumn(schemaConfig, schemaConfig.Columns[colIdx], 0)
 		if slabCreationErr != nil {
 			return slabCreationErr
 		}

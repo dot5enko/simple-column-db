@@ -141,7 +141,11 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 					return fmt.Errorf("unable to trim finalized slab: %s", trimErr.Error())
 				}
 
-				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index])
+				// check curBlock size
+				// if we changed the block size to be different from 32k rows
+				nextSlabOffset := sh.SlabOffsetBlocks + uint64(sh.BlocksTotal)
+
+				newSlab, newSlabCreationErr := m.Slabs.NewSlabForColumn(*schemaObject, schemaObject.Columns[field.index], nextSlabOffset)
 				if newSlabCreationErr != nil {
 					return newSlabCreationErr
 				}

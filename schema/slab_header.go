@@ -10,13 +10,13 @@ import (
 )
 
 const CurrentSlabVersion = 1
-
 const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
-
 const SlabDiskContentsUncompressed = 10 * 1024 * 1024
 
 type DiskSlabHeader struct {
 	Version uint16
+
+	SlabOffsetBlocks uint64
 
 	Uid uuid.UUID
 
@@ -39,7 +39,11 @@ type DiskSlabHeader struct {
 	// BlocksCompressedData []byte
 }
 
-func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error) {
+func NewDiskSlab(
+	schemaObject Schema,
+	fieldName string,
+	slabOffsetBlocks uint64,
+) (*DiskSlabHeader, error) {
 
 	var columnDef SchemaColumn
 	selectedIdx := -1
@@ -64,6 +68,7 @@ func NewDiskSlab(schemaObject Schema, fieldName string) (*DiskSlabHeader, error)
 
 	return &DiskSlabHeader{
 		Version:             CurrentSlabVersion,
+		SlabOffsetBlocks:    slabOffsetBlocks,
 		Uid:                 uid,
 		BlocksTotal:         uint16(slabBlocks),
 		SingleBlockRowsSize: BlockRowsSize,
@@ -82,7 +87,7 @@ func (header *DiskSlabHeader) FromBytes(input io.ReadSeeker) (topErr error) {
 	reader := bits.NewReader(input, binary.LittleEndian)
 
 	header.Version = reader.MustReadU16()
-	// log.Printf(" >> reading version of a slab: %d", header.Version)
+	header.SlabOffsetBlocks = reader.MustReadU64()
 
 	if header.Version != CurrentSlabVersion {
 		return fmt.Errorf("invalid version (%d). Supported versions: %d ", header.Version, CurrentSlabVersion)
@@ -119,6 +124,7 @@ func (header *DiskSlabHeader) WriteTo(buffer []byte) (int, error) {
 
 	// Write basic fields
 	bw.PutUint16(header.Version)
+	bw.PutUint64(header.SlabOffsetBlocks)
 
 	uuidLength := 16
 	n, _ := bw.Write(header.Uid[:])
