@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -27,7 +26,7 @@ func (m *SlabManager) IngestIntoBlock(
 
 	stats := IngestStats{}
 
-	color.Yellow(" ++ ingesting into block %s, slab %s", block.String(), slab.Uid.String())
+	// color.Yellow(" ++ ingesting into block %s, slab %s", block.String(), slab.Uid.String())
 
 	data, err := m.LoadBlockToRuntimeBlockData(schemaObject, slab, block)
 

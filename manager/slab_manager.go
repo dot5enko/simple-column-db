@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -85,7 +84,7 @@ func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
 	if item, ok := m.cache[uid]; ok {
 
-		log.Printf(" --- reading block %s from cache : %d", block.String(), item.rtStats.Reads)
+		// log.Printf(" --- reading block %s from cache : %d", block.String(), item.rtStats.Reads)
 
 		item.rtStats.Reads++
 		return &item

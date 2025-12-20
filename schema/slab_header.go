@@ -10,7 +10,7 @@ import (
 )
 
 const CurrentSlabVersion = 1
-const SlabHeaderFixedSize = 2 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
+const SlabHeaderFixedSize = 2 + 8 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
 const SlabDiskContentsUncompressed = 10 * 1024 * 1024
 
 type DiskSlabHeader struct {
@@ -35,8 +35,6 @@ type DiskSlabHeader struct {
 
 	// up to this point we have a predictable layout
 	BlockHeaders []DiskHeader
-
-	// BlocksCompressedData []byte
 }
 
 func NewDiskSlab(

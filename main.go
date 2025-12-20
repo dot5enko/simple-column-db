@@ -97,7 +97,7 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
-	// ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
+	ingest_data_into_simple_metric_value(m, testSchemaName, 1_000_000)
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
