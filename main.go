@@ -6,12 +6,16 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/manager"
 	"github.com/dot5enko/simple-column-db/schema"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func testCycles(n int, label string, testSize int, cb func()) {
@@ -77,6 +81,17 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
+	waiter := sync.WaitGroup{}
+	waiter.Add(1)
+
+	go func() {
+		defer func() {
+			waiter.Done()
+			log.Printf(" >> done pprof server")
+		}()
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	m := manager.New(manager.ManagerConfig{
 		PathToStorage: "./storage",
 		CacheMaxBytes: 0,
@@ -102,45 +117,53 @@ func main() {
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
-	before := time.Now()
-	result, qerr := m.Get(testSchemaName, manager.Query{
-		Filter: []manager.FilterCondition{
-			{
-				Field:     "created_at",
-				Operand:   manager.RANGE,
-				Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
-			},
-			{
-				Field:     "monitor_id",
-				Operand:   manager.RANGE,
-				Arguments: []any{uint64(4), uint64(6)},
-			},
-			{
-				Field:     "value",
-				Operand:   manager.GT,
-				Arguments: []any{float32(0.7999)},
-			},
-		},
-		Select: []manager.Selector{
-			{
-				Arguments: []any{"avg", "value"},
-				Alias:     "avg_value",
-			},
-			{
-				Arguments: []any{"count"},
-				Alias:     "total_count",
-			},
-		},
-	})
+	time.Sleep(time.Second * 5)
 
-	end := time.Since(before)
-	log.Printf("query took %.2fms", end.Seconds()*1000)
+	testN := 10
 
-	if qerr != nil {
-		panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
-	} else {
-		log.Printf("query result : %v", result)
+	for i := 0; i < testN; i++ {
+		before := time.Now()
+		result, qerr := m.Get(testSchemaName, manager.Query{
+			Filter: []manager.FilterCondition{
+				{
+					Field:     "created_at",
+					Operand:   manager.RANGE,
+					Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
+				},
+				{
+					Field:     "monitor_id",
+					Operand:   manager.RANGE,
+					Arguments: []any{uint64(4), uint64(6)},
+				},
+				{
+					Field:     "value",
+					Operand:   manager.GT,
+					Arguments: []any{float32(0.7999)},
+				},
+			},
+			Select: []manager.Selector{
+				{
+					Arguments: []any{"avg", "value"},
+					Alias:     "avg_value",
+				},
+				{
+					Arguments: []any{"count"},
+					Alias:     "total_count",
+				},
+			},
+		})
+
+		end := time.Since(before)
+		log.Printf("query took %.2fms", end.Seconds()*1000)
+
+		if qerr != nil {
+			panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
+		} else {
+			log.Printf("query result : %v", result)
+		}
 	}
+
+	waiter.Wait()
 
 }
 
