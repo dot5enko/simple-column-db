@@ -295,7 +295,9 @@ func (sm *Manager) Get(
 
 					absBlockOffset := int(slabInfo.SlabOffsetBlocks) + blockIdx
 
-					log.Printf("filterd indices in block[%s][%d]: %v. [abs block offset : %d]", columnName, blockIdx, len(mergedIndices), absBlockOffset)
+					if len(mergedIndices) < 0 {
+						log.Printf("filterd indices in block[%s][%d]: %v. [abs block offset : %d]", columnName, blockIdx, len(mergedIndices), absBlockOffset)
+					}
 				}
 
 			}
