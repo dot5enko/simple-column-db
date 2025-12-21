@@ -1,6 +1,8 @@
 package bits
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 type Bitfield [64 * 8]uint64
 
@@ -24,6 +26,27 @@ func (b *Bitfield) SetTo(bit int, v uint64) {
 	} else {
 		b[word] &^= mask // clear
 	}
+}
+
+func NewFullBitfield() (bf Bitfield) {
+	for i := range bf {
+		bf[i] = ^uint64(0)
+	}
+	return
+}
+
+func (b *Bitfield) FromOther(other Bitfield) {
+	for i := range other {
+		b[i] = other[i]
+	}
+}
+
+func (b *Bitfield) And(other Bitfield) {
+
+	for i := range other {
+		b[i] &= other[i]
+	}
+
 }
 
 func (b *Bitfield) FromSorted(bits []uint16) {
@@ -98,9 +121,22 @@ func (b *Bitfield) Any() bool {
 	return false
 }
 
+func (b *Bitfield) Sum() int {
+
+	total := 0
+
+	for idx, _ := range b {
+		cval := int(b[idx])
+		total += cval
+	}
+
+	return total
+
+}
+
 func (b *Bitfield) Count() int {
 	c := 0
-	for i := 0; i < 64; i += 4 {
+	for i := 0; i < len(b); i += 4 {
 		c += bits.OnesCount64(b[i+0])
 		c += bits.OnesCount64(b[i+1])
 		c += bits.OnesCount64(b[i+2])
@@ -116,7 +152,7 @@ func MergeOR(a, b Bitfield) (out Bitfield) {
 	return
 }
 
-func MergeAND(a, b Bitfield) (out Bitfield) {
+func MergeAND(a Bitfield, b Bitfield) (out Bitfield) {
 	for i := range a {
 		out[i] = a[i] & b[i]
 	}

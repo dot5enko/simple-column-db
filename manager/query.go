@@ -104,10 +104,10 @@ func (sm *Manager) Get(
 
 		// should be big enough to hold all the entries to
 		// todo replace with bitset
-		mergeIndicesCache := make([]uint16, schema.BlockRowsSize*len(query.Filter))
+		// mergeIndicesCache := make([]uint16, schema.BlockRowsSize*len(query.Filter))
+		// var indicesCounter [schema.BlockRowsSize]uint16
 
 		var indicesResultCache [schema.BlockRowsSize]uint16
-		var indicesCounter [schema.BlockRowsSize]uint16
 
 		// check fields before filtering data
 		for _, filter := range query.Filter {
@@ -177,14 +177,7 @@ func (sm *Manager) Get(
 		// spew.Dump("filter by columns", filtersByColumns)
 		// spew.Dump("slabs filtered", slabsByColumns)
 
-		type BlockFilterMask struct {
-			full    bool
-			indices []uint16
-
-			applied int
-		}
-
-		absBlockMaps := map[uint64]*BlockFilterMask{}
+		absBlockMaps := map[uint64]*lists.IndiceUnmerged{}
 
 		for columnName, filterColumn := range filtersByColumns {
 
@@ -292,7 +285,12 @@ func (sm *Manager) Get(
 
 				for blockIdx, blockData := range blocks {
 
-					blockGroupMerger := lists.NewUnmerged(mergeIndicesCache)
+					absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(blockIdx)
+					blockGroupMerger, has := absBlockMaps[absBlockOffset]
+					if !has {
+						blockGroupMerger = lists.NewUnmerged()
+						absBlockMaps[absBlockOffset] = blockGroupMerger
+					}
 
 					for fIdx, filter := range filterColumn {
 
@@ -304,7 +302,10 @@ func (sm *Manager) Get(
 							skippedBlocksDueToHeaderFiltering += 1
 
 							blockGroupMerger.With(nil, false, true)
-						} else {
+							continue
+						}
+
+						{
 							var processFilterErr error
 							var filteredSize int
 
@@ -322,103 +323,34 @@ func (sm *Manager) Get(
 								return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
 							}
 
+							_ = filteredSize
+
 							if processFilterErr != nil {
-								return nil, fmt.Errorf("error filter processing : %s", processFilterErr.Error())
+								return nil, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 							}
 
-							if isFull {
-								log.Printf(" -- [FULL] filteredSize : %d", filteredSize)
-							}
+							// log.Printf(" -- [filtered] filteredSize : %d. sum of bitset = %d, bitcount = %d", filteredSize, blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 						}
 					}
 
 					// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
-					mergedSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
-					mergedIndices := indicesResultCache[:mergedSize]
-
-					if mergedSize > 0 {
-						absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(blockIdx)
-						old := absBlockMaps[absBlockOffset]
-
-						nowFullBlock := mergedSize == schema.BlockRowsSize
-
-						if old == nil {
-
-							// create new one
-							nval := BlockFilterMask{full: nowFullBlock, applied: 1}
-							if !nval.full {
-
-								// todo optimize memory usage
-								// use cache and bitset
-
-								// slog.Warn("memory allocation", "allocation_size", mergedSize)
-
-								nval.indices = make([]uint16, mergedSize)
-								copy(nval.indices, mergedIndices)
-							}
-							absBlockMaps[absBlockOffset] = &nval
-						} else {
-
-							old.applied += 1
-
-							if old.full {
-								// copy indices from current only
-								if !nowFullBlock {
-
-									// slog.Warn("memory allocation", "allocation_size", mergedSize)
-
-									old.indices = make([]uint16, mergedSize)
-									copy(old.indices, mergedIndices)
-									old.full = false
-								}
-								// else no need to change anything
-							} else {
-								if !nowFullBlock {
-									// merge both
-
-									blockGroupMerger.With(old.indices, false, false)
-									newMergeSize := blockGroupMerger.Merge(indicesCounter[:], indicesResultCache[:])
-									newMergedIndices := indicesResultCache[:newMergeSize]
-
-									if newMergeSize > mergedSize {
-										panic(fmt.Sprintf("merging of two lists made more elements than before: %d, was %d", newMergeSize, mergedSize))
-									} else {
-										if newMergeSize > 0 {
-											old.full = false
-											copy(old.indices, newMergedIndices)
-											// truncate
-											old.indices = old.indices[:newMergeSize]
-
-											// log.Printf("decreased list size from %d to %d. block idx : %d", mergedSize, newMergeSize, absBlockOffset)
-										} else {
-											old.full = false
-											// todo use empty
-											old.indices = []uint16{}
-										}
-									}
-
-								}
-							}
-
-						}
-
-					}
+					// mergedSize := blockGroupMerger.ResultBitset.Count()
+					// mergedIndices := indicesResultCache[:mergedSize]
 				}
 
 			}
 		}
 
-		diffColumnSize := len(filtersByColumns)
+		// diffColumnSize := len(filtersByColumns)
 
 		totalItems := 0
 
 		// filter merged blocks info
 		for _, blockFilterMask := range absBlockMaps {
-			if blockFilterMask.applied == diffColumnSize {
-				// color.Red("-- dropped %d items ", len(blockFilterMask.indices))
-				// color.Green("-- kept %d items in block %d", len(blockFilterMask.indices), absBlockIdx)
-				totalItems += len(blockFilterMask.indices)
-			}
+
+			amount := blockFilterMask.ResultBitset.Count()
+
+			totalItems += amount
 		}
 
 		log.Printf("total items left after filtering : %d", totalItems)
