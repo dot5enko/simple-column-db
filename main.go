@@ -90,6 +90,7 @@ func main() {
 		Columns: []schema.SchemaColumn{
 			{Name: "created_at", Type: schema.Uint64FieldType},
 			{Name: "value", Type: schema.Float32FieldType},
+			{Name: "monitor_id", Type: schema.Uint64FieldType},
 		},
 	})
 
@@ -97,7 +98,7 @@ func main() {
 		panic(shemaCreatedErr)
 	}
 
-	// ingest_data_into_simple_metric_value(m, testSchemaName, 10_000_000)
+	// ingest_data_into_simple_metric_value(m, testSchemaName, 10_000_000, 8)
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
@@ -110,9 +111,14 @@ func main() {
 				Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
 			},
 			{
+				Field:     "monitor_id",
+				Operand:   manager.RANGE,
+				Arguments: []any{uint64(4), uint64(6)},
+			},
+			{
 				Field:     "value",
 				Operand:   manager.GT,
-				Arguments: []any{float32(0.7)},
+				Arguments: []any{float32(0.7999)},
 			},
 		},
 		Select: []manager.Selector{
@@ -138,9 +144,9 @@ func main() {
 
 }
 
-func ingest_data_into_simple_metric_value(m *manager.Manager, testSchemaName string, dataSize int) {
+func ingest_data_into_simple_metric_value(m *manager.Manager, testSchemaName string, dataSize int, monitors int) {
 
-	fields := []string{"created_at", "value"}
+	fields := []string{"created_at", "value", "monitor_id"}
 	testRows := dataSize
 
 	binWriter := bits.NewEncodeBuffer([]byte{}, binary.LittleEndian)
@@ -151,12 +157,15 @@ func ingest_data_into_simple_metric_value(m *manager.Manager, testSchemaName str
 
 	for i := 0; i < testRows; i++ {
 
+		monitorId := rand.Int63n(int64(monitors))
+
 		timeOffset := uint64(i * 60)
 		timeVal := uint64(startTime) + timeOffset
 		randVal := 0.5 + rand.Float32()*(0.8-0.5)
 
 		binWriter.PutUint64(timeVal)
 		binWriter.PutFloat32(randVal)
+		binWriter.PutUint64(uint64(monitorId))
 
 	}
 
