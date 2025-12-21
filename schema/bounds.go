@@ -18,6 +18,29 @@ type Bounds[T NumericTypes] struct {
 
 const BoundsSize = 8 + 8
 
+type BoundsFilterMatchResult uint8
+
+const (
+	NoIntersection BoundsFilterMatchResult = iota
+	PartialIntersection
+	FullIntersection
+	UnknownIntersection
+)
+
+func (b BoundsFilterMatchResult) String() string {
+
+	switch b {
+	case NoIntersection:
+		return "no intersection"
+	case PartialIntersection:
+		return "partial intersection"
+	case FullIntersection:
+		return "full intersection"
+	default:
+		return fmt.Sprintf("unknown bounds match result:%d", b)
+	}
+}
+
 type BoundsFloat struct {
 	initialized bool
 
@@ -25,8 +48,18 @@ type BoundsFloat struct {
 	Max float64
 }
 
-func (b *BoundsFloat) Intersects(other BoundsFloat) bool {
-	return !(other.Max <= b.Min || other.Min >= b.Max)
+func (b BoundsFloat) Intersects(other BoundsFloat) BoundsFilterMatchResult {
+
+	if !other.initialized || !b.initialized {
+		panic("bounds not initialized, can't calc intersection")
+	} else if !(b.Min <= other.Max && b.Max >= other.Min) {
+		return NoIntersection
+	} else if b.Min >= other.Min && b.Max <= other.Max {
+		return FullIntersection
+	} else {
+		return PartialIntersection
+	}
+
 }
 
 func (b BoundsFloat) Contains(value float64) bool {

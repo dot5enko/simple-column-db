@@ -16,7 +16,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
-) error {
+) (int, error) {
 
 	var itemsFiltered int
 
@@ -62,12 +62,12 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.Header.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered])
+	merger.With(indicesCache[:itemsFiltered], false, false)
 
-	return nil
+	return itemsFiltered, nil
 
 }
 
@@ -77,7 +77,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
-) error {
+) (int, error) {
 
 	var itemsFiltered int
 
@@ -123,12 +123,12 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered])
+	merger.With(indicesCache[:itemsFiltered], false, false)
 
-	return nil
+	return itemsFiltered, nil
 
 }
 
@@ -138,7 +138,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
-) error {
+) (int, error) {
 
 	var itemsFiltered int
 
@@ -199,24 +199,25 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered])
+	merger.With(indicesCache[:itemsFiltered], false, false)
 
-	return nil
+	return itemsFiltered, nil
 
 }
 
-func ProcessFilterOnBlockHEader[T ops.NumericTypes](
+func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 	filter FilterCondition,
 	block schema.DiskHeader,
-) (blockShouldBeSkipped bool, err error) {
+) (matchResult schema.BoundsFilterMatchResult, err error) {
 
 	blockBounds := block.Bounds
 
 	switch filter.Operand {
 	case RANGE:
+
 		operandFrom := float64(filter.Arguments[0].(T))
 		operandTo := float64(filter.Arguments[1].(T))
 
@@ -226,29 +227,58 @@ func ProcessFilterOnBlockHEader[T ops.NumericTypes](
 			operandFrom = temp
 		}
 
-		if !blockBounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo)) {
-			return true, nil
-		}
+		matchResult = blockBounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo))
+
+		return matchResult, nil
 
 	case EQ:
 
 		operand := float64(filter.Arguments[0].(T))
-		return !blockBounds.Contains(operand), nil
+		contains := blockBounds.Contains(operand)
+
+		if !contains {
+			return schema.NoIntersection, nil
+		} else if contains {
+			return schema.PartialIntersection, nil
+		}
 
 	case GT:
 
 		operand := float64(filter.Arguments[0].(T))
-		return !(blockBounds.Min < operand), nil
+
+		if operand > blockBounds.Max {
+			return schema.NoIntersection, nil
+		}
+
+		if operand <= blockBounds.Min {
+
+			if operand >= blockBounds.Max {
+				return schema.FullIntersection, nil
+			}
+
+			return schema.PartialIntersection, nil
+		}
+
+		return schema.PartialIntersection, nil
 
 	case LT:
 
 		operand := float64(filter.Arguments[0].(T))
-		return !(blockBounds.Max > operand), nil
+
+		if operand < blockBounds.Min {
+			return schema.NoIntersection, nil
+		}
+
+		if operand >= blockBounds.Max {
+			return schema.FullIntersection, nil
+		}
+
+		return schema.PartialIntersection, nil
 
 	default:
-		return false, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBlockHEader[%s]", filter.Operand, block.DataType.String())
+		return schema.UnknownIntersection, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBlockHEader[%s]", filter.Operand, block.DataType.String())
 	}
 
-	return false, nil
+	return schema.UnknownIntersection, nil
 
 }

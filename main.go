@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
@@ -14,7 +13,6 @@ import (
 	"github.com/dot5enko/simple-column-db/manager"
 	"github.com/dot5enko/simple-column-db/schema"
 
-	"net/http"
 	_ "net/http/pprof"
 )
 
@@ -81,16 +79,16 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
-	waiter := sync.WaitGroup{}
-	waiter.Add(1)
+	// waiter := sync.WaitGroup{}
+	// waiter.Add(1)
 
-	go func() {
-		defer func() {
-			waiter.Done()
-			log.Printf(" >> done pprof server")
-		}()
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	// go func() {
+	// 	defer func() {
+	// 		waiter.Done()
+	// 		log.Printf(" >> done pprof server")
+	// 	}()
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
 
 	m := manager.New(manager.ManagerConfig{
 		PathToStorage: "./storage",
@@ -117,9 +115,9 @@ func main() {
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
-	time.Sleep(time.Second * 5)
+	// time.Sleep(time.Second * 5)
 
-	testN := 10
+	testN := 1
 
 	for i := 0; i < testN; i++ {
 		before := time.Now()
@@ -163,7 +161,7 @@ func main() {
 		}
 	}
 
-	waiter.Wait()
+	// waiter.Wait()
 
 }
 
