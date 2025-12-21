@@ -7,7 +7,6 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -84,17 +83,17 @@ func (m *Manager) loadSchemesFromDisk() error {
 			m.schemas[schema.Name] = &schema
 			slog.Info(" loaded schema from disk", "schema_name", schema.Name)
 
-			for _, column := range schema.Columns {
-				for _, colSlab := range column.Slabs {
+			// for _, column := range schema.Columns {
+			// 	for _, colSlab := range column.Slabs {
 
-					uidTime := colSlab.Time()
-					seconds, ns := uidTime.UnixTime()
+			// 		uidTime := colSlab.Time()
+			// 		seconds, ns := uidTime.UnixTime()
 
-					oTime := time.Unix(seconds, ns)
+			// 		oTime := time.Unix(seconds, ns)
 
-					slog.Info("slab for column loaded", "column_name", column.Name, "time", oTime.String())
-				}
-			}
+			// 		slog.Info("slab for column loaded", "column_name", column.Name, "time", oTime.String())
+			// 	}
+			// }
 
 		}
 
