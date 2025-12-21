@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -82,7 +82,7 @@ func (m *Manager) loadSchemesFromDisk() error {
 			return err
 		} else {
 			m.schemas[schema.Name] = &schema
-			color.Yellow(" >> loaded schema from disk : %s", schema)
+			slog.Info(" loaded schema from disk", "schema_name", schema.Name)
 
 			for _, column := range schema.Columns {
 				for _, colSlab := range column.Slabs {
@@ -92,7 +92,7 @@ func (m *Manager) loadSchemesFromDisk() error {
 
 					oTime := time.Unix(seconds, ns)
 
-					log.Printf(" >> column %s slab : %s", column.Name, oTime.String())
+					slog.Info("slab for column loaded", "column_name", column.Name, "time", oTime.String())
 				}
 			}
 
