@@ -348,11 +348,15 @@ func (sm *Manager) Get(
 		// filter merged blocks info
 		for _, blockFilterMask := range absBlockMaps {
 
-			amount := blockFilterMask.ResultBitset.Count()
+			if blockFilterMask.Merges() == len(query.Filter) {
 
-			totalItems += amount
+				amount := blockFilterMask.ResultBitset.Count()
+				totalItems += amount
+
+			}
 		}
 
+		log.Printf(" -- skipped blocks %d", skippedBlocksDueToHeaderFiltering)
 		log.Printf("total items left after filtering : %d", totalItems)
 
 	}

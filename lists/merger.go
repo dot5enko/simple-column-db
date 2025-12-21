@@ -12,7 +12,13 @@ var (
 type IndiceUnmerged struct {
 	initialized bool
 
+	merges int
+
 	ResultBitset bits.Bitfield
+}
+
+func (i *IndiceUnmerged) Merges() int {
+	return i.merges
 }
 
 func (i *IndiceUnmerged) WithOtherBitset(other bits.Bitfield) {
@@ -30,13 +36,15 @@ func (i *IndiceUnmerged) WithOtherBitset(other bits.Bitfield) {
 
 func (i *IndiceUnmerged) With(input []uint16, isEmpty, isFull bool) {
 
+	i.merges += 1
+
 	if isFull {
-		i.WithFull()
+		i.withFull()
 		return
 	}
 
 	if isEmpty {
-		i.WithEmpty()
+		i.withEmpty()
 		return
 	}
 
@@ -52,7 +60,7 @@ func (i *IndiceUnmerged) With(input []uint16, isEmpty, isFull bool) {
 	i.ResultBitset = bits.MergeAND(i.ResultBitset, bitset)
 }
 
-func (i *IndiceUnmerged) WithFull() {
+func (i *IndiceUnmerged) withFull() {
 
 	if !i.initialized {
 		i.ResultBitset = BitsetFull
@@ -64,7 +72,7 @@ func (i *IndiceUnmerged) WithFull() {
 
 }
 
-func (i *IndiceUnmerged) WithEmpty() {
+func (i *IndiceUnmerged) withEmpty() {
 
 	if !i.initialized {
 		i.ResultBitset = BitsetEmpty
