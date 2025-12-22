@@ -48,13 +48,13 @@ func (sm *Manager) CreateSchemaIfNotExists(schemaConfig schema.Schema) error {
 
 	}
 
+	// TODO: should be one api
 	// store once per all columns/slabs
-	storeErr := sm.storeSchemeToDisk(schemaConfig)
+	storeErr := sm.Meta.StoreSchemeToDisk(schemaConfig)
 	if storeErr != nil {
 		return fmt.Errorf("unable to save schema config to disk : %s", storeErr.Error())
 	}
-
-	sm.schemas[schemaConfig.Name] = &schemaConfig
+	sm.Meta.AddSchema(&schemaConfig)
 
 	return nil
 }

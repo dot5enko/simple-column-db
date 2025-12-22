@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
@@ -12,7 +13,7 @@ import (
 
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	slab *schema.DiskSlabHeader,
-	filter FilterCondition,
+	filter query.FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
@@ -29,7 +30,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	inputArray := arrayCasted[:arrayEndOffset]
 
 	switch filter.Operand {
-	case RANGE:
+	case query.RANGE:
 		operandA := filter.Arguments[0].(T)
 		operandB := filter.Arguments[1].(T)
 
@@ -47,16 +48,16 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
 			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
 		}
-	case EQ:
+	case query.EQ:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
 
-	case GT:
+	case query.GT:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
-	case LT:
+	case query.LT:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
@@ -73,7 +74,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 
 func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 	slab *schema.DiskSlabHeader,
-	filter FilterCondition,
+	filter query.FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
@@ -90,7 +91,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 	inputArray := arrayCasted[:arrayEndOffset]
 
 	switch filter.Operand {
-	case RANGE:
+	case query.RANGE:
 		operandA := filter.Arguments[0].(T)
 		operandB := filter.Arguments[1].(T)
 
@@ -108,16 +109,16 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
 			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
 		}
-	case EQ:
+	case query.EQ:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
 
-	case GT:
+	case query.GT:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
-	case LT:
+	case query.LT:
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
@@ -134,7 +135,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 
 func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	slab *schema.DiskSlabHeader,
-	filter FilterCondition,
+	filter query.FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
@@ -158,7 +159,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	inputArray := arrayCasted[:arrayEndOffset]
 
 	switch filter.Operand {
-	case RANGE:
+	case query.RANGE:
 		operandA := filter.Arguments[0].(T)
 		operandB := filter.Arguments[1].(T)
 
@@ -184,16 +185,16 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 			color.Green("-- filtered : %#+v", valuesFiltered)
 		}
 
-	case EQ:
+	case query.EQ:
 
 		operand := filter.Arguments[0].(T)
 		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
 
-	case GT:
+	case query.GT:
 
 		operand := filter.Arguments[0].(T)
 		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
-	case LT:
+	case query.LT:
 
 		operand := filter.Arguments[0].(T)
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
@@ -209,14 +210,14 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 }
 
 func ProcessFilterOnBlockHeader[T ops.NumericTypes](
-	filter FilterCondition,
+	filter query.FilterCondition,
 	block schema.DiskHeader,
 ) (matchResult schema.BoundsFilterMatchResult, err error) {
 
 	blockBounds := block.Bounds
 
 	switch filter.Operand {
-	case RANGE:
+	case query.RANGE:
 
 		operandFrom := float64(filter.Arguments[0].(T))
 		operandTo := float64(filter.Arguments[1].(T))
@@ -231,7 +232,7 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 
 		return matchResult, nil
 
-	case EQ:
+	case query.EQ:
 
 		operand := float64(filter.Arguments[0].(T))
 		contains := blockBounds.Contains(operand)
@@ -242,7 +243,7 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 			return schema.PartialIntersection, nil
 		}
 
-	case GT:
+	case query.GT:
 
 		operand := float64(filter.Arguments[0].(T))
 
@@ -261,7 +262,7 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 
 		return schema.PartialIntersection, nil
 
-	case LT:
+	case query.LT:
 
 		operand := float64(filter.Arguments[0].(T))
 

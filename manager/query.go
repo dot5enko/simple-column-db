@@ -6,174 +6,20 @@ import (
 	"log/slog"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/google/uuid"
 )
 
-type CondOperand byte
-
-const (
-	EQ CondOperand = iota
-	GT
-	LT
-	RANGE
-)
-
-func (c CondOperand) String() string {
-	switch c {
-	case EQ:
-		return "EQ"
-	case GT:
-		return "GT"
-	case LT:
-		return "LT"
-	case RANGE:
-		return "RANGE"
-	default:
-		panic(fmt.Sprintf("unknown operand %v", c))
-	}
-}
-
-type FilterCondition struct {
-	Field     string
-	Operand   CondOperand
-	Arguments []any
-}
-
-func (fc FilterCondition) ArgumentFloatValue(idx int) float64 {
-
-	arg := fc.Arguments[idx]
-
-	switch v := arg.(type) {
-	case float64:
-		return v
-	case int:
-		return float64(v)
-	case int64:
-		return float64(v)
-	case int32:
-		return float64(v)
-	case int16:
-		return float64(v)
-	case int8:
-		return float64(v)
-	case uint64:
-		return float64(v)
-	case uint32:
-		return float64(v)
-	case uint16:
-		return float64(v)
-	case uint8:
-		return float64(v)
-	case float32:
-		return float64(v)
-	default:
-		panic(fmt.Sprintf("filter cond argument is not numeric: %T", arg))
-	}
-}
-
-type SelectorType byte
-
-const (
-	SelectFunction SelectorType = iota
-)
-
-type Selector struct {
-	Type      SelectorType
-	Arguments []any
-
-	Alias string
-}
-
-type Query struct {
-	Filter []FilterCondition
-	Select []Selector
-}
-
-func (sm *Manager) Get(
+func (sm *Manager) Query(
 	schemaName string,
-	query Query,
+	queryData query.Query,
 ) ([]map[string]any, error) {
 
 	result := []map[string]any{}
 
-	schemaObject, ok := sm.schemas[schemaName]
-	if !ok {
-		return nil, fmt.Errorf("schema not found")
-	} else {
+	var indicesResultCache [schema.BlockRowsSize]uint16
 
-		// should be big enough to hold all the entries to
-		// todo replace with bitset
-		// mergeIndicesCache := make([]uint16, schema.BlockRowsSize*len(query.Filter))
-		// var indicesCounter [schema.BlockRowsSize]uint16
-
-		var indicesResultCache [schema.BlockRowsSize]uint16
-
-		// check fields before filtering data
-		for _, filter := range query.Filter {
-
-			found := false
-			for _, it := range schemaObject.Columns {
-				if it.Name == filter.Field {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				return nil, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
-			}
-		}
-
-		// slabs
-
-		slabsFiltered := []uuid.UUID{}
-		skippedBlocksDueToHeaderFiltering := 0
-
-		// full scan of all slabs and their blocks
-		slabsByColumns := map[string][]uuid.UUID{}
-
-		for _, it := range schemaObject.Columns {
-			if len(it.Slabs) > 0 {
-
-				// global
-				slabsFiltered = append(slabsFiltered, it.Slabs...)
-
-				old, isOk := slabsByColumns[it.Name]
-				if !isOk {
-					old = []uuid.UUID{}
-					slabsByColumns[it.Name] = old
-				}
-
-				// todo filter by header bounds, etc
-				slabsByColumns[it.Name] = append(old, it.Slabs...)
-			}
-		}
-
-		type RuntimeFilterCache struct {
-			column                      schema.SchemaColumn
-			filterLastBlockHeaderResult schema.BoundsFilterMatchResult
-		}
-
-		type FilterConditionRuntime struct {
-			filter  FilterCondition
-			runtime *RuntimeFilterCache
-		}
-
-		// group filters by columns
-		filtersByColumns := map[string][]FilterConditionRuntime{}
-		for _, filter := range query.Filter {
-			old, isOk := filtersByColumns[filter.Field]
-			if !isOk {
-				old = []FilterConditionRuntime{}
-			}
-
-			filtersByColumns[filter.Field] = append(old, FilterConditionRuntime{
-				filter:  filter,
-				runtime: &RuntimeFilterCache{},
-			})
-		}
-
+	{
 		// spew.Dump("filter by columns", filtersByColumns)
 		// spew.Dump("slabs filtered", slabsByColumns)
 

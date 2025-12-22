@@ -1,17 +1,12 @@
 package manager
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
-	"log"
-	"log/slog"
-	"os"
 	"sync"
 
-	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/cache"
+	"github.com/dot5enko/simple-column-db/manager/meta"
+	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
@@ -32,89 +27,15 @@ type ManagerConfig struct {
 }
 
 type Manager struct {
-	schemas map[string]*schema.Schema
-
 	config ManagerConfig
 
-	Slabs SlabManager
+	Slabs   SlabManager
+	Planner *query.QueryPlanner
+	Meta    *meta.MetaManager
 
 	BlockBuffer [schema.TotalHeaderSize]byte
 
 	indiceMergerPool *sync.Pool
-}
-
-func (m *Manager) storeSchemeToDisk(schemeObject schema.Schema) error {
-	schemesPath := m.Slabs.getAbsStoragePath(schemeObject.Name, "schema.json")
-
-	fr := io.NewFileReader(schemesPath)
-	createFileErr := fr.Open(false)
-
-	if createFileErr != nil {
-		return createFileErr
-	}
-
-	defer fr.Close()
-
-	jschemeBytes, _ := json.Marshal(schemeObject)
-
-	linesWriter := bufio.NewWriter(fr.Raw())
-	linesWriter.Write(jschemeBytes)
-	return linesWriter.Flush()
-
-}
-func (m *Manager) loadSchemesFromDisk() error {
-
-	entries, err := os.ReadDir(m.config.PathToStorage)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) { // no schemes yet
-			return nil
-		} else {
-			log.Printf(" >>>>>>> %v", err)
-			return err
-		}
-	}
-
-	loadSingleSchemeFileFromDisk := func(path string) error {
-
-		schemaFilePathName := m.Slabs.getAbsStoragePath(path, "schema.json")
-
-		fullContent, contentErr := os.ReadFile(schemaFilePathName)
-		if contentErr != nil {
-			return contentErr
-		}
-
-		var schema schema.Schema
-		err = json.Unmarshal(fullContent, &schema)
-		if err != nil {
-			return err
-		} else {
-			m.schemas[schema.Name] = &schema
-			slog.Info(" loaded schema from disk", "schema_name", schema.Name)
-
-			// for _, column := range schema.Columns {
-			// 	for _, colSlab := range column.Slabs {
-
-			// 		uidTime := colSlab.Time()
-			// 		seconds, ns := uidTime.UnixTime()
-
-			// 		oTime := time.Unix(seconds, ns)
-
-			// 		slog.Info("slab for column loaded", "column_name", column.Name, "time", oTime.String())
-			// 	}
-			// }
-
-		}
-
-		return nil
-	}
-
-	for _, e := range entries {
-		if e.IsDir() {
-			loadSingleSchemeFileFromDisk(e.Name())
-		}
-	}
-
-	return nil
 }
 
 func New(config ManagerConfig) *Manager {
@@ -126,8 +47,9 @@ func New(config ManagerConfig) *Manager {
 	}
 
 	man := &Manager{
-		schemas: make(map[string]*schema.Schema),
+		Planner: query.NewQueryPlanner(),
 		config:  config,
+		Meta:    meta.NewMetaManager(config.PathToStorage),
 		Slabs: SlabManager{
 			storagePath: config.PathToStorage,
 			// caches
@@ -140,7 +62,7 @@ func New(config ManagerConfig) *Manager {
 
 	man.Slabs.cacheManager.Prefill(32)
 
-	loadErr := man.loadSchemesFromDisk()
+	loadErr := man.Meta.LoadSchemesFromDisk()
 	if loadErr != nil {
 		panic(loadErr) // todo return error
 	}

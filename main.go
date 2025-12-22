@@ -13,6 +13,7 @@ import (
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/manager"
+	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 
 	"net/http"
@@ -133,25 +134,25 @@ func main() {
 
 	for i := 0; i < testN; i++ {
 		before := time.Now()
-		result, qerr := m.Get(testSchemaName, manager.Query{
-			Filter: []manager.FilterCondition{
+		result, qerr := m.Query(testSchemaName, query.Query{
+			Filter: []query.FilterCondition{
 				{
 					Field:     "created_at",
-					Operand:   manager.RANGE,
+					Operand:   query.RANGE,
 					Arguments: []any{uint64(time.Now().Add(-beforeIndex).Unix()), uint64(time.Now().Unix())},
 				},
 				{
 					Field:     "monitor_id",
-					Operand:   manager.RANGE,
+					Operand:   query.RANGE,
 					Arguments: []any{uint64(4), uint64(6)},
 				},
 				{
 					Field:     "value",
-					Operand:   manager.GT,
+					Operand:   query.GT,
 					Arguments: []any{float32(0.4999)},
 				},
 			},
-			Select: []manager.Selector{
+			Select: []query.Selector{
 				{
 					Arguments: []any{"avg", "value"},
 					Alias:     "avg_value",

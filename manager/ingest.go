@@ -31,9 +31,9 @@ type layoutFieldInfo struct {
 func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 	// get the schema object from name
-	schemaObject, exists := m.schemas[schemaName]
+	schemaObject := m.Meta.GetSchema(schemaName)
 
-	if !exists {
+	if schemaObject == nil {
 		return errors.New("schema not found")
 	}
 
@@ -161,7 +161,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 					col.Slabs = append(col.Slabs, newSlab.Uid)
 					col.ActiveSlab = newSlab.Uid
 
-					storeErr := m.storeSchemeToDisk(*schemaObject)
+					storeErr := m.Meta.StoreSchemeToDisk(*schemaObject)
 					if storeErr != nil {
 						return fmt.Errorf("unable to update schema config on disk: %s", storeErr.Error())
 					}
