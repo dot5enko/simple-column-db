@@ -58,6 +58,8 @@ func (b *Bitfield) FromSorted(bits []uint16) {
 	currWord := bits[0] >> 6
 	mask := uint64(0)
 
+	// slog.Info("from sorted with ", "elements", len(bits))
+
 	for _, bit := range bits {
 		w := bit >> 6
 		if w != currWord {

@@ -119,7 +119,7 @@ func main() {
 
 	time.Sleep(time.Second * 5)
 
-	testN := 10
+	testN := 100
 
 	for i := 0; i < testN; i++ {
 		before := time.Now()
@@ -138,7 +138,7 @@ func main() {
 				{
 					Field:     "value",
 					Operand:   manager.GT,
-					Arguments: []any{float32(0.7999)},
+					Arguments: []any{float32(0.5999)},
 				},
 			},
 			Select: []manager.Selector{

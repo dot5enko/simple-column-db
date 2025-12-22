@@ -58,14 +58,14 @@ func (i *IndiceUnmerged) With(input []uint16, isEmpty, isFull bool) {
 		return
 	}
 
-	var bitset bits.Bitfield
-	bitset.FromSorted(input)
-
 	if !i.initialized {
-		i.ResultBitset = bitset
+		i.ResultBitset.FromSorted(input)
 		i.initialized = true
 		return
 	}
+
+	var bitset bits.Bitfield
+	bitset.FromSorted(input)
 
 	i.ResultBitset = bits.MergeAND(i.ResultBitset, bitset)
 }
