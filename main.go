@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -81,16 +82,23 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
+	pprofEnabled := flag.Bool("pprof", false, "enable pprof server")
+	testIterations := flag.Int("test_iterations", 1, "number of iterations")
+
+	flag.Parse()
+
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
 
-	go func() {
-		defer func() {
-			waiter.Done()
-			log.Printf(" >> done pprof server")
+	if *pprofEnabled {
+		go func() {
+			defer func() {
+				waiter.Done()
+				log.Printf(" >> done pprof server")
+			}()
+			log.Println(http.ListenAndServe("localhost:6060", nil))
 		}()
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	}
 
 	m := manager.New(manager.ManagerConfig{
 		PathToStorage: "./storage",
@@ -117,9 +125,11 @@ func main() {
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
-	time.Sleep(time.Second * 5)
+	testN := *testIterations
 
-	testN := 100
+	if *pprofEnabled {
+		time.Sleep(time.Second * 5)
+	}
 
 	for i := 0; i < testN; i++ {
 		before := time.Now()
@@ -138,7 +148,7 @@ func main() {
 				{
 					Field:     "value",
 					Operand:   manager.GT,
-					Arguments: []any{float32(0.5999)},
+					Arguments: []any{float32(0.4999)},
 				},
 			},
 			Select: []manager.Selector{
@@ -163,7 +173,9 @@ func main() {
 		}
 	}
 
-	waiter.Wait()
+	if *pprofEnabled {
+		waiter.Wait()
+	}
 
 }
 

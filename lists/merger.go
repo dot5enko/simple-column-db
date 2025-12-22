@@ -19,6 +19,17 @@ type IndiceUnmerged struct {
 	fullSkip bool
 }
 
+func (i *IndiceUnmerged) Reset() {
+
+	if i.initialized {
+		for j := range i.ResultBitset {
+			i.ResultBitset[j] = 0
+		}
+
+		i.initialized = false
+	}
+}
+
 func (i *IndiceUnmerged) SetFullSkip() {
 	i.fullSkip = true
 }
@@ -94,6 +105,7 @@ func (i *IndiceUnmerged) withEmpty() {
 }
 
 func NewUnmerged() *IndiceUnmerged {
+
 	return &IndiceUnmerged{
 		initialized: false,
 	}

@@ -7,8 +7,10 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/dot5enko/simple-column-db/io"
+	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -37,6 +39,8 @@ type Manager struct {
 	Slabs SlabManager
 
 	BlockBuffer [schema.TotalHeaderSize]byte
+
+	indiceMergerPool *sync.Pool
 }
 
 func (m *Manager) storeSchemeToDisk(schemeObject schema.Schema) error {
@@ -115,6 +119,12 @@ func (m *Manager) loadSchemesFromDisk() error {
 
 func New(config ManagerConfig) *Manager {
 
+	var unmergedPool = sync.Pool{
+		New: func() any {
+			return lists.NewUnmerged() // allocates zeroed object
+		},
+	}
+
 	man := &Manager{
 		schemas: make(map[string]*schema.Schema),
 		config:  config,
@@ -125,6 +135,7 @@ func New(config ManagerConfig) *Manager {
 			slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
 			cacheManager:  cache.NewSlabCacheManager(),
 		},
+		indiceMergerPool: &unmergedPool,
 	}
 
 	man.Slabs.cacheManager.Prefill(32)

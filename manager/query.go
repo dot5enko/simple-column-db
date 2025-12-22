@@ -272,8 +272,11 @@ func (sm *Manager) Get(
 						blockRT.Val = blockDecodedInfo
 					} else {
 						absBlockRTInfo, ok := absBlockMaps[absBlockOffset]
+
 						if !ok {
-							absBlockRTInfo = lists.NewUnmerged()
+							absBlockRTInfo = sm.indiceMergerPool.Get().(*lists.IndiceUnmerged)
+							absBlockRTInfo.Reset()
+
 							absBlockMaps[absBlockOffset] = absBlockRTInfo
 						}
 
@@ -296,7 +299,7 @@ func (sm *Manager) Get(
 
 					blockGroupMerger, has := absBlockMaps[absBlockOffset]
 					if !has {
-						blockGroupMerger = lists.NewUnmerged()
+						blockGroupMerger = sm.indiceMergerPool.Get().(*lists.IndiceUnmerged)
 						absBlockMaps[absBlockOffset] = blockGroupMerger
 					} else {
 						if blockGroupMerger.FullSkip() {
@@ -360,10 +363,13 @@ func (sm *Manager) Get(
 			} else {
 				wastedMerges += blockFilterMask.Merges()
 			}
+
+			sm.indiceMergerPool.Put(blockFilterMask)
 		}
 
-		slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", wastedMerges, "skipped_blocks", skippedBlocksDueToHeaderFiltering, "total_filtered", totalItems)
+		clear(absBlockMaps)
 
+		slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", wastedMerges, "skipped_blocks", skippedBlocksDueToHeaderFiltering, "total_filtered", totalItems)
 	}
 
 	return result, nil
