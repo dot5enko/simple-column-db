@@ -3,7 +3,6 @@ package manager
 import (
 	"bytes"
 	"fmt"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
@@ -13,19 +12,11 @@ import (
 
 func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
-	// before := time.Now()
-	// defer func() {
-	// 	loadTook := time.Since(before).Microseconds()
-	// 	log.Printf("slab %s load took %dus", slabUid.String(), loadTook)
-	// }()
-
 	slabHeader := m.getSlabFromCache(slabUid)
 
 	if slabHeader != nil {
-		return slabHeader.header, nil
+		return slabHeader.Header, nil
 	} else {
-
-		tn := time.Now()
 
 		fileReader, openErr := m.GetSlabFile(schemaObject, slabUid, false)
 		if openErr != nil {
@@ -102,22 +93,25 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 						return
 					} else {
 
-						item := SlabCacheItem{
-							header:  result,
-							rtStats: &CacheStats{Created: tn, Reads: 1},
+						item, cacheErr := m.cacheManager.GetCacheEntry()
+						if cacheErr != nil {
+							e = cacheErr
+							return
 						}
 
+						item.Header = result
+
 						if result.CompressionType == 0 {
-							copy(item.data[:], m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize])
+							copy(item.Data[:], m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize])
 						} else {
 							switch result.CompressionType {
 							case 1:
-								_, decompressErr := compression.DecompressLz4(m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize], item.data[:])
+								_, decompressErr := compression.DecompressLz4(m.BufferForCompressedData10Mb[:result.CompressedSlabContentSize], item.Data[:])
 								if decompressErr != nil {
 
 									spew.Dump("input buffers to decompress ", m.BufferForCompressedData10Mb[:256])
 
-									e = fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.data[:]), decompressErr.Error())
+									e = fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
 									return
 								}
 							default:
@@ -129,7 +123,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 						m.slabCacheLocker.Lock()
 						defer m.slabCacheLocker.Unlock()
 
-						m.slabCacheItem[slabUid] = &item
+						m.slabCacheItem[slabUid] = item
 					}
 
 				}

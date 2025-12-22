@@ -6,28 +6,16 @@ import (
 	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
-
-type CacheStats struct {
-	Reads   int
-	Created time.Time
-}
 
 type BlockCacheItem struct {
 	header  *schema.DiskHeader
 	runtime *schema.RuntimeBlockData
 
-	rtStats *CacheStats
-}
-
-type SlabCacheItem struct {
-	header *schema.DiskSlabHeader
-
-	data [schema.SlabDiskContentsUncompressed]byte
-
-	rtStats *CacheStats
+	rtStats *cache.CacheStats
 }
 
 const HeadersCacheSize = 256 * schema.TotalHeaderSize
@@ -38,7 +26,9 @@ type SlabManager struct {
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
-	slabCacheItem   map[uuid.UUID]*SlabCacheItem
+	cacheManager *cache.SlabCacheManager
+
+	slabCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabCacheLocker sync.RWMutex
 
 	SlabHeaderReaderBuffer     [schema.SlabHeaderFixedSize]byte
@@ -47,16 +37,16 @@ type SlabManager struct {
 	BufferForCompressedData10Mb [schema.SlabDiskContentsUncompressed]byte
 }
 
-func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *SlabCacheItem {
+func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 	return m.getSlabFromCache(uid)
 }
-func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *SlabCacheItem {
+func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 	m.slabCacheLocker.Lock()
 	defer m.slabCacheLocker.Unlock()
 
 	if item, ok := m.slabCacheItem[uid]; ok {
 
-		item.rtStats.Reads++
+		item.RtStats.Reads++
 		return item
 	}
 
@@ -138,7 +128,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				}
 			}
 
-			blockRawData := slabCache.data[blockStartOffset:]
+			blockRawData := slabCache.Data[blockStartOffset:]
 
 			// log.Printf(" --- loading %s block. blockHeader.StartOffset:%d", blockHeader.Uid.String(), blockHeader.StartOffset)
 
@@ -155,7 +145,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				m.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
-					rtStats: &CacheStats{Created: time.Now(), Reads: 1},
+					rtStats: &cache.CacheStats{Created: time.Now(), Reads: 1},
 				}
 
 				return runtimeBlockData, nil

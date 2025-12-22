@@ -117,7 +117,7 @@ func main() {
 
 	beforeIndex := time.Hour * 24 * 30 * 12 * 4
 
-	// time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 5)
 
 	testN := 10
 
@@ -163,7 +163,7 @@ func main() {
 		}
 	}
 
-	// waiter.Wait()
+	waiter.Wait()
 
 }
 

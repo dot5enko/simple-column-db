@@ -77,23 +77,23 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 			return fmt.Errorf("unable to find slab cache item, need to load whole slab from disk first")
 		}
 
-		copy(slabCacheItem.data[blockDataOffset:], writeBuf.Bytes())
+		copy(slabCacheItem.Data[blockDataOffset:], writeBuf.Bytes())
 
 		// compress whole slab
 
-		compressionSizeTotal := dataSize * int(slabCacheItem.header.BlocksTotal)
+		compressionSizeTotal := dataSize * int(slabCacheItem.Header.BlocksTotal)
 
 		if false {
 
 			start := time.Now()
 
-			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
+			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.Data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
 			if compressedSize > 0 {
 				compressionTook := time.Since(start)
 
 				showSize := 128
 
-				spew.Dump("compression input ", slabCacheItem.data[:showSize], slabCacheItem.data[compressionSizeTotal-showSize:compressionSizeTotal])
+				spew.Dump("compression input ", slabCacheItem.Data[:showSize], slabCacheItem.Data[compressionSizeTotal-showSize:compressionSizeTotal])
 
 				if compressErr != nil {
 					return fmt.Errorf("unable to compress slab data : %s", compressErr.Error())
@@ -144,7 +144,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		if slab.CompressionType != 0 {
 			writeDataErr = fileManager.WriteAt(sm.BufferForCompressedData10Mb[:slab.CompressedSlabContentSize], int(schema.SlabHeaderFixedSize+headersSize), int(slab.CompressedSlabContentSize))
 		} else {
-			writeDataErr = fileManager.WriteAt(slabCacheItem.data[:], schema.SlabHeaderFixedSize+headersSize, int(slab.CompressedSlabContentSize))
+			writeDataErr = fileManager.WriteAt(slabCacheItem.Data[:], schema.SlabHeaderFixedSize+headersSize, int(slab.CompressedSlabContentSize))
 		}
 
 		if writeDataErr != nil {

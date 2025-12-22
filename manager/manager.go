@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/dot5enko/simple-column-db/io"
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
@@ -121,9 +122,12 @@ func New(config ManagerConfig) *Manager {
 			storagePath: config.PathToStorage,
 			// caches
 			cache:         map[[32]byte]BlockCacheItem{},
-			slabCacheItem: map[uuid.UUID]*SlabCacheItem{},
+			slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
+			cacheManager:  cache.NewSlabCacheManager(),
 		},
 	}
+
+	man.Slabs.cacheManager.Prefill(32)
 
 	loadErr := man.loadSchemesFromDisk()
 	if loadErr != nil {

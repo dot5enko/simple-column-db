@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
@@ -18,7 +19,7 @@ type layoutFieldInfo struct {
 	typ   schema.FieldType
 	name  string
 
-	slab       *SlabCacheItem
+	slab       *cache.SlabCacheItem
 	dataOffset int
 
 	DataArray any
@@ -54,7 +55,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 			return errors.New("layout does not match schema, no column " + col.Name + " found in data")
 		} else {
 
-			var slabHeader *SlabCacheItem
+			var slabHeader *cache.SlabCacheItem
 
 			// slab exists
 			if col.ActiveSlab != uuid.Nil {
@@ -129,7 +130,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 		for field.leftover > 0 {
 
-			sh := field.slab.header
+			sh := field.slab.Header
 
 			if sh.BlocksFinalized >= sh.BlocksTotal {
 
@@ -169,7 +170,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 
 				var loadErr error
 				sh, loadErr = m.Slabs.LoadSlabToCache(*schemaObject, newSlab.Uid)
-				field.slab.header = sh
+				field.slab.Header = sh
 				if loadErr != nil {
 					return fmt.Errorf("unable to load just created slab: %s", loadErr.Error())
 				}
