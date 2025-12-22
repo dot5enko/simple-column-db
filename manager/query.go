@@ -3,7 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -178,6 +178,7 @@ func (sm *Manager) Get(
 		// spew.Dump("slabs filtered", slabsByColumns)
 
 		absBlockMaps := map[uint64]*lists.IndiceUnmerged{}
+		skippedBlocksFULL := 0
 
 		for columnName, filterColumn := range filtersByColumns {
 
@@ -196,16 +197,12 @@ func (sm *Manager) Get(
 
 			for _, slab := range slabsByColumns[columnName] {
 
-				// color.Red(" -- slab processing by field name : %s. slab %s ", columnName, slab.String())
-
 				slabInfo, slabErr := sm.Slabs.LoadSlabToCache(*schemaObject, slab)
 				if slabErr != nil {
 					return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
 				}
 
 				var blocks []BlockRuntimeInfo
-				// filter slab blocks by filter
-
 				for idx, blockHeader := range slabInfo.BlockHeaders {
 
 					if idx > int(slabInfo.BlocksFinalized) {
@@ -213,7 +210,7 @@ func (sm *Manager) Get(
 					}
 
 					skipFilters := 0
-					fullIntersect := 0
+					absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(idx)
 
 					for _, filter := range filterColumn {
 
@@ -244,33 +241,43 @@ func (sm *Manager) Get(
 
 							if skipSingleBlock {
 								skipFilters++
-							} else {
-								if intersectType == schema.FullIntersection {
-									fullIntersect++
-								}
 							}
 						}
 					}
 
-					if skipFilters == filtersSize {
+					fullSkipBlock := skipFilters == filtersSize
+
+					if fullSkipBlock {
+
+						skippedBlocksFULL += 1
+
 						// color.Yellow("skipping block %s on header filtering step", blockHeader.Uid.String())
 						// do not load this block into memory at all
-						continue
-					}
-
-					// filter by headers if possible
-					blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
-
-					// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
-
-					if blockErr != nil {
-						return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
 					}
 
 					blockRT := BlockRuntimeInfo{
-						Val:          blockDecodedInfo,
 						Header:       blockHeader,
 						Synchronized: true,
+					}
+
+					if !fullSkipBlock {
+						blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
+
+						// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
+
+						if blockErr != nil {
+							return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
+						}
+
+						blockRT.Val = blockDecodedInfo
+					} else {
+						absBlockRTInfo, ok := absBlockMaps[absBlockOffset]
+						if !ok {
+							absBlockRTInfo = lists.NewUnmerged()
+							absBlockMaps[absBlockOffset] = absBlockRTInfo
+						}
+
+						absBlockRTInfo.SetFullSkip()
 					}
 
 					for filterIdx, filter := range filterColumn {
@@ -286,10 +293,15 @@ func (sm *Manager) Get(
 				for blockIdx, blockData := range blocks {
 
 					absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(blockIdx)
+
 					blockGroupMerger, has := absBlockMaps[absBlockOffset]
 					if !has {
 						blockGroupMerger = lists.NewUnmerged()
 						absBlockMaps[absBlockOffset] = blockGroupMerger
+					} else {
+						if blockGroupMerger.FullSkip() {
+							continue
+						}
 					}
 
 					for fIdx, filter := range filterColumn {
@@ -332,32 +344,25 @@ func (sm *Manager) Get(
 							// log.Printf(" -- [filtered] filteredSize : %d. sum of bitset = %d, bitcount = %d", filteredSize, blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 						}
 					}
-
-					// we can use here indicesResultCache again as we copied the result into blockGroupMerger buf
-					// mergedSize := blockGroupMerger.ResultBitset.Count()
-					// mergedIndices := indicesResultCache[:mergedSize]
 				}
-
 			}
 		}
 
-		// diffColumnSize := len(filtersByColumns)
-
 		totalItems := 0
+		wastedMerges := 0
 
 		// filter merged blocks info
 		for _, blockFilterMask := range absBlockMaps {
-
 			if blockFilterMask.Merges() == len(query.Filter) {
-
 				amount := blockFilterMask.ResultBitset.Count()
 				totalItems += amount
 
+			} else {
+				wastedMerges += blockFilterMask.Merges()
 			}
 		}
 
-		log.Printf(" -- skipped blocks %d", skippedBlocksDueToHeaderFiltering)
-		log.Printf("total items left after filtering : %d", totalItems)
+		slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", wastedMerges, "skipped_blocks", skippedBlocksDueToHeaderFiltering, "total_filtered", totalItems)
 
 	}
 

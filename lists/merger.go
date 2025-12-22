@@ -15,24 +15,34 @@ type IndiceUnmerged struct {
 	merges int
 
 	ResultBitset bits.Bitfield
+
+	fullSkip bool
+}
+
+func (i *IndiceUnmerged) SetFullSkip() {
+	i.fullSkip = true
+}
+
+func (i *IndiceUnmerged) FullSkip() bool {
+	return i.fullSkip
 }
 
 func (i *IndiceUnmerged) Merges() int {
 	return i.merges
 }
 
-func (i *IndiceUnmerged) WithOtherBitset(other bits.Bitfield) {
+// func (i *IndiceUnmerged) WithOtherBitset(other bits.Bitfield) {
 
-	if !i.initialized {
-		i.initialized = true
+// 	if !i.initialized {
+// 		i.initialized = true
 
-		i.ResultBitset = other
-		return
-	}
+// 		i.ResultBitset = other
+// 		return
+// 	}
 
-	i.ResultBitset = bits.MergeAND(i.ResultBitset, other)
+// 	i.ResultBitset = bits.MergeAND(i.ResultBitset, other)
 
-}
+// }
 
 func (i *IndiceUnmerged) With(input []uint16, isEmpty, isFull bool) {
 
