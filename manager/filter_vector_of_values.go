@@ -12,7 +12,6 @@ import (
 )
 
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
-	slab *schema.DiskSlabHeader,
 	filter query.FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
@@ -23,8 +22,6 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
-
-	// log.Printf("[slab %s] processing numeric filter on column %v, type = %s", slab.Uid.String(), filter.Field, blockData.Header.DataType.String())
 
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
@@ -45,8 +42,8 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
 		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
+			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
+			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
 		}
 	case query.EQ:
 		operand := filter.Arguments[0].(T)
@@ -63,7 +60,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered], false, false)
@@ -85,7 +82,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
-	// log.Printf("[slab %s] processing numeric filter on column %v, type = %s", slab.Uid.String(), filter.Field, blockData.Header.DataType.String())
+	// log.Printf("[slab %s] processing numeric filter on column %v, type = %s", slab.Uid.String(), filter.Field, blockData.BlockHeader.DataType.String())
 
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
@@ -106,8 +103,8 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
 		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
+			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
+			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
 		}
 	case query.EQ:
 		operand := filter.Arguments[0].(T)
@@ -124,7 +121,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered], false, false)
@@ -134,7 +131,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 }
 
 func ProcessFloatFilterOnColumnWithType[T ops.Floats](
-	slab *schema.DiskSlabHeader,
+	// slab *schema.DiskSlabHeader,
 	filter query.FilterCondition,
 	blockData *BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
@@ -149,7 +146,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	// log.Printf("[slab %s] filter: %v, type = %s. offset %p[%d]. block %p",
 	// 	slab.Uid.String(),
 	// 	filter.Field,
-	// 	blockData.Header.DataType.String(),
+	// 	blockData.BlockHeader.DataType.String(),
 	// 	directBlockArray,
 	// 	arrayEndOffset,
 	// 	runtimeBlockInfo,
@@ -174,8 +171,8 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
 
 		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.Header.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.Header.Uid.String(), blockData.Header.Bounds.Min, blockData.Header.Bounds.Max)
+			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
+			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
 			valuesFiltered := []T{}
 
 			for _, i := range indicesCache[:itemsFiltered] {
@@ -200,7 +197,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
 
 	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.Header.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
 	}
 
 	merger.With(indicesCache[:itemsFiltered], false, false)

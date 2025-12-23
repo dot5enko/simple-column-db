@@ -128,7 +128,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		buf := bits.NewEncodeBuffer(sm.SlabBlockHeadersReadBuffer[:], binary.LittleEndian)
 		serializedBytes, headerBytesErr := block.Header.WriteTo(&buf)
 
-		// log.Printf("%s block bounds written : min %.2f. items in block : %d", block.Header.Uid.String(), block.Header.Bounds.Min, block.Header.Items)
+		// log.Printf("%s block bounds written : min %.2f. items in block : %d", block.BlockHeader.Uid.String(), block.BlockHeader.Bounds.Min, block.BlockHeader.Items)
 
 		if headerBytesErr != nil {
 			return fmt.Errorf("unable to serialize block header, header won't serialize : %s", headerBytesErr.Error())

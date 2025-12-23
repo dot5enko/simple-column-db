@@ -29,7 +29,7 @@ func (sm *Manager) Query(
 
 	for _, blockChunk := range plan.BlockChunks {
 
-		data, chunkErr := executePlanChunk(sm, plan, blockChunk)
+		data, chunkErr := executePlanChunk(sm, &plan, blockChunk)
 		if chunkErr != nil {
 			return nil, fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
 		}

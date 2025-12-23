@@ -38,6 +38,8 @@ type (
 		Schema                schema.Schema
 		FilterGroupedByFields []FilterGroupedRT
 		BlockChunks           []BlockChunk
+
+		FilterSize int
 	}
 )
 
@@ -64,6 +66,7 @@ func (qp *QueryPlanner) Plan(
 		// var indicesCounter [schema.BlockRowsSize]uint16
 
 		// check fields before filtering data
+
 		for _, filter := range queryData.Filter {
 
 			found := false
@@ -246,6 +249,7 @@ func (qp *QueryPlanner) Plan(
 			Schema:                *schemaObject,
 			FilterGroupedByFields: filterByColumnsArray,
 			BlockChunks:           chunks,
+			FilterSize:            len(queryData.Filter),
 		}, nil
 
 	}

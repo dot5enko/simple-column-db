@@ -19,7 +19,7 @@ func preloadChunks(sm *Manager, plan *query.QueryPlan, blockChunk query.BlockChu
 
 	preloadingStart := time.Now()
 	for _, filtersGroup := range plan.FilterGroupedByFields {
-		blockSegments := blockChunk.SlabsByFields[filtersGroup.ColumnIdx]
+		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
 		for _, segment := range blockSegments {
 			_, err := sm.Slabs.LoadSlabToCache(schemaObject, segment.Slab)
 			if err != nil {
@@ -46,6 +46,8 @@ type BlockMergerContext struct {
 	CurrentBlockProcessingIdx int
 
 	AbsBlockMaps []lists.IndiceUnmerged
+
+	QueryPlan *query.QueryPlan
 }
 
 func prepareBlockForMerger(
@@ -96,7 +98,8 @@ func prepareBlockForMerger(
 	fullSkipBlock := skipFilters == mergerContext.FilterSize
 
 	blockRT := &mergerContext.Blocks[curRelativeBlockId]
-	blockRT.Header = blockHeader
+	blockRT.BlockHeader = blockHeader
+	blockRT.SlabHeader = slabInfo
 
 	// increase current block pointer
 
@@ -127,41 +130,121 @@ func prepareBlockForMerger(
 	return nil
 }
 
+type ChunkFilterProcessResult struct {
+	skippedBlocksDueToHeaderFiltering int
+
+	totalItems   int
+	wastedMerges int
+}
+
+type SingleColumnProcessingResult struct {
+	skippedBlocksDueToHeaderFiltering int
+}
+
+func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRuntimeInfo, indicesResultCache []uint16) (result SingleColumnProcessingResult, topErr error) {
+
+	// get slab bounds
+	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
+
+	for blockRelativeIdx, blockData := range blocks {
+
+		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
+		{
+			if blockGroupMerger.FullSkip() {
+				continue
+			}
+		}
+
+		blockDataType := blockData.BlockHeader.DataType
+		// slabInfo := blockData.SlabHeader
+
+		for fIdx, filter := range mCtx.FilterColumn {
+
+			headerMatchResult := blockData.HeaderFilterMatchResult[fIdx]
+
+			isFull := headerMatchResult == schema.FullIntersection
+
+			if isFull {
+				result.skippedBlocksDueToHeaderFiltering += 1
+
+				blockGroupMerger.With(nil, false, true)
+				continue
+			}
+
+			{
+				var processFilterErr error
+				var filteredSize int
+
+				// process filter on a block
+				switch blockDataType {
+				case schema.Uint64FieldType:
+					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				case schema.Uint8FieldType:
+					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				case schema.Float32FieldType:
+					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float32](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				case schema.Float64FieldType:
+					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float64](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+				default:
+					return SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
+				}
+
+				_ = filteredSize
+
+				if processFilterErr != nil {
+					return SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
+				}
+
+				// log.Printf(" -- [filtered] filteredSize : %d. sum of bitset = %d, bitcount = %d", filteredSize, blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
+			}
+		}
+	}
+
+	return
+}
+
 // todo should result something
-func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.BlockChunk) (any, error) {
+func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.BlockChunk) (ChunkFilterProcessResult, error) {
 
 	// preallocate per executor thread
 
+	// global for all fields/slabs
 	absBlockMaps := [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged{}
+
+	// local per column
 	blocks := [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo{}
+	indicesResultCache := [schema.BlockRowsSize]uint16{}
 
 	skippedBlocksFULL := 0
 
 	// preload all slabs that are in the chunk
 	preloadErr := preloadChunks(sm, plan, blockChunk)
 	if preloadErr != nil {
-		return nil, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
+		return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
 	}
 
 	schemaObject := plan.Schema
 
+	// per field/slab processing
+	//
+	// could be parallelized
+	// but synchronization is needed which could be less effective
+	// than chunk process parallelization
+
+	result := ChunkFilterProcessResult{}
+
 	for _, filtersGroup := range plan.FilterGroupedByFields {
 
-		// per field/slab processing
-		//
-		// could be parallelized by columns
-		// but synchronization is needed
-
-		columnName, filterColumn := filtersGroup.FieldName, filtersGroup.Conditions
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
 
-		filtersSize := len(filterColumn)
+		filtersSize := len(filtersGroup.Conditions)
 
 		slabMergerContext := BlockMergerContext{
 			Schema:         schemaObject,
 			AbsOffsetStart: blockChunk.GlobalBlockOffset,
 
-			FilterColumn: filterColumn,
+			// filters applied to single column
+			FilterColumn: filtersGroup.Conditions,
 			FilterSize:   filtersSize,
 
 			Blocks:                    blocks[:],
@@ -170,16 +253,15 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 			AbsBlockMaps: absBlockMaps[:],
 		}
 
+		// preprocess segments into blocks
 		for _, segment := range blockSegments {
 
 			slabBlockOffsetStart := segment.StartBlock
 
 			slabInfo, slabErr := sm.Slabs.LoadSlabToCache(schemaObject, segment.Slab)
 			if slabErr != nil {
-				return nil, fmt.Errorf("unable to load slab : %s", slabErr.Error())
+				return ChunkFilterProcessResult{}, fmt.Errorf("unable to load slab : %s", slabErr.Error())
 			}
-
-			// preallocate for each executor thread, should be  same as absBlockMaps
 
 			blockHeaders := slabInfo.BlockHeaders
 
@@ -201,159 +283,16 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 					&sm.Slabs,
 				)
 				if preparationErr != nil {
-					return nil, fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
+					return ChunkFilterProcessResult{}, fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
 				}
 			}
 		}
 
-		for _, slab := range slabsByColumns[columnName] {
-
-			var blocks []BlockRuntimeInfo
-			for idx, blockHeader := range slabInfo.BlockHeaders {
-
-				if idx > int(slabInfo.BlocksFinalized) {
-					break
-				}
-
-				skipFilters := 0
-				absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(idx)
-
-				for _, filter := range filterColumn {
-
-					var processFilterErr error
-					intersectType := schema.UnknownIntersection
-
-					// process filter on a block header
-					switch columnInfo.Type {
-					case schema.Uint64FieldType:
-						intersectType, processFilterErr = ProcessFilterOnBlockHeader[uint64](filter.filter, blockHeader)
-					case schema.Uint8FieldType:
-						intersectType, processFilterErr = ProcessFilterOnBlockHeader[uint8](filter.filter, blockHeader)
-					case schema.Float32FieldType:
-						intersectType, processFilterErr = ProcessFilterOnBlockHeader[float32](filter.filter, blockHeader)
-					case schema.Float64FieldType:
-						intersectType, processFilterErr = ProcessFilterOnBlockHeader[float64](filter.filter, blockHeader)
-					default:
-						return nil, fmt.Errorf("unsupported type %v while filtering block headers", columnInfo.Type.String())
-					}
-
-					if processFilterErr != nil {
-						return nil, fmt.Errorf("error filter processing : %s", processFilterErr.Error())
-					} else {
-
-						skipSingleBlock := intersectType == schema.NoIntersection
-						// here, so we override old data for sure
-						filter.Runtime.FilterLastBlockHeaderResult = intersectType
-
-						if skipSingleBlock {
-							skipFilters++
-						}
-					}
-				}
-
-				fullSkipBlock := skipFilters == filtersSize
-
-				if fullSkipBlock {
-
-					skippedBlocksFULL += 1
-
-					// color.Yellow("skipping block %s on header filtering step", blockHeader.Uid.String())
-					// do not load this block into memory at all
-				}
-
-				blockRT := BlockRuntimeInfo{
-					Header:       blockHeader,
-					Synchronized: true,
-				}
-
-				if !fullSkipBlock {
-					blockDecodedInfo, blockErr := sm.Slabs.LoadBlockToRuntimeBlockData(*schemaObject, slabInfo, blockHeader.Uid)
-
-					// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
-
-					if blockErr != nil {
-						return nil, fmt.Errorf("unable to decode block : %s", blockErr.Error())
-					}
-
-					blockRT.Val = blockDecodedInfo
-				} else {
-					absBlockRTInfo, ok := absBlockMaps[absBlockOffset]
-
-					if !ok {
-						absBlockRTInfo = sm.indiceMergerPool.Get().(*lists.IndiceUnmerged)
-						absBlockRTInfo.Reset()
-
-						absBlockMaps[absBlockOffset] = absBlockRTInfo
-					}
-
-					absBlockRTInfo.SetFullSkip()
-				}
-
-				for filterIdx, filter := range filterColumn {
-					blockRT.HeaderFilterMatchResult[filterIdx] = filter.Runtime.FilterLastBlockHeaderResult
-				}
-
-				blocks = append(blocks, blockRT)
-			}
-
-			// get slab bounds
-			// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
-
-			for blockIdx, blockData := range blocks {
-
-				absBlockOffset := slabInfo.SlabOffsetBlocks + uint64(blockIdx)
-
-				blockGroupMerger, has := absBlockMaps[absBlockOffset]
-				if !has {
-					blockGroupMerger = sm.indiceMergerPool.Get().(*lists.IndiceUnmerged)
-					absBlockMaps[absBlockOffset] = blockGroupMerger
-				} else {
-					if blockGroupMerger.FullSkip() {
-						continue
-					}
-				}
-
-				for fIdx, filter := range filterColumn {
-
-					headerMatchResult := blockData.HeaderFilterMatchResult[fIdx]
-
-					isFull := headerMatchResult == schema.FullIntersection
-
-					if isFull {
-						skippedBlocksDueToHeaderFiltering += 1
-
-						blockGroupMerger.With(nil, false, true)
-						continue
-					}
-
-					{
-						var processFilterErr error
-						var filteredSize int
-
-						// process filter on a block
-						switch columnInfo.Type {
-						case schema.Uint64FieldType:
-							filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
-						case schema.Uint8FieldType:
-							filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
-						case schema.Float32FieldType:
-							filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float32](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
-						case schema.Float64FieldType:
-							filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float64](slabInfo, filter.filter, &blockData, blockGroupMerger, indicesResultCache[:])
-						default:
-							return nil, fmt.Errorf("unsupported type %v", columnInfo.Type.String())
-						}
-
-						_ = filteredSize
-
-						if processFilterErr != nil {
-							return nil, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
-						}
-
-						// log.Printf(" -- [filtered] filteredSize : %d. sum of bitset = %d, bitcount = %d", filteredSize, blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
-					}
-				}
-			}
+		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, blocks[:], indicesResultCache[:])
+		if chunkProcessErr != nil {
+			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
+		} else {
+			result.skippedBlocksDueToHeaderFiltering += singleColumnProcessResult.skippedBlocksDueToHeaderFiltering
 		}
 	}
 
@@ -362,20 +301,22 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 
 	// filter merged blocks info
 	for _, blockFilterMask := range absBlockMaps {
-		if blockFilterMask.Merges() == len(queryData.Filter) {
+		if blockFilterMask.Merges() == plan.FilterSize {
 			amount := blockFilterMask.ResultBitset.Count()
 			totalItems += amount
 
 		} else {
 			wastedMerges += blockFilterMask.Merges()
 		}
-
-		sm.indiceMergerPool.Put(blockFilterMask)
 	}
 
-	clear(absBlockMaps)
+	result.totalItems = totalItems
+	result.wastedMerges = wastedMerges
 
-	slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", wastedMerges, "skipped_blocks", skippedBlocksDueToHeaderFiltering, "total_filtered", totalItems)
+	slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", result.wastedMerges, "skipped_blocks", result.skippedBlocksDueToHeaderFiltering, "total_filtered", result.totalItems)
 
-	return nil
+	// todo cleanup
+	// absBlockMaps
+
+	return result, nil
 }

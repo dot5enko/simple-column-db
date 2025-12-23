@@ -1,9 +1,6 @@
 package manager
 
 import (
-	"sync"
-
-	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -12,8 +9,10 @@ import (
 )
 
 type BlockRuntimeInfo struct {
-	Val    *schema.RuntimeBlockData
-	Header *schema.DiskHeader
+	Val *schema.RuntimeBlockData
+
+	BlockHeader *schema.DiskHeader
+	SlabHeader  *schema.DiskSlabHeader
 
 	// 32 filters max ?
 	HeaderFilterMatchResult [16]schema.BoundsFilterMatchResult
@@ -33,17 +32,15 @@ type Manager struct {
 	Meta    *meta.MetaManager
 
 	BlockBuffer [schema.TotalHeaderSize]byte
-
-	indiceMergerPool *sync.Pool
 }
 
 func New(config ManagerConfig) *Manager {
 
-	var unmergedPool = sync.Pool{
-		New: func() any {
-			return lists.NewUnmerged() // allocates zeroed object
-		},
-	}
+	// var unmergedPool = sync.Pool{
+	// 	New: func() any {
+	// 		return lists.NewUnmerged() // allocates zeroed object
+	// 	},
+	// }
 
 	man := &Manager{
 		Planner: query.NewQueryPlanner(),
@@ -56,7 +53,7 @@ func New(config ManagerConfig) *Manager {
 			slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
 			cacheManager:  cache.NewSlabCacheManager(),
 		},
-		indiceMergerPool: &unmergedPool,
+		// indiceMergerPool: &unmergedPool,
 	}
 
 	man.Slabs.cacheManager.Prefill(32)
