@@ -189,16 +189,16 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRunt
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
 
-	for blockRelativeIdx := range query.ExecutorChunkSizeBlocks {
+	for blockRelativeIdx := range mCtx.CurrentBlockProcessingIdx {
 
 		blockData := &blocks[blockRelativeIdx]
 
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
-		{
-			if blockGroupMerger.FullSkip() {
-				continue
-			}
+		if blockGroupMerger.FullSkip() {
+			continue
 		}
+
+		// slog.Info("processing block OK", "block_relative_idx", blockRelativeIdx, "block_data_is_nil", blockData.Val == nil)
 
 		blockDataType := blockData.BlockHeader.DataType
 		// slabInfo := blockData.SlabHeader
@@ -301,16 +301,6 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 		if blocksPreprocessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
-
-		// for itIdx := range slabMergerContext.CurrentBlockProcessingIdx {
-
-		// 	cBlock := &blocks[itIdx]
-		// 	mergerInfo := &absBlockMaps[itIdx]
-
-		// 	// if cBlock.SlabHeader == nil {
-		// 	// 	slog.Info("block info after preprocess", "block_idx", itIdx, "val_is_nil", cBlock.Val == nil, "full_skip", mergerInfo.FullSkip(), "abs_slab_offset", cBlock.SlabHeader.SlabOffsetBlocks)
-		// 	// }
-		// }
 
 		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, blocks[:], indicesResultCache[:])
 		if chunkProcessErr != nil {
