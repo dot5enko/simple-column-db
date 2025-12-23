@@ -114,7 +114,7 @@ func prepareBlockForMerger(
 
 		blockRT.Val = blockDecodedInfo
 	} else {
-		absBlockRTInfo := mergerContext.AbsBlockMaps[curRelativeBlockId]
+		absBlockRTInfo := &mergerContext.AbsBlockMaps[curRelativeBlockId]
 
 		// preallocated for each thread executor
 		// check if works correctly
@@ -141,12 +141,57 @@ type SingleColumnProcessingResult struct {
 	skippedBlocksDueToHeaderFiltering int
 }
 
+func preprocessSegmentsIntoBlocksAndHeaderFilter(
+	sm *Manager,
+	slabMergerContext *BlockMergerContext,
+	segments []query.Segment,
+) error {
+
+	for _, segment := range segments {
+
+		slabBlockOffsetStart := segment.StartBlock
+
+		slabInfo, slabErr := sm.Slabs.LoadSlabToCache(slabMergerContext.Schema, segment.Slab)
+		if slabErr != nil {
+			return fmt.Errorf("unable to load slab : %s", slabErr.Error())
+		}
+
+		blockHeaders := slabInfo.BlockHeaders
+
+		// todo remove internal function call here
+		// move whole loop into separate func
+
+		for i := 0; i < int(segment.Size); i++ {
+			idx := i + slabBlockOffsetStart
+
+			if idx > int(slabInfo.BlocksFinalized) {
+				break
+			}
+
+			blockHeader := &blockHeaders[idx]
+
+			preparationErr := prepareBlockForMerger(slabMergerContext,
+				slabInfo,
+				blockHeader,
+				&sm.Slabs,
+			)
+			if preparationErr != nil {
+				return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
+			}
+		}
+	}
+
+	return nil
+}
+
 func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRuntimeInfo, indicesResultCache []uint16) (result SingleColumnProcessingResult, topErr error) {
 
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
 
-	for blockRelativeIdx, blockData := range blocks {
+	for blockRelativeIdx := range query.ExecutorChunkSizeBlocks {
+
+		blockData := &blocks[blockRelativeIdx]
 
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
 		{
@@ -178,13 +223,13 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRunt
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float32](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float64](filter.Filter, &blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				default:
 					return SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}
@@ -214,8 +259,6 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 	// local per column
 	blocks := [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo{}
 	indicesResultCache := [schema.BlockRowsSize]uint16{}
-
-	skippedBlocksFULL := 0
 
 	// preload all slabs that are in the chunk
 	preloadErr := preloadChunks(sm, plan, blockChunk)
@@ -254,39 +297,20 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 		}
 
 		// preprocess segments into blocks
-		for _, segment := range blockSegments {
-
-			slabBlockOffsetStart := segment.StartBlock
-
-			slabInfo, slabErr := sm.Slabs.LoadSlabToCache(schemaObject, segment.Slab)
-			if slabErr != nil {
-				return ChunkFilterProcessResult{}, fmt.Errorf("unable to load slab : %s", slabErr.Error())
-			}
-
-			blockHeaders := slabInfo.BlockHeaders
-
-			// todo remove internal function call here
-			// move whole loop into separate func
-
-			for i := 0; i < int(segment.Size); i++ {
-				idx := i + slabBlockOffsetStart
-
-				if idx > int(slabInfo.BlocksFinalized) {
-					break
-				}
-
-				blockHeader := &blockHeaders[idx]
-
-				preparationErr := prepareBlockForMerger(&slabMergerContext,
-					slabInfo,
-					blockHeader,
-					&sm.Slabs,
-				)
-				if preparationErr != nil {
-					return ChunkFilterProcessResult{}, fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
-				}
-			}
+		blocksPreprocessErr := preprocessSegmentsIntoBlocksAndHeaderFilter(sm, &slabMergerContext, blockSegments)
+		if blocksPreprocessErr != nil {
+			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
+
+		// for itIdx := range slabMergerContext.CurrentBlockProcessingIdx {
+
+		// 	cBlock := &blocks[itIdx]
+		// 	mergerInfo := &absBlockMaps[itIdx]
+
+		// 	// if cBlock.SlabHeader == nil {
+		// 	// 	slog.Info("block info after preprocess", "block_idx", itIdx, "val_is_nil", cBlock.Val == nil, "full_skip", mergerInfo.FullSkip(), "abs_slab_offset", cBlock.SlabHeader.SlabOffsetBlocks)
+		// 	// }
+		// }
 
 		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, blocks[:], indicesResultCache[:])
 		if chunkProcessErr != nil {
@@ -312,8 +336,6 @@ func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.Block
 
 	result.totalItems = totalItems
 	result.wastedMerges = wastedMerges
-
-	slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", result.wastedMerges, "skipped_blocks", result.skippedBlocksDueToHeaderFiltering, "total_filtered", result.totalItems)
 
 	// todo cleanup
 	// absBlockMaps

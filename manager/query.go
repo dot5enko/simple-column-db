@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/dot5enko/simple-column-db/manager/query"
 )
@@ -27,6 +28,8 @@ func (sm *Manager) Query(
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
 
+	cummResult := ChunkFilterProcessResult{}
+
 	for _, blockChunk := range plan.BlockChunks {
 
 		data, chunkErr := executePlanChunk(sm, &plan, blockChunk)
@@ -34,8 +37,8 @@ func (sm *Manager) Query(
 			return nil, fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
 		}
 
-		// use data here
-		_ = data
+		cummResult.totalItems += data.totalItems
+		cummResult.wastedMerges += data.wastedMerges
 
 		// paralelize with https://pkg.go.dev/golang.org/x/sync/errgroup
 
@@ -45,6 +48,8 @@ func (sm *Manager) Query(
 
 		// slog.Info("processing chunk", "blocks", len(blockChunk.SlabsByFields))
 	}
+
+	slog.Info("merge info", "wasted_merges", cummResult.wastedMerges, "skipped_blocks", cummResult.skippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.totalItems)
 
 	return result, nil
 }
