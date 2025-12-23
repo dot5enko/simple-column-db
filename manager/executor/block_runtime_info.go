@@ -9,5 +9,5 @@ type BlockRuntimeInfo struct {
 	SlabHeader  *schema.DiskSlabHeader
 
 	// 32 filters max ?
-	HeaderFilterMatchResult [16]schema.BoundsFilterMatchResult
+	HeaderFilterMatchResult [4]schema.BoundsFilterMatchResult
 }

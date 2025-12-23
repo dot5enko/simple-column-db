@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -13,6 +14,18 @@ type ChunkExecutorThreadCache struct {
 	absBlockMaps       [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
 	blocks             [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
 	indicesResultCache [schema.BlockRowsSize]uint16
+}
+
+func (c *ChunkExecutorThreadCache) Reset() {
+
+	for i := range query.ExecutorChunkSizeBlocks {
+		c.absBlockMaps[i].Reset()
+
+		bRef := &c.blocks[i]
+
+		bRef.BlockHeader = nil
+		bRef.Val = nil
+	}
 }
 
 type WrappedCacheItem struct {
@@ -59,6 +72,13 @@ func (m *ExecutorCacheManager) Release(uid uuid.UUID) {
 		}
 	}
 
+}
+
+// start executor with N worker threads
+func (m *ExecutorCacheManager) StartWorkerThreads(workerCount int, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk query.BlockChunk) {
+	for i := 0; i < workerCount; i++ {
+
+	}
 }
 
 func NewExecutorCacheManager() *ExecutorCacheManager {

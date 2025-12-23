@@ -21,13 +21,16 @@ type IndiceUnmerged struct {
 
 func (i *IndiceUnmerged) Reset() {
 
+	i.merges = 0
+	i.fullSkip = false
+
 	if i.initialized {
 		for j := range i.ResultBitset {
 			i.ResultBitset[j] = 0
 		}
-
-		i.initialized = false
 	}
+
+	i.initialized = false
 }
 
 func (i *IndiceUnmerged) SetFullSkip() {

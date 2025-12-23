@@ -34,7 +34,8 @@ func (sm *Manager) Query(
 	cummResult := executor.ChunkFilterProcessResult{}
 	slog.Info("starting workers", "max_executors", sm.config.ExecutorsMaxConcurentThreads)
 
-	for _, blockChunk := range plan.BlockChunks {
+	bChunksSize := len(plan.BlockChunks)
+	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
 
 		cacheItem, uid := sm.exCacheManager.Get()
 
@@ -42,25 +43,21 @@ func (sm *Manager) Query(
 			return nil, fmt.Errorf("unable to acquire executor cache")
 		}
 
-		func() error {
+		cacheItem.Reset()
 
-			defer sm.exCacheManager.Release(uid)
+		data, chunkErr := executor.ExecutePlanForChunk(cacheItem, sm.Slabs, &plan, &plan.BlockChunks[bChunkIdx])
+		if chunkErr != nil {
+			return nil, fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
+		}
 
-			cacheItem := &executor.ChunkExecutorThreadCache{}
+		// resultLock.Lock()
+		// defer resultLock.Unlock()
 
-			data, chunkErr := executor.ExecutePlanForChunk(cacheItem, sm.Slabs, &plan, blockChunk)
-			if chunkErr != nil {
-				return fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
-			}
+		cummResult.TotalItems += data.TotalItems
+		cummResult.WastedMerges += data.WastedMerges
 
-			// resultLock.Lock()
-			// defer resultLock.Unlock()
+		sm.exCacheManager.Release(uid)
 
-			cummResult.TotalItems += data.TotalItems
-			cummResult.WastedMerges += data.WastedMerges
-
-			return nil
-		}()
 	}
 
 	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)

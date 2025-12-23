@@ -16,7 +16,7 @@ type ChunkFilterProcessResult struct {
 	WastedMerges int
 }
 
-func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk query.BlockChunk) error {
+func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
 
 	schemaObject := plan.Schema
 
@@ -39,7 +39,7 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk qu
 	return nil
 }
 
-func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk query.BlockChunk) (ChunkFilterProcessResult, error) {
+func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
 
 	// preallocate per executor thread
 
@@ -99,7 +99,10 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 	wastedMerges := 0
 
 	// filter merged blocks info
-	for _, blockFilterMask := range cache.absBlockMaps {
+	for idx := range query.ExecutorChunkSizeBlocks {
+
+		blockFilterMask := &cache.absBlockMaps[idx]
+
 		if blockFilterMask.Merges() == plan.FilterSize {
 			amount := blockFilterMask.ResultBitset.Count()
 			totalItems += amount
