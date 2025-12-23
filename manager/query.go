@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/query"
-	"github.com/dot5enko/simple-column-db/schema"
 )
 
 func (sm *Manager) Query(
@@ -17,27 +15,44 @@ func (sm *Manager) Query(
 
 	result := []map[string]any{}
 
-	var indicesResultCache [schema.BlockRowsSize]uint16
+	// var indicesResultCache [schema.BlockRowsSize]uint16
 
-	{
-		// spew.Dump("filter by columns", filtersByColumns)
-		// spew.Dump("slabs filtered", slabsByColumns)
+	schemaObject := sm.Meta.GetSchema(schemaName)
+	if schemaObject == nil {
+		return nil, fmt.Errorf("no such schema '%s'", schemaName)
+	}
 
+	plan, planErr := sm.Planner.Plan(schemaName, queryData, sm.Meta)
+
+	if planErr != nil {
+		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
+	}
+
+	for chunkIdx, blockChunk := range plan.BlockChunks {
+		for _, filterGroup := range plan.FilterGroupedByFields {
+
+			blockSegments := blockChunk.SlabsByFields[filterGroup.ColumnIdx]
+
+			slog.Info("processing chunk", "chunk_idx", chunkIdx, "column_name", filterGroup.FieldName, "block_segments", len(blockSegments))
+
+			// paralelize!
+
+			// for _, blockSegment := range blockSegments {
+
+			// }
+
+		}
+
+		// slog.Info("processing chunk", "blocks", len(blockChunk.SlabsByFields))
+	}
+
+	/* {
 		absBlockMaps := map[uint64]*lists.IndiceUnmerged{}
 		skippedBlocksFULL := 0
 
-		for columnName, filterColumn := range filtersByColumns {
+		for _, filtersGroup := range plan.FilterGroupedByFields {
 
-			var columnInfo schema.SchemaColumn
-
-			// cache
-			for _, it := range schemaObject.Columns {
-				if it.Name == columnName {
-					columnInfo = it
-
-					break
-				}
-			}
+			columnName, filterColumn := filtersGroup.FieldName, filtersGroup.Conditions
 
 			filtersSize := len(filterColumn)
 
@@ -202,7 +217,7 @@ func (sm *Manager) Query(
 
 		// filter merged blocks info
 		for _, blockFilterMask := range absBlockMaps {
-			if blockFilterMask.Merges() == len(query.Filter) {
+			if blockFilterMask.Merges() == len(queryData.Filter) {
 				amount := blockFilterMask.ResultBitset.Count()
 				totalItems += amount
 
@@ -217,7 +232,7 @@ func (sm *Manager) Query(
 
 		slog.Info("merge info", "skipped_full", skippedBlocksFULL, "wasted_merges", wastedMerges, "skipped_blocks", skippedBlocksDueToHeaderFiltering, "total_filtered", totalItems)
 	}
-
+	*/
 	return result, nil
 }
 
