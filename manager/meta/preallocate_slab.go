@@ -1,4 +1,4 @@
-package manager
+package meta
 
 import (
 	"github.com/dot5enko/simple-column-db/schema"

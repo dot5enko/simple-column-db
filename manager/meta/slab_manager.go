@@ -1,4 +1,4 @@
-package manager
+package meta
 
 import (
 	"fmt"
@@ -26,8 +26,6 @@ type SlabManager struct {
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
-	cacheManager *cache.SlabCacheManager
-
 	slabCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabCacheLocker sync.RWMutex
 
@@ -35,6 +33,24 @@ type SlabManager struct {
 	SlabBlockHeadersReadBuffer [HeadersCacheSize]byte // max blocks per slab ? TODO: check
 
 	BufferForCompressedData10Mb [schema.SlabDiskContentsUncompressed]byte
+
+	meta         *MetaManager
+	cacheManager *cache.SlabCacheManager
+}
+
+// todo : remove const/literals, add config param
+func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
+	sm := &SlabManager{
+		storagePath:   storagePath,
+		cache:         map[[32]byte]BlockCacheItem{},
+		slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
+		cacheManager:  cache.NewSlabCacheManager(),
+		meta:          meta,
+	}
+
+	sm.cacheManager.Prefill(32)
+
+	return sm
 }
 
 func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {

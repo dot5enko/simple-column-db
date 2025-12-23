@@ -1,4 +1,4 @@
-package manager
+package executor
 
 import (
 	"fmt"

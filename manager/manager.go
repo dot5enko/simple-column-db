@@ -1,22 +1,10 @@
 package manager
 
 import (
-	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/google/uuid"
 )
-
-type BlockRuntimeInfo struct {
-	Val *schema.RuntimeBlockData
-
-	BlockHeader *schema.DiskHeader
-	SlabHeader  *schema.DiskSlabHeader
-
-	// 32 filters max ?
-	HeaderFilterMatchResult [16]schema.BoundsFilterMatchResult
-}
 
 type ManagerConfig struct {
 	PathToStorage string
@@ -27,7 +15,7 @@ type ManagerConfig struct {
 type Manager struct {
 	config ManagerConfig
 
-	Slabs   SlabManager
+	Slabs   *meta.SlabManager
 	Planner *query.QueryPlanner
 	Meta    *meta.MetaManager
 
@@ -46,17 +34,11 @@ func New(config ManagerConfig) *Manager {
 		Planner: query.NewQueryPlanner(),
 		config:  config,
 		Meta:    meta.NewMetaManager(config.PathToStorage),
-		Slabs: SlabManager{
-			storagePath: config.PathToStorage,
-			// caches
-			cache:         map[[32]byte]BlockCacheItem{},
-			slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
-			cacheManager:  cache.NewSlabCacheManager(),
-		},
+
 		// indiceMergerPool: &unmergedPool,
 	}
 
-	man.Slabs.cacheManager.Prefill(32)
+	man.Slabs = meta.NewSlabManager(config.PathToStorage, man.Meta)
 
 	loadErr := man.Meta.LoadSchemesFromDisk()
 	if loadErr != nil {

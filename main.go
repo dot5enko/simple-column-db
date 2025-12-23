@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
 	"flag"
 	"fmt"
@@ -162,7 +163,7 @@ func main() {
 					Alias:     "total_count",
 				},
 			},
-		})
+		}, context.Background())
 
 		end := time.Since(before)
 		log.Printf("query took %.2fms", end.Seconds()*1000)

@@ -1,16 +1,21 @@
 package manager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 
+	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/query"
+	"golang.org/x/sync/errgroup"
 )
 
 func (sm *Manager) Query(
 	schemaName string,
 	queryData query.Query,
+	ctx context.Context,
 ) ([]map[string]any, error) {
 
 	result := []map[string]any{}
@@ -28,17 +33,27 @@ func (sm *Manager) Query(
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
 
-	cummResult := ChunkFilterProcessResult{}
+	cummResult := executor.ChunkFilterProcessResult{}
+
+	numberOfCpus := runtime.NumCPU()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(numberOfCpus)
 
 	for _, blockChunk := range plan.BlockChunks {
 
-		data, chunkErr := executePlanChunk(sm, &plan, blockChunk)
-		if chunkErr != nil {
-			return nil, fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
-		}
+		g.Go(func() error {
 
-		cummResult.totalItems += data.totalItems
-		cummResult.wastedMerges += data.wastedMerges
+			data, chunkErr := executePlanForChunk(sm, &plan, blockChunk)
+			if chunkErr != nil {
+				return fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
+			}
+
+			cummResult.TotalItems += data.totalItems
+			cummResult.WastedMerges += data.wastedMerges
+
+			return nil
+		})
 
 		// paralelize with https://pkg.go.dev/golang.org/x/sync/errgroup
 
@@ -49,7 +64,7 @@ func (sm *Manager) Query(
 		// slog.Info("processing chunk", "blocks", len(blockChunk.SlabsByFields))
 	}
 
-	slog.Info("merge info", "wasted_merges", cummResult.wastedMerges, "skipped_blocks", cummResult.skippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.totalItems)
+	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)
 
 	return result, nil
 }

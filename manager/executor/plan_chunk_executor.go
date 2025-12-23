@@ -1,39 +1,15 @@
-package manager
+package executor
 
 import (
 	"fmt"
-	"log/slog"
-	"time"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
 type PlanExecutor struct {
-}
-
-func preloadChunks(sm *Manager, plan *query.QueryPlan, blockChunk query.BlockChunk) error {
-
-	schemaObject := plan.Schema
-
-	preloadingStart := time.Now()
-	for _, filtersGroup := range plan.FilterGroupedByFields {
-		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
-		for _, segment := range blockSegments {
-			_, err := sm.Slabs.LoadSlabToCache(schemaObject, segment.Slab)
-			if err != nil {
-				return fmt.Errorf("unable to load slab : %s", err.Error())
-			}
-		}
-	}
-	preloadingTook := time.Since(preloadingStart).Seconds() * 1000
-
-	if preloadingTook > 10 {
-		slog.Info("slow slabs preloading for chunk executor", "took", preloadingTook)
-	}
-
-	return nil
 }
 
 type BlockMergerContext struct {
@@ -56,7 +32,7 @@ func prepareBlockForMerger(
 	slabInfo *schema.DiskSlabHeader,
 	blockHeader *schema.DiskHeader,
 
-	slabsManager *SlabManager,
+	slabsManager *meta.SlabManager,
 ) (err error) {
 
 	skipFilters := 0
@@ -130,19 +106,12 @@ func prepareBlockForMerger(
 	return nil
 }
 
-type ChunkFilterProcessResult struct {
-	skippedBlocksDueToHeaderFiltering int
-
-	totalItems   int
-	wastedMerges int
-}
-
 type SingleColumnProcessingResult struct {
 	skippedBlocksDueToHeaderFiltering int
 }
 
 func preprocessSegmentsIntoBlocksAndHeaderFilter(
-	sm *Manager,
+	sm *meta.SlabManager,
 	slabMergerContext *BlockMergerContext,
 	segments []query.Segment,
 ) error {
@@ -151,7 +120,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 
 		slabBlockOffsetStart := segment.StartBlock
 
-		slabInfo, slabErr := sm.Slabs.LoadSlabToCache(slabMergerContext.Schema, segment.Slab)
+		slabInfo, slabErr := sm.LoadSlabToCache(slabMergerContext.Schema, segment.Slab)
 		if slabErr != nil {
 			return fmt.Errorf("unable to load slab : %s", slabErr.Error())
 		}
@@ -173,7 +142,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 			preparationErr := prepareBlockForMerger(slabMergerContext,
 				slabInfo,
 				blockHeader,
-				&sm.Slabs,
+				sm,
 			)
 			if preparationErr != nil {
 				return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
@@ -246,89 +215,4 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRunt
 	}
 
 	return
-}
-
-// todo should result something
-func executePlanChunk(sm *Manager, plan *query.QueryPlan, blockChunk query.BlockChunk) (ChunkFilterProcessResult, error) {
-
-	// preallocate per executor thread
-
-	// global for all fields/slabs
-	absBlockMaps := [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged{}
-
-	// local per column
-	blocks := [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo{}
-	indicesResultCache := [schema.BlockRowsSize]uint16{}
-
-	// preload all slabs that are in the chunk
-	preloadErr := preloadChunks(sm, plan, blockChunk)
-	if preloadErr != nil {
-		return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
-	}
-
-	schemaObject := plan.Schema
-
-	// per field/slab processing
-	//
-	// could be parallelized
-	// but synchronization is needed which could be less effective
-	// than chunk process parallelization
-
-	result := ChunkFilterProcessResult{}
-
-	for _, filtersGroup := range plan.FilterGroupedByFields {
-
-		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
-
-		filtersSize := len(filtersGroup.Conditions)
-
-		slabMergerContext := BlockMergerContext{
-			Schema:         schemaObject,
-			AbsOffsetStart: blockChunk.GlobalBlockOffset,
-
-			// filters applied to single column
-			FilterColumn: filtersGroup.Conditions,
-			FilterSize:   filtersSize,
-
-			Blocks:                    blocks[:],
-			CurrentBlockProcessingIdx: 0,
-
-			AbsBlockMaps: absBlockMaps[:],
-		}
-
-		// preprocess segments into blocks
-		blocksPreprocessErr := preprocessSegmentsIntoBlocksAndHeaderFilter(sm, &slabMergerContext, blockSegments)
-		if blocksPreprocessErr != nil {
-			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
-		}
-
-		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, blocks[:], indicesResultCache[:])
-		if chunkProcessErr != nil {
-			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
-		} else {
-			result.skippedBlocksDueToHeaderFiltering += singleColumnProcessResult.skippedBlocksDueToHeaderFiltering
-		}
-	}
-
-	totalItems := 0
-	wastedMerges := 0
-
-	// filter merged blocks info
-	for _, blockFilterMask := range absBlockMaps {
-		if blockFilterMask.Merges() == plan.FilterSize {
-			amount := blockFilterMask.ResultBitset.Count()
-			totalItems += amount
-
-		} else {
-			wastedMerges += blockFilterMask.Merges()
-		}
-	}
-
-	result.totalItems = totalItems
-	result.wastedMerges = wastedMerges
-
-	// todo cleanup
-	// absBlockMaps
-
-	return result, nil
 }
