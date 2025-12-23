@@ -12,12 +12,11 @@ import (
 )
 
 type BlockRuntimeInfo struct {
-	Val          *schema.RuntimeBlockData
-	Synchronized bool
-	Header       schema.DiskHeader
+	Val    *schema.RuntimeBlockData
+	Header *schema.DiskHeader
 
 	// 32 filters max ?
-	HeaderFilterMatchResult [32]schema.BoundsFilterMatchResult
+	HeaderFilterMatchResult [16]schema.BoundsFilterMatchResult
 }
 
 type ManagerConfig struct {

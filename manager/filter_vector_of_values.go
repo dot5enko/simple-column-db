@@ -211,7 +211,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 
 func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 	filter query.FilterCondition,
-	block schema.DiskHeader,
+	block *schema.DiskHeader,
 ) (matchResult schema.BoundsFilterMatchResult, err error) {
 
 	blockBounds := block.Bounds

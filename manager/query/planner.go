@@ -18,7 +18,7 @@ type (
 	QueryPlanner struct {
 	}
 
-	SlabField struct {
+	Segment struct {
 		Slab uuid.UUID
 
 		StartBlock int
@@ -26,14 +26,22 @@ type (
 	}
 
 	BlockChunk struct {
-		SlabsByFields [][]SlabField
+		GlobalBlockOffset uint64
+
+		// for each field there will be an array of segments
+		// thats why we need a "map" here, for speed we use numeric array instead
+		// indices correspond to the order of fields in schema object
+		ChunkSegmentsByFieldIndexMap [][]Segment
 	}
 
 	QueryPlan struct {
+		Schema                schema.Schema
 		FilterGroupedByFields []FilterGroupedRT
 		BlockChunks           []BlockChunk
 	}
 )
+
+const ExecutorChunkSizeBlocks = 20
 
 func NewQueryPlanner() *QueryPlanner {
 	return &QueryPlanner{}
@@ -105,8 +113,8 @@ func (qp *QueryPlanner) Plan(
 			}
 
 			filtersByColumns[filter.Field] = append(old, FilterConditionRuntime{
-				filter:  filter,
-				runtime: &RuntimeFilterCache{},
+				Filter:  filter,
+				Runtime: &RuntimeFilterCache{},
 			})
 		}
 
@@ -139,21 +147,20 @@ func (qp *QueryPlanner) Plan(
 			return strings.Compare(a.FieldName, b.FieldName)
 		})
 
-		chunkSizeBlocks := 20
-
-		type OneChunkSlabs struct {
-			items []SlabField
-			used  int
+		// total size of blocks in all segments == ExecutorChunkSizeBlocks
+		type SingleChunk struct {
+			segments      []Segment
+			blocks_filled int
 		}
 
 		type ColumnChunks struct {
-			List []OneChunkSlabs
+			List []SingleChunk
 		}
 
 		perColumnChunks := map[int]*ColumnChunks{}
 
-		newSingleChunk := func() *OneChunkSlabs {
-			return &OneChunkSlabs{items: []SlabField{}}
+		newSingleChunk := func() *SingleChunk {
+			return &SingleChunk{segments: []Segment{}}
 		}
 
 		maxChunks := 0
@@ -164,7 +171,7 @@ func (qp *QueryPlanner) Plan(
 
 			curChunkSlabs, ok := perColumnChunks[columnIdx]
 			if !ok {
-				curChunkSlabs = &ColumnChunks{List: []OneChunkSlabs{}}
+				curChunkSlabs = &ColumnChunks{List: []SingleChunk{}}
 				perColumnChunks[columnIdx] = curChunkSlabs
 			}
 
@@ -176,19 +183,19 @@ func (qp *QueryPlanner) Plan(
 
 				for leftoverBlocks > 0 {
 
-					curSize := chunkSizeBlocks
+					curSize := ExecutorChunkSizeBlocks
 
-					if leftoverBlocks <= chunkSizeBlocks {
+					if leftoverBlocks <= ExecutorChunkSizeBlocks {
 						curSize = leftoverBlocks
 					}
 
-					leftoverCurrentChunk := chunkSizeBlocks - curChunkSlabsItem.used
+					leftoverCurrentChunk := ExecutorChunkSizeBlocks - curChunkSlabsItem.blocks_filled
 
 					if curSize > leftoverCurrentChunk {
 						curSize = leftoverCurrentChunk
 					}
 
-					slabFieldInfo := SlabField{
+					segment := Segment{
 						Slab:       slabUid,
 						StartBlock: used,
 						Size:       curSize,
@@ -196,15 +203,15 @@ func (qp *QueryPlanner) Plan(
 
 					leftoverBlocks -= curSize
 					used += curSize
-					curChunkSlabsItem.used += curSize
+					curChunkSlabsItem.blocks_filled += curSize
 
-					curChunkSlabsItem.items = append(curChunkSlabsItem.items, slabFieldInfo)
+					curChunkSlabsItem.segments = append(curChunkSlabsItem.segments, segment)
 
-					if curChunkSlabsItem.used > chunkSizeBlocks {
-						panic("this should not happen")
+					if curChunkSlabsItem.blocks_filled > ExecutorChunkSizeBlocks {
+						panic(fmt.Sprintf("this should not happen. never. Number of blocks filled %d, exceeds executor chunk size %d", curChunkSlabsItem.blocks_filled, ExecutorChunkSizeBlocks))
 					}
 
-					if curChunkSlabsItem.used == chunkSizeBlocks {
+					if curChunkSlabsItem.blocks_filled == ExecutorChunkSizeBlocks {
 						curChunkSlabs.List = append(curChunkSlabs.List, *curChunkSlabsItem)
 						curChunkSlabsItem = newSingleChunk()
 					}
@@ -224,15 +231,19 @@ func (qp *QueryPlanner) Plan(
 
 			for chunkIdx, chunk := range perColumnChunk.List {
 
-				if chunks[chunkIdx].SlabsByFields == nil {
-					chunks[chunkIdx].SlabsByFields = make([][]SlabField, fieldsCount)
+				curChunkObject := &chunks[chunkIdx]
+
+				if curChunkObject.ChunkSegmentsByFieldIndexMap == nil {
+					curChunkObject.ChunkSegmentsByFieldIndexMap = make([][]Segment, fieldsCount)
+					curChunkObject.GlobalBlockOffset = uint64(chunkIdx) * ExecutorChunkSizeBlocks
 				}
 
-				chunks[chunkIdx].SlabsByFields[columnIdx] = chunk.items
+				curChunkObject.ChunkSegmentsByFieldIndexMap[columnIdx] = chunk.segments
 			}
 		}
 
 		return QueryPlan{
+			Schema:                *schemaObject,
 			FilterGroupedByFields: filterByColumnsArray,
 			BlockChunks:           chunks,
 		}, nil

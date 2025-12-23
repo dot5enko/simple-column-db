@@ -4,12 +4,12 @@ import "github.com/dot5enko/simple-column-db/schema"
 
 type RuntimeFilterCache struct {
 	// column                      schema.SchemaColumn
-	filterLastBlockHeaderResult schema.BoundsFilterMatchResult
+	FilterLastBlockHeaderResult schema.BoundsFilterMatchResult
 }
 
 type FilterConditionRuntime struct {
-	filter  FilterCondition
-	runtime *RuntimeFilterCache
+	Filter  FilterCondition
+	Runtime *RuntimeFilterCache
 }
 
 type FilterGroupedRT struct {
