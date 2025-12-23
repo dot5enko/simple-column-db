@@ -1,6 +1,9 @@
 package manager
 
 import (
+	"runtime"
+
+	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -10,6 +13,8 @@ type ManagerConfig struct {
 	PathToStorage string
 
 	CacheMaxBytes uint64
+
+	ExecutorsMaxConcurentThreads int
 }
 
 type Manager struct {
@@ -19,26 +24,35 @@ type Manager struct {
 	Planner *query.QueryPlanner
 	Meta    *meta.MetaManager
 
-	BlockBuffer [schema.TotalHeaderSize]byte
+	BlockBuffer    [schema.TotalHeaderSize]byte
+	exCacheManager *executor.ExecutorCacheManager
 }
 
 func New(config ManagerConfig) *Manager {
 
-	// var unmergedPool = sync.Pool{
-	// 	New: func() any {
-	// 		return lists.NewUnmerged() // allocates zeroed object
-	// 	},
-	// }
-
 	man := &Manager{
 		Planner: query.NewQueryPlanner(),
-		config:  config,
 		Meta:    meta.NewMetaManager(config.PathToStorage),
-
-		// indiceMergerPool: &unmergedPool,
 	}
 
 	man.Slabs = meta.NewSlabManager(config.PathToStorage, man.Meta)
+
+	{ // executor cache setup
+		maxThreadsCache := config.ExecutorsMaxConcurentThreads
+		if maxThreadsCache == 0 {
+			maxThreadsCache = runtime.NumCPU()
+		}
+
+		// set default value if not specified
+		config.ExecutorsMaxConcurentThreads = maxThreadsCache
+
+		executorCache := executor.NewExecutorCacheManager()
+		executorCache.Prefill(maxThreadsCache)
+
+		man.exCacheManager = executorCache
+	}
+
+	man.config = config
 
 	loadErr := man.Meta.LoadSchemesFromDisk()
 	if loadErr != nil {

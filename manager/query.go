@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime"
 
 	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/query"
-	"golang.org/x/sync/errgroup"
 )
 
 func (sm *Manager) Query(
@@ -34,34 +32,35 @@ func (sm *Manager) Query(
 	}
 
 	cummResult := executor.ChunkFilterProcessResult{}
-
-	numberOfCpus := runtime.NumCPU()
-
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(numberOfCpus)
+	slog.Info("starting workers", "max_executors", sm.config.ExecutorsMaxConcurentThreads)
 
 	for _, blockChunk := range plan.BlockChunks {
 
-		g.Go(func() error {
+		cacheItem, uid := sm.exCacheManager.Get()
 
-			data, chunkErr := executePlanForChunk(sm, &plan, blockChunk)
+		if cacheItem == nil {
+			return nil, fmt.Errorf("unable to acquire executor cache")
+		}
+
+		func() error {
+
+			defer sm.exCacheManager.Release(uid)
+
+			cacheItem := &executor.ChunkExecutorThreadCache{}
+
+			data, chunkErr := executor.ExecutePlanForChunk(cacheItem, sm.Slabs, &plan, blockChunk)
 			if chunkErr != nil {
 				return fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
 			}
 
-			cummResult.TotalItems += data.totalItems
-			cummResult.WastedMerges += data.wastedMerges
+			// resultLock.Lock()
+			// defer resultLock.Unlock()
+
+			cummResult.TotalItems += data.TotalItems
+			cummResult.WastedMerges += data.WastedMerges
 
 			return nil
-		})
-
-		// paralelize with https://pkg.go.dev/golang.org/x/sync/errgroup
-
-		// for _, blockSegment := range blockSegments {
-
-		// }
-
-		// slog.Info("processing chunk", "blocks", len(blockChunk.SlabsByFields))
+		}()
 	}
 
 	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)

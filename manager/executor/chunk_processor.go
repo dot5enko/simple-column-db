@@ -39,7 +39,7 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk qu
 	return nil
 }
 
-func executePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk query.BlockChunk) (ChunkFilterProcessResult, error) {
+func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk query.BlockChunk) (ChunkFilterProcessResult, error) {
 
 	// preallocate per executor thread
 
