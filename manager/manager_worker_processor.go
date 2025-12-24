@@ -42,19 +42,17 @@ func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGro
 				task.Status.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
 			} else {
 
+				func() {
+					task.Status.Lock.Lock()
+					defer task.Status.Lock.Unlock()
+
+					task.Status.ChunkResult.TotalItems += taskRes.TotalItems
+					task.Status.ChunkResult.WastedMerges += taskRes.WastedMerges
+					task.Status.ChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
+
+				}()
+
 				processed := task.Status.ChunksProcessed.Add(1)
-
-				// slog.Info("chunk processor reuslt", "items", taskRes.TotalItems)
-
-				// task.Status.Lock.Lock()
-				// defer task.Status.Lock.Unlock()
-
-				// task.Status.Lock.Lock()
-				task.Status.ChunkResult.TotalItems += taskRes.TotalItems
-				// task.Status.Lock.Unlock()
-
-				task.Status.ChunkResult.WastedMerges += taskRes.WastedMerges
-				task.Status.ChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
 
 				if processed == int32(task.Status.ChunksTotal) {
 					task.Status.Waiter.Done()

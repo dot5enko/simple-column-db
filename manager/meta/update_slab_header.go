@@ -6,9 +6,17 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
+// todo check thread safety
+
 func (sm *SlabManager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlabHeader) error {
 
-	serializedBytes, headerBytesErr := slab.WriteTo(sm.SlabHeaderReaderBuffer[:])
+	headerReadBuffer, headerBufferIdx := sm.headerReaderBufferRing.Get()
+
+	defer func() {
+		sm.headerReaderBufferRing.Return(headerBufferIdx)
+	}()
+
+	serializedBytes, headerBytesErr := slab.WriteTo(headerReadBuffer)
 	if headerBytesErr != nil {
 		return fmt.Errorf("unable to finalize block, slab header won't serialize : %s", headerBytesErr.Error())
 	} else {
@@ -19,6 +27,6 @@ func (sm *SlabManager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.Disk
 		}
 
 		defer fileManager.Close()
-		return fileManager.WriteAt(sm.SlabHeaderReaderBuffer[:], 0, serializedBytes)
+		return fileManager.WriteAt(headerReadBuffer, 0, serializedBytes)
 	}
 }

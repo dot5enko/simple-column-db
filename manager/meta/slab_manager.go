@@ -30,10 +30,10 @@ type SlabManager struct {
 	slabCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabCacheLocker sync.RWMutex
 
-	SlabHeaderReaderBuffer     [schema.SlabHeaderFixedSize]byte
 	SlabBlockHeadersReadBuffer [HeadersCacheSize]byte // max blocks per slab ? TODO: check
 
-	BufferForCompressedData10Mb [schema.SlabDiskContentsUncompressed]byte
+	headerReaderBufferRing *cache.FixedSizeBufferPool
+	fullSlabBufferRing     *cache.FixedSizeBufferPool
 
 	meta         *MetaManager
 	cacheManager *cache.SlabCacheManager
@@ -51,7 +51,10 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 		meta:          meta,
 	}
 
-	sm.cacheManager.Prefill(64)
+	sm.cacheManager.Prefill(32)
+
+	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
+	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
 
 	return sm
 }

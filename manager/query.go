@@ -19,6 +19,7 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 
 	for i := 0; i < workerCount; i++ {
 		go func() {
+
 			defer func() {
 				swg.Done()
 
@@ -59,8 +60,6 @@ func (sm *Manager) Query(
 	if planErr != nil {
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
-
-	// responsesQueue := make(chan *executor.ChunkFilterProcessResult, 100)
 
 	bChunksSize := len(plan.BlockChunks)
 

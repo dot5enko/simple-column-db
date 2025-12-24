@@ -2,6 +2,7 @@ package cache
 
 import (
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,9 @@ type CacheEntry struct {
 type SlabCacheManager struct {
 	storage       map[uuid.UUID]*CacheEntry
 	storageLocker sync.RWMutex
+
+	usedCount int32
+	allocated int
 }
 
 func NewSlabCacheManager() *SlabCacheManager {
@@ -34,6 +38,9 @@ func (m *SlabCacheManager) Prefill(size int) {
 		entry := m.newEntry()
 		m.storage[entry.Item.CacheEntryId] = entry
 	}
+
+	m.allocated += len(m.storage)
+
 }
 
 var ErrNoFreeEntries = errors.New("no free entries")
@@ -65,11 +72,35 @@ func (m *SlabCacheManager) GetCacheEntry() (*SlabCacheItem, error) {
 	for _, entry := range m.storage {
 		if entry.InUse.CompareAndSwap(false, true) {
 
+			entry.Item.RtStats.Reads++
+			usage := atomic.AddInt32(&m.usedCount, 1)
+
+			if usage == int32(m.allocated) {
+				slog.Info("slab cache entry used", "total_used", usage, "allocated", m.allocated)
+			}
+
 			// todo mark usage
 			return &entry.Item, nil
 		}
 	}
 
 	return nil, ErrNoFreeEntries
+
+}
+
+func (m *SlabCacheManager) Release(uid uuid.UUID) {
+
+	m.storageLocker.RLock()
+	defer m.storageLocker.RUnlock()
+
+	for _, v := range m.storage {
+		wasInUse := v.InUse.CompareAndSwap(true, false)
+
+		if wasInUse {
+			usage := atomic.AddInt32(&m.usedCount, -1)
+			slog.Info("slab cache entry released", "total_used", usage, "allocated", m.allocated)
+		}
+
+	}
 
 }

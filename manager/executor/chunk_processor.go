@@ -41,10 +41,6 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 
 func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
 
-	// preallocate per executor thread
-
-	// global for all fields/slabs
-
 	// preload all slabs that are in the chunk
 	preloadErr := preloadChunks(sm, plan, blockChunk)
 	if preloadErr != nil {

@@ -40,6 +40,7 @@ func (sm *SlabManager) TrimFinalizedBlocksSize(
 	return fileManager.Raw().Truncate(finalSize)
 }
 
+// todo work on thread safety
 func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 	s schema.Schema,
 	slab *schema.DiskSlabHeader,
@@ -58,6 +59,9 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		return fmt.Errorf("block with uid `%s` doesn't exist in slab", block.Header.Uid.String())
 	}
 
+	slabReadCache, slabCacheIdx := sm.fullSlabBufferRing.Get()
+	defer sm.fullSlabBufferRing.Return(slabCacheIdx)
+
 	{
 		singleBlockUncompressedSize := slab.Type.BlockSize()
 		blockDataOffset := singleBlockUncompressedSize * foundIdx
@@ -66,7 +70,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		slabHeaderAbsOffset := schema.SlabHeaderFixedSize + headersHeaderOffset
 		headersSize := schema.TotalHeaderSize * int(slab.BlocksTotal)
 
-		writeBuf := bytes.NewBuffer(sm.BufferForCompressedData10Mb[:0])
+		writeBuf := bytes.NewBuffer(slabReadCache[:0])
 		dataSize, writeErr := io.DumpNumbersArrayBlockAny(writeBuf, block.DataTypedArray)
 		if writeErr != nil {
 			return fmt.Errorf("unable to finalize block : %s", writeErr.Error())
@@ -87,7 +91,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 			start := time.Now()
 
-			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.Data[:compressionSizeTotal], sm.BufferForCompressedData10Mb[:])
+			compressedSize, compressErr := compression.CompressLz4(slabCacheItem.Data[:compressionSizeTotal], slabReadCache)
 			if compressedSize > 0 {
 				compressionTook := time.Since(start)
 
@@ -106,7 +110,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 				color.Yellow(" compressed slab [type=%s][%d/%d] %d -> %d [%.2f%%] fill %.2f%% %.2fms", slab.Type.String(), slab.BlocksFinalized, slab.BlocksTotal, compressionSizeTotal, compressedSize, compressRatio*100.0, fillRatio*100, compressionTook.Seconds()*1000)
 
-				spew.Dump("compressed data", sm.BufferForCompressedData10Mb[:showSize], sm.BufferForCompressedData10Mb[compressedSize-showSize:compressedSize])
+				spew.Dump("compressed data", slabReadCache[:showSize], slabReadCache[compressedSize-showSize:compressedSize])
 
 				slab.CompressedSlabContentSize = uint64(compressedSize)
 				slab.CompressionType = 1
@@ -142,7 +146,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		var writeDataErr error
 
 		if slab.CompressionType != 0 {
-			writeDataErr = fileManager.WriteAt(sm.BufferForCompressedData10Mb[:slab.CompressedSlabContentSize], int(schema.SlabHeaderFixedSize+headersSize), int(slab.CompressedSlabContentSize))
+			writeDataErr = fileManager.WriteAt(slabReadCache[:slab.CompressedSlabContentSize], int(schema.SlabHeaderFixedSize+headersSize), int(slab.CompressedSlabContentSize))
 		} else {
 			writeDataErr = fileManager.WriteAt(slabCacheItem.Data[:], schema.SlabHeaderFixedSize+headersSize, int(slab.CompressedSlabContentSize))
 		}
