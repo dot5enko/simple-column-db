@@ -26,13 +26,16 @@ type Manager struct {
 
 	BlockBuffer    [schema.TotalHeaderSize]byte
 	exCacheManager *executor.ExecutorCacheManager
+
+	chunksQueue chan *executor.ChunkProcessingTask
 }
 
 func New(config ManagerConfig) *Manager {
 
 	man := &Manager{
-		Planner: query.NewQueryPlanner(),
-		Meta:    meta.NewMetaManager(config.PathToStorage),
+		Planner:     query.NewQueryPlanner(),
+		Meta:        meta.NewMetaManager(config.PathToStorage),
+		chunksQueue: make(chan *executor.ChunkProcessingTask, 100),
 	}
 
 	man.Slabs = meta.NewSlabManager(config.PathToStorage, man.Meta)

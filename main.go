@@ -133,6 +133,8 @@ func main() {
 		time.Sleep(time.Second * 5)
 	}
 
+	m.StartWorkers(1)
+
 	for i := 0; i < testN; i++ {
 		before := time.Now()
 		result, qerr := m.Query(testSchemaName, query.Query{

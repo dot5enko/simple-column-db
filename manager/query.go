@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 
 	"github.com/dot5enko/simple-column-db/manager/executor"
-	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
-	"github.com/fatih/color"
 )
 
 func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup {
@@ -61,119 +58,32 @@ func (sm *Manager) Query(
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
 
-	cummResult := executor.ChunkFilterProcessResult{}
 	slog.Info("starting workers", "max_executors", sm.config.ExecutorsMaxConcurentThreads)
 
-	type TaskStatus struct {
-		ChunksTotal     int
-		ChunksProcessed atomic.Int32
-
-		Err       atomic.Bool
-		ErrObject error
-
-		ChunkResult executor.ChunkFilterProcessResult
-
-		Waiter sync.WaitGroup
-	}
-
-	type ChunkProcessingTask struct {
-		bchunk *query.BlockChunk
-		slabs  *meta.SlabManager
-		plan   *query.QueryPlan
-
-		chunkIdx int
-
-		status *TaskStatus
-	}
-
-	chunksQueue := make(chan *ChunkProcessingTask, 100)
 	// responsesQueue := make(chan *executor.ChunkFilterProcessResult, 100)
-
-	StartWorkerThreads(4, func(threadId int) {
-
-		threadCache := &executor.ChunkExecutorThreadCache{}
-
-		slog.Info("worker started", "thread_id", threadId)
-		defer slog.Info("worker stopped", "thread_id", threadId)
-
-		for task := range chunksQueue {
-
-			if task.status.Err.Load() {
-
-				if task.status.ErrObject == nil {
-					panic("err object not set, but err flag is true")
-				} else {
-					color.Red("skipped because of error: %s", task.status.ErrObject.Error())
-				}
-				continue
-			}
-
-			threadCache.Reset()
-
-			taskRes, err := executor.ExecutePlanForChunk(threadCache, sm.Slabs, task.plan, task.bchunk)
-			if err != nil {
-				task.status.Err.Store(true)
-				task.status.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
-			} else {
-
-				processed := task.status.ChunksProcessed.Add(1)
-
-				// slog.Info("chunk DONE", "worker_id", threadId, "bchunk_idx", task.chunkIdx, "filtered_items", taskRes.TotalItems, "tasks_done", processed, "total_tasks", task.status.ChunksTotal)
-
-				if processed == int32(task.status.ChunksTotal) {
-					task.status.Waiter.Done()
-					// slog.Info("finished processing all chunks")
-				}
-
-				_ = taskRes
-				// responsesQueue <- &taskRes
-			}
-		}
-	})
 
 	bChunksSize := len(plan.BlockChunks)
 
-	taskStatus := &TaskStatus{ChunksTotal: bChunksSize}
+	taskStatus := &executor.TaskStatus{ChunksTotal: bChunksSize}
 	taskStatus.Waiter.Add(1)
 
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
+		sm.chunksQueue <- &executor.ChunkProcessingTask{
+			Bchunk: &plan.BlockChunks[bChunkIdx],
+			Slabs:  sm.Slabs,
+			Plan:   &plan,
 
-		// cacheItem, uid := sm.exCacheManager.Get()
+			ChunkIdx: bChunkIdx,
 
-		// if cacheItem == nil {
-		// 	return nil, fmt.Errorf("unable to acquire executor cache")
-		// }
-
-		// cacheItem.Reset()
-
-		chunksQueue <- &ChunkProcessingTask{
-			bchunk: &plan.BlockChunks[bChunkIdx],
-			slabs:  sm.Slabs,
-			plan:   &plan,
-
-			chunkIdx: bChunkIdx,
-
-			status: taskStatus,
+			Status: taskStatus,
 		}
-
-		// slog.Info("submitted chunk to processors", "chunk_idx", bChunkIdx, "total_chunks", bChunksSize)
-
-		// data, chunkErr := executor.ExecutePlanForChunk(cacheItem, sm.Slabs, &plan, &plan.BlockChunks[bChunkIdx])
-		// if chunkErr != nil {
-		// 	return nil, fmt.Errorf("error while executing plan chunk: %s", chunkErr.Error())
-		// }
-
-		// cummResult.TotalItems += data.TotalItems
-		// cummResult.WastedMerges += data.WastedMerges
-
-		// sm.exCacheManager.Release(uid)
-
 	}
 
 	slog.Info("waiting for tasks completion")
 
 	taskStatus.Waiter.Wait()
 
+	cummResult := taskStatus.ChunkResult
 	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)
 
 	return result, nil
