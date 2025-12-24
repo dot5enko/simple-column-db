@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const ExecutorChunkSizeBlocks = 10
+
 var (
 	ErrSchemaNotFound = fmt.Errorf("schema not found")
 )
@@ -42,8 +44,6 @@ type (
 		FilterSize int
 	}
 )
-
-const ExecutorChunkSizeBlocks = 20
 
 func NewQueryPlanner() *QueryPlanner {
 	return &QueryPlanner{}
