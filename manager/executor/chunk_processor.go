@@ -44,10 +44,10 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
 
 	// preload all slabs that are in the chunk
-	preloadErr := preloadChunks(sm, plan, blockChunk)
-	if preloadErr != nil {
-		return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
-	}
+	// preloadErr := preloadChunks(sm, plan, blockChunk)
+	// if preloadErr != nil {
+	// 	return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
+	// }
 
 	schemaObject := plan.Schema
 

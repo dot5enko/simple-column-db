@@ -80,6 +80,7 @@ func prepareBlockForMerger(
 	// increase current block pointer
 
 	if !fullSkipBlock {
+		// todo fix
 		blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
 
 		// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)

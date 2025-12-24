@@ -51,6 +51,7 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 
 	sm.cacheManager.Prefill(32)
 
+	// 1slab = ±10MB ram
 	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
 	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
 
