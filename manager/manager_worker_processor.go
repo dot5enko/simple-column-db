@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -9,7 +10,8 @@ import (
 	"github.com/fatih/color"
 )
 
-func (sm *Manager) StartWorkers(routines int) *sync.WaitGroup {
+// todo handle context
+func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGroup {
 
 	return StartWorkerThreads(routines, func(threadId int) {
 

@@ -86,6 +86,7 @@ func main() {
 
 	pprofEnabled := flag.Bool("pprof", false, "enable pprof server")
 	testIterations := flag.Int("test_iterations", 1, "number of iterations")
+	workerThreads := flag.Int("worker_threads", 1, "number of worker threads")
 
 	flag.Parse()
 
@@ -133,7 +134,9 @@ func main() {
 		time.Sleep(time.Second * 5)
 	}
 
-	m.StartWorkers(1)
+	workersCtx, cancelWorkers := context.WithCancel(context.Background())
+
+	m.StartWorkers(*workerThreads, workersCtx)
 
 	for i := 0; i < testN; i++ {
 		before := time.Now()
@@ -179,7 +182,10 @@ func main() {
 
 	if *pprofEnabled {
 		waiter.Wait()
+
 	}
+
+	cancelWorkers()
 
 }
 
