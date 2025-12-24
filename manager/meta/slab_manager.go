@@ -154,7 +154,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 			// log.Printf(" --- loading %s block. blockHeader.StartOffset:%d", blockHeader.Uid.String(), blockHeader.StartOffset)
 
-			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, blockHeader)
+			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, &blockHeader)
 
 			if runtimeDecodeErr != nil {
 				return nil, fmt.Errorf("unable to decoded raw block data for slab %s. block %s: %s", slab.Uid.String(), block.String(), runtimeDecodeErr.Error())
@@ -180,7 +180,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 }
 
 // return RuntimeBlockData
-func DecodeRawBlockData(blockData []byte, bheader schema.DiskHeader) (*schema.RuntimeBlockData, error) {
+func DecodeRawBlockData(blockData []byte, bheader *schema.DiskHeader) (*schema.RuntimeBlockData, error) {
 
 	var runtimeData *schema.RuntimeBlockData
 

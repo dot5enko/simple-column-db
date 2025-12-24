@@ -7,7 +7,7 @@ import (
 )
 
 type RuntimeBlockData struct {
-	Header DiskHeader
+	Header *DiskHeader
 
 	lock sync.RWMutex
 
@@ -83,7 +83,7 @@ func (b *RuntimeBlockData) DirectAccess() (typedDataArray any, endOffset int) {
 func NewRuntimeBlockDataFromSlice(dataArray any, itemCount int) *RuntimeBlockData {
 
 	return &RuntimeBlockData{
-		Cap:            BlockRowsSize, // todo make it possible to have different sizes for different blocks ?
+		Cap:            BlockRowsSize,
 		Items:          itemCount,
 		DataTypedArray: dataArray,
 	}
