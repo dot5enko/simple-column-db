@@ -38,6 +38,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 			if openErr != nil {
 				return nil, openErr
 			} else {
+				defer fileReader.Close()
 
 				// readStart := time.Now()
 				headerReadErr := fileReader.ReadAt(headerReadBuffer, 0, int(schema.SlabHeaderFixedSize))
