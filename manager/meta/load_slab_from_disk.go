@@ -25,6 +25,8 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 			slabReadCache, slabCacheIdx := m.fullSlabBufferRing.Get()
 			headerReadBuffer, headerBufferIdx := m.headerReaderBufferRing.Get()
 
+			// no need to block this resources for whole duration of func
+			// todo optimize
 			defer func() {
 				m.fullSlabBufferRing.Return(slabCacheIdx)
 				m.headerReaderBufferRing.Return(headerBufferIdx)
@@ -66,7 +68,8 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 							nonEmptyHeadersSize += int(schema.TotalHeaderSize)
 						}
 
-						headersReadErr := fileReader.ReadAt(m.SlabBlockHeadersReadBuffer[:], int(schema.SlabHeaderFixedSize), nonEmptyHeadersSize)
+						// we use here slab read cache to save resources
+						headersReadErr := fileReader.ReadAt(slabReadCache, int(schema.SlabHeaderFixedSize), nonEmptyHeadersSize)
 
 						if headersReadErr != nil {
 							return nil, fmt.Errorf("unable to read data while LoadSlabToCache: %s", headersReadErr.Error())
@@ -79,7 +82,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 							for i := 0; i < blocksToIterate; i++ {
 								blockOffset := i * int(schema.TotalHeaderSize)
-								headerBuffer := m.SlabBlockHeadersReadBuffer[blockOffset:]
+								headerBuffer := slabReadCache[blockOffset:]
 
 								headerDecodeErr := result.BlockHeaders[i].FromBytes(bytes.NewReader(headerBuffer))
 

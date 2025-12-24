@@ -30,8 +30,6 @@ type SlabManager struct {
 	slabCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabCacheLocker sync.RWMutex
 
-	SlabBlockHeadersReadBuffer [HeadersCacheSize]byte // max blocks per slab ? TODO: check
-
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
 

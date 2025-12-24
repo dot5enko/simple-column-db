@@ -11,6 +11,9 @@ import (
 
 func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.SchemaColumn, slabOffsetBlocks uint64) (*schema.DiskSlabHeader, error) {
 
+	wholeSlabCache, slabCacheIdx1 := m.fullSlabBufferRing.Get()
+	defer m.fullSlabBufferRing.Return(slabCacheIdx1)
+
 	slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name, slabOffsetBlocks)
 	if slabError != nil {
 		return nil, slabError
@@ -34,13 +37,13 @@ func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.Sc
 
 	// crete first block
 	firstBlock := schema.NewBlockHeader(col.Type)
-	headerWriter := bits.NewEncodeBuffer(m.SlabBlockHeadersReadBuffer[:], binary.LittleEndian)
+	headerWriter := bits.NewEncodeBuffer(wholeSlabCache, binary.LittleEndian)
 	writtenBytes, writeErr := firstBlock.WriteTo(&headerWriter)
 	if writeErr != nil {
 		return nil, fmt.Errorf("unable to encode block header : %s", writeErr.Error())
 	}
 
-	writeToDiskErr := f.WriteAt(m.SlabBlockHeadersReadBuffer[:writtenBytes], schema.SlabHeaderFixedSize, writtenBytes)
+	writeToDiskErr := f.WriteAt(wholeSlabCache[:writtenBytes], schema.SlabHeaderFixedSize, writtenBytes)
 	if writeToDiskErr != nil {
 		return nil, fmt.Errorf("unable to write block header into slab : %s", writeToDiskErr.Error())
 	}

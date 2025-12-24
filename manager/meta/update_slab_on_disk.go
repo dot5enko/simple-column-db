@@ -62,6 +62,9 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 	slabReadCache, slabCacheIdx := sm.fullSlabBufferRing.Get()
 	defer sm.fullSlabBufferRing.Return(slabCacheIdx)
 
+	slabReadCache1, slabCacheIdx1 := sm.fullSlabBufferRing.Get()
+	defer sm.fullSlabBufferRing.Return(slabCacheIdx1)
+
 	{
 		singleBlockUncompressedSize := slab.Type.BlockSize()
 		blockDataOffset := singleBlockUncompressedSize * foundIdx
@@ -84,7 +87,6 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		copy(slabCacheItem.Data[blockDataOffset:], writeBuf.Bytes())
 
 		// compress whole slab
-
 		compressionSizeTotal := dataSize * int(slabCacheItem.Header.BlocksTotal)
 
 		if false {
@@ -129,7 +131,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 
 		defer fileManager.Close()
 
-		buf := bits.NewEncodeBuffer(sm.SlabBlockHeadersReadBuffer[:], binary.LittleEndian)
+		buf := bits.NewEncodeBuffer(slabReadCache1, binary.LittleEndian)
 		serializedBytes, headerBytesErr := block.Header.WriteTo(&buf)
 
 		// log.Printf("%s block bounds written : min %.2f. items in block : %d", block.BlockHeader.Uid.String(), block.BlockHeader.Bounds.Min, block.BlockHeader.Items)
@@ -137,7 +139,7 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 		if headerBytesErr != nil {
 			return fmt.Errorf("unable to serialize block header, header won't serialize : %s", headerBytesErr.Error())
 		} else {
-			headerBlockUpdateErr := fileManager.WriteAt(sm.SlabBlockHeadersReadBuffer[:], int(slabHeaderAbsOffset), serializedBytes)
+			headerBlockUpdateErr := fileManager.WriteAt(slabReadCache1[:], int(slabHeaderAbsOffset), serializedBytes)
 			if headerBlockUpdateErr != nil {
 				return fmt.Errorf("unable to update block header : %s", headerBlockUpdateErr.Error())
 			}

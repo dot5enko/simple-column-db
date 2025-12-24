@@ -24,12 +24,14 @@ func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGro
 
 		for task := range sm.chunksQueue {
 
-			if task.Status.Err.Load() {
+			curStatus := task.Status
 
-				if task.Status.ErrObject == nil {
+			if curStatus.Err.Load() {
+
+				if curStatus.ErrObject == nil {
 					panic("err object not set, but err flag is true")
 				} else {
-					color.Red("skipped because of error: %s", task.Status.ErrObject.Error())
+					color.Red("skipped because of error: %s", curStatus.ErrObject.Error())
 				}
 				continue
 			}
@@ -38,24 +40,27 @@ func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGro
 
 			taskRes, err := executor.ExecutePlanForChunk(threadCache, sm.Slabs, task.Plan, task.Bchunk)
 			if err != nil {
-				task.Status.Err.Store(true)
-				task.Status.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
+				curStatus.Err.Store(true)
+				curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
 			} else {
 
 				func() {
-					task.Status.Lock.Lock()
-					defer task.Status.Lock.Unlock()
+					curStatus.Lock.Lock()
+					defer curStatus.Lock.Unlock()
 
-					task.Status.ChunkResult.TotalItems += taskRes.TotalItems
-					task.Status.ChunkResult.WastedMerges += taskRes.WastedMerges
-					task.Status.ChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
+					globalChunkResult := &curStatus.ChunkResult
 
+					globalChunkResult.TotalItems += taskRes.TotalItems
+					globalChunkResult.WastedMerges += taskRes.WastedMerges
+					globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
+
+					globalChunkResult.ProcessedChunks += 1
 				}()
 
-				processed := task.Status.ChunksProcessed.Add(1)
+				processed := curStatus.ChunksProcessed.Add(1)
 
-				if processed == int32(task.Status.ChunksTotal) {
-					task.Status.Waiter.Done()
+				if processed == int32(curStatus.ChunksTotal) {
+					curStatus.Waiter.Done()
 				}
 
 			}

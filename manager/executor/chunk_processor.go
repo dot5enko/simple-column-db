@@ -14,6 +14,8 @@ type ChunkFilterProcessResult struct {
 
 	TotalItems   int
 	WastedMerges int
+
+	ProcessedChunks int
 }
 
 func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
