@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -43,6 +44,7 @@ func (sm *Manager) Query(
 	ctx context.Context,
 ) ([]map[string]any, error) {
 
+	before := time.Now()
 	result := []map[string]any{}
 
 	// var indicesResultCache [schema.BlockRowsSize]uint16
@@ -57,8 +59,6 @@ func (sm *Manager) Query(
 	if planErr != nil {
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
-
-	slog.Info("starting workers", "max_executors", sm.config.ExecutorsMaxConcurentThreads)
 
 	// responsesQueue := make(chan *executor.ChunkFilterProcessResult, 100)
 
@@ -79,12 +79,12 @@ func (sm *Manager) Query(
 		}
 	}
 
-	slog.Info("waiting for tasks completion")
-
 	taskStatus.Waiter.Wait()
 
+	queryTookMs := time.Since(before).Seconds() * 1000
+
 	cummResult := taskStatus.ChunkResult
-	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)
+	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
 
 	return result, nil
 }

@@ -139,7 +139,7 @@ func main() {
 	m.StartWorkers(*workerThreads, workersCtx)
 
 	for i := 0; i < testN; i++ {
-		before := time.Now()
+
 		result, qerr := m.Query(testSchemaName, query.Query{
 			Filter: []query.FilterCondition{
 				{
@@ -170,13 +170,10 @@ func main() {
 			},
 		}, context.Background())
 
-		end := time.Since(before)
-		log.Printf("query took %.2fms", end.Seconds()*1000)
-
 		if qerr != nil {
 			panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
 		} else {
-			log.Printf("query result : %v", result)
+			_ = result
 		}
 	}
 

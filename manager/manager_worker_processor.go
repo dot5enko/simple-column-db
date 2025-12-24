@@ -13,6 +13,8 @@ import (
 // todo handle context
 func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGroup {
 
+	slog.Info("starting workers", "max_executors", routines)
+
 	return StartWorkerThreads(routines, func(threadId int) {
 
 		threadCache := &executor.ChunkExecutorThreadCache{}
