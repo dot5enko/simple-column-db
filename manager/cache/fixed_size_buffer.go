@@ -15,7 +15,7 @@ func NewFixedSizeBufferPool(n int, bufSize int) *FixedSizeBufferPool {
 	for i := 0; i < n; i++ {
 		start := i * bufSize
 		end := start + bufSize
-		buffers[i] = arena[start:end:end] // full slice expression
+		buffers[i] = arena[start:end:end]
 	}
 
 	free := make(chan uint16, n)

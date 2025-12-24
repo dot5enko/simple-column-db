@@ -6,7 +6,6 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
-	"github.com/dot5enko/simple-column-db/schema"
 )
 
 type ManagerConfig struct {
@@ -23,9 +22,6 @@ type Manager struct {
 	Slabs   *meta.SlabManager
 	Planner *query.QueryPlanner
 	Meta    *meta.MetaManager
-
-	BlockBuffer    [schema.TotalHeaderSize]byte
-	exCacheManager *executor.ExecutorCacheManager
 
 	chunksQueue chan *executor.ChunkProcessingTask
 }
@@ -48,11 +44,6 @@ func New(config ManagerConfig) *Manager {
 
 		// set default value if not specified
 		config.ExecutorsMaxConcurentThreads = maxThreadsCache
-
-		executorCache := executor.NewExecutorCacheManager()
-		executorCache.Prefill(maxThreadsCache)
-
-		man.exCacheManager = executorCache
 	}
 
 	man.config = config

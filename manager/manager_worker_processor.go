@@ -36,8 +36,6 @@ func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGro
 				continue
 			}
 
-			threadCache.Reset()
-
 			taskRes, err := executor.ExecutePlanForChunk(threadCache, sm.Slabs, task.Plan, task.Bchunk)
 			if err != nil {
 				curStatus.Err.Store(true)
@@ -53,8 +51,6 @@ func (sm *Manager) StartWorkers(routines int, ctx context.Context) *sync.WaitGro
 					globalChunkResult.TotalItems += taskRes.TotalItems
 					globalChunkResult.WastedMerges += taskRes.WastedMerges
 					globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
-
-					globalChunkResult.ProcessedChunks += 1
 				}()
 
 				processed := curStatus.ChunksProcessed.Add(1)

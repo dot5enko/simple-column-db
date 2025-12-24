@@ -14,8 +14,6 @@ type ChunkFilterProcessResult struct {
 
 	TotalItems   int
 	WastedMerges int
-
-	ProcessedChunks int
 }
 
 func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
@@ -42,6 +40,8 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 }
 
 func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
+
+	cache.Reset()
 
 	// preload all slabs that are in the chunk
 	// preloadErr := preloadChunks(sm, plan, blockChunk)
