@@ -15,24 +15,20 @@ const SlabHeaderFixedSize = 2 + 8 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
 const SlabDiskContentsUncompressed = 10 * 1024 * 1024
 
 type DiskSlabHeader struct {
-	Version uint16
-
-	SlabOffsetBlocks uint64
-
-	Uid uuid.UUID
-
-	BlocksTotal     uint16
-	BlocksFinalized uint16
-
-	SingleBlockRowsSize uint16
-
-	SchemaFieldId uint8
-	Type          FieldType
-
-	CompressionType           uint8
-	CompressedSlabContentSize uint64
-
 	Bounds BoundsFloat
+	Uid    uuid.UUID
+
+	CompressedSlabContentSize uint64
+	SlabOffsetBlocks          uint64
+
+	BlocksTotal         uint16
+	BlocksFinalized     uint16
+	SingleBlockRowsSize uint16
+	Version             uint16
+
+	SchemaFieldId   uint8
+	CompressionType uint8
+	Type            FieldType
 
 	// up to this point we have a predictable layout
 	BlockHeaders []DiskHeader

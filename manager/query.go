@@ -11,6 +11,7 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
+	"github.com/fatih/color"
 )
 
 func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup {
@@ -25,6 +26,9 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 
 				rec := recover()
 				if rec != nil {
+
+					panic(rec)
+
 					slog.Error("executor panicked", "err", fmt.Sprintf("%v", rec))
 				}
 			}()
@@ -64,11 +68,12 @@ func (sm *Manager) Query(
 		ChunksTotal     int
 		ChunksProcessed atomic.Int32
 
-		Err atomic.Bool
+		Err       atomic.Bool
+		ErrObject error
 
 		ChunkResult executor.ChunkFilterProcessResult
 
-		Waiter *sync.WaitGroup
+		Waiter sync.WaitGroup
 	}
 
 	type ChunkProcessingTask struct {
@@ -94,6 +99,12 @@ func (sm *Manager) Query(
 		for task := range chunksQueue {
 
 			if task.status.Err.Load() {
+
+				if task.status.ErrObject == nil {
+					panic("err object not set, but err flag is true")
+				} else {
+					color.Red("skipped because of error: %s", task.status.ErrObject.Error())
+				}
 				continue
 			}
 
@@ -102,17 +113,19 @@ func (sm *Manager) Query(
 			taskRes, err := executor.ExecutePlanForChunk(threadCache, sm.Slabs, task.plan, task.bchunk)
 			if err != nil {
 				task.status.Err.Store(true)
+				task.status.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
 			} else {
 
 				processed := task.status.ChunksProcessed.Add(1)
 
-				slog.Info("chunk DONE", "worker_id", threadId, "bchunk_idx", task.chunkIdx, "filtered_items", taskRes.TotalItems, "tasks_done", processed)
+				// slog.Info("chunk DONE", "worker_id", threadId, "bchunk_idx", task.chunkIdx, "filtered_items", taskRes.TotalItems, "tasks_done", processed, "total_tasks", task.status.ChunksTotal)
 
 				if processed == int32(task.status.ChunksTotal) {
 					task.status.Waiter.Done()
-					slog.Info("finished processing all chunks")
+					// slog.Info("finished processing all chunks")
 				}
 
+				_ = taskRes
 				// responsesQueue <- &taskRes
 			}
 		}
@@ -120,8 +133,8 @@ func (sm *Manager) Query(
 
 	bChunksSize := len(plan.BlockChunks)
 
-	queryWaitGroup := sync.WaitGroup{}
-	queryWaitGroup.Add(1)
+	taskStatus := &TaskStatus{ChunksTotal: bChunksSize}
+	taskStatus.Waiter.Add(1)
 
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
 
@@ -140,10 +153,10 @@ func (sm *Manager) Query(
 
 			chunkIdx: bChunkIdx,
 
-			status: &TaskStatus{ChunksTotal: bChunksSize, Waiter: &queryWaitGroup},
+			status: taskStatus,
 		}
 
-		slog.Info("submitted chunk to processors", "chunk_idx", bChunkIdx)
+		// slog.Info("submitted chunk to processors", "chunk_idx", bChunkIdx, "total_chunks", bChunksSize)
 
 		// data, chunkErr := executor.ExecutePlanForChunk(cacheItem, sm.Slabs, &plan, &plan.BlockChunks[bChunkIdx])
 		// if chunkErr != nil {
@@ -159,7 +172,7 @@ func (sm *Manager) Query(
 
 	slog.Info("waiting for tasks completion")
 
-	queryWaitGroup.Wait()
+	taskStatus.Waiter.Wait()
 
 	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems)
 

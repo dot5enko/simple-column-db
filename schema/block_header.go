@@ -17,17 +17,20 @@ const HeaderSizeUsed uint64 = 16 + 2 + 8 + 8 + 1 + 16 // guid + start offset + c
 const ReservedSize uint64 = TotalHeaderSize - HeaderSizeUsed
 
 type DiskHeader struct {
-	Uid uuid.UUID
 
-	Items uint16
+	// reserved for future use
+
+	Uid uuid.UUID
 
 	StartOffset    uint64
 	CompressedSize uint64
 
-	DataType FieldType
-	Bounds   BoundsFloat
+	Bounds BoundsFloat
 
-	// reserved for future use
+	Items uint16
+
+	DataType FieldType
+
 	Reserved [ReservedSize]uint8
 }
 

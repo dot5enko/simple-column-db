@@ -11,6 +11,38 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
+// type BoundsFloat1 struct {
+// 	initialized bool
+
+// 	Min float64
+// 	Max float64
+// }
+
+// type BoundsFloatAligned1 struct {
+// 	Min float64
+// 	Max float64
+
+// 	initialized bool
+// }
+
+// func BenchmarkPoorlyAligned(b *testing.B) {
+// 	for b.Loop() {
+// 		var items = make([]BoundsFloat1, 10_000_000)
+// 		for j := range items {
+// 			items[j].initialized = true
+// 		}
+// 	}
+// }
+
+// func BenchmarkWellAligned(b *testing.B) {
+// 	for b.Loop() {
+// 		var items = make([]BoundsFloatAligned1, 10_000_000)
+// 		for j := range items {
+// 			items[j].initialized = true
+// 		}
+// 	}
+// }
+
 func BenchmarkTransponeSlow(b *testing.B) {
 
 	const size = 40000

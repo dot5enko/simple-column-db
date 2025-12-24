@@ -9,6 +9,7 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 type BlockCacheItem struct {
@@ -36,6 +37,8 @@ type SlabManager struct {
 
 	meta         *MetaManager
 	cacheManager *cache.SlabCacheManager
+
+	loadGroup singleflight.Group
 }
 
 // todo : remove const/literals, add config param
@@ -48,7 +51,7 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 		meta:          meta,
 	}
 
-	sm.cacheManager.Prefill(32)
+	sm.cacheManager.Prefill(64)
 
 	return sm
 }
@@ -57,8 +60,9 @@ func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 	return m.getSlabFromCache(uid)
 }
 func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
-	m.slabCacheLocker.Lock()
-	defer m.slabCacheLocker.Unlock()
+
+	m.slabCacheLocker.RLock()
+	defer m.slabCacheLocker.RUnlock()
 
 	if item, ok := m.slabCacheItem[uid]; ok {
 
@@ -83,8 +87,8 @@ func GetUniqueBlockId(slab, block uuid.UUID) [32]byte {
 
 func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
-	m.slabCacheLocker.Lock()
-	defer m.slabCacheLocker.Unlock()
+	m.locker.RLock()
+	defer m.locker.RUnlock()
 
 	uid := GetUniqueBlockId(slab, block)
 
