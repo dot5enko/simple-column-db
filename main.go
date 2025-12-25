@@ -155,7 +155,7 @@ func main() {
 				{
 					Field:     "value",
 					Operand:   query.GT,
-					Arguments: []any{float32(0.7999)},
+					Arguments: []any{float32(0.4999)},
 				},
 			},
 			Select: []query.Selector{

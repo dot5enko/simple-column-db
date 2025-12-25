@@ -57,6 +57,8 @@ func (sm *Manager) Query(
 
 	plan, planErr := sm.Planner.Plan(schemaName, queryData, sm.Meta)
 
+	// discard non intersecting blocks from the plan
+
 	if planErr != nil {
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
@@ -66,30 +68,9 @@ func (sm *Manager) Query(
 	taskStatus := &executor.TaskStatus{ChunksTotal: bChunksSize}
 	taskStatus.Waiter.Add(1)
 
-	deepCopyBlockChunk := func(idx int) *query.BlockChunk {
-
-		source := plan.BlockChunks[idx]
-
-		items := make([][]query.Segment, len(source.ChunkSegmentsByFieldIndexMap))
-		for idx, item := range source.ChunkSegmentsByFieldIndexMap {
-
-			itemsCount := len(item)
-			items[idx] = make([]query.Segment, itemsCount)
-
-			copy(items[idx], item)
-		}
-
-		newBchunk := query.BlockChunk{
-			GlobalBlockOffset:            source.GlobalBlockOffset,
-			ChunkSegmentsByFieldIndexMap: items,
-		}
-
-		return &newBchunk
-	}
-
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
 		sm.chunksQueue <- &executor.ChunkProcessingTask{
-			Bchunk: deepCopyBlockChunk(bChunkIdx),
+			Bchunk: &plan.BlockChunks[bChunkIdx],
 			Slabs:  sm.Slabs,
 			Plan:   &plan,
 
