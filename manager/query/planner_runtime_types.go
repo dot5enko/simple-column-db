@@ -8,8 +8,8 @@ type RuntimeFilterCache struct {
 }
 
 type FilterConditionRuntime struct {
-	Filter  FilterCondition
-	Runtime *RuntimeFilterCache
+	Filter FilterCondition
+	// Runtime *RuntimeFilterCache
 }
 
 type FilterGroupedRT struct {

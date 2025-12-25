@@ -116,8 +116,7 @@ func (qp *QueryPlanner) Plan(
 			}
 
 			filtersByColumns[filter.Field] = append(old, FilterConditionRuntime{
-				Filter:  filter,
-				Runtime: &RuntimeFilterCache{},
+				Filter: filter,
 			})
 		}
 

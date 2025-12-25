@@ -69,7 +69,10 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 
 			// filters applied to single column
 			FilterColumn: filtersGroup.Conditions,
-			FilterSize:   filtersSize,
+
+			FilterColumnRuntimeCache: make([]query.RuntimeFilterCache, len(filtersGroup.Conditions)),
+
+			FilterSize: filtersSize,
 
 			Blocks:       cache.blocks[:],
 			AbsBlockMaps: cache.absBlockMaps[:],

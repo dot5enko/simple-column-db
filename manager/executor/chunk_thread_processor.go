@@ -43,10 +43,6 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 				globalChunkResult := &curStatus.ChunkResult
 
-				if task.ChunkIdx == 5 {
-					slog.Info("chunk result", "chunk_idx", task.ChunkIdx, "processed_as", processed, "total_items", taskRes.TotalItems, "skipped_blocks", taskRes.SkippedBlocksDueToHeaderFiltering)
-				}
-
 				globalChunkResult.TotalItems += taskRes.TotalItems
 				globalChunkResult.WastedMerges += taskRes.WastedMerges
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering

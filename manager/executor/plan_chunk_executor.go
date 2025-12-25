@@ -16,7 +16,10 @@ type BlockMergerContext struct {
 	Schema         schema.Schema
 	AbsOffsetStart uint64
 	FilterColumn   []query.FilterConditionRuntime
-	FilterSize     int
+
+	FilterColumnRuntimeCache []query.RuntimeFilterCache
+
+	FilterSize int
 
 	Blocks                    []BlockRuntimeInfo
 	CurrentBlockProcessingIdx int
@@ -65,7 +68,7 @@ func prepareBlockForMerger(
 
 			skipSingleBlock := intersectType == schema.NoIntersection
 
-			filter.Runtime.FilterLastBlockHeaderResult = intersectType
+			mergerContext.FilterColumnRuntimeCache[idx].FilterLastBlockHeaderResult = intersectType
 
 			if skipSingleBlock {
 				skipFilters++
@@ -102,8 +105,8 @@ func prepareBlockForMerger(
 		absBlockRTInfo.SetFullSkip()
 	}
 
-	for filterIdx, filter := range mergerContext.FilterColumn {
-		blockRT.HeaderFilterMatchResult[filterIdx] = filter.Runtime.FilterLastBlockHeaderResult
+	for filterIdx := range mergerContext.FilterColumn {
+		blockRT.HeaderFilterMatchResult[filterIdx] = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterLastBlockHeaderResult
 	}
 
 	return nil
