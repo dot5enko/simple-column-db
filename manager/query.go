@@ -66,9 +66,30 @@ func (sm *Manager) Query(
 	taskStatus := &executor.TaskStatus{ChunksTotal: bChunksSize}
 	taskStatus.Waiter.Add(1)
 
+	deepCopyBlockChunk := func(idx int) *query.BlockChunk {
+
+		source := plan.BlockChunks[idx]
+
+		items := make([][]query.Segment, len(source.ChunkSegmentsByFieldIndexMap))
+		for idx, item := range source.ChunkSegmentsByFieldIndexMap {
+
+			itemsCount := len(item)
+			items[idx] = make([]query.Segment, itemsCount)
+
+			copy(items[idx], item)
+		}
+
+		newBchunk := query.BlockChunk{
+			GlobalBlockOffset:            source.GlobalBlockOffset,
+			ChunkSegmentsByFieldIndexMap: items,
+		}
+
+		return &newBchunk
+	}
+
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
 		sm.chunksQueue <- &executor.ChunkProcessingTask{
-			Bchunk: &plan.BlockChunks[bChunkIdx],
+			Bchunk: deepCopyBlockChunk(bChunkIdx),
 			Slabs:  sm.Slabs,
 			Plan:   &plan,
 
@@ -81,9 +102,11 @@ func (sm *Manager) Query(
 	taskStatus.Waiter.Wait()
 
 	queryTookMs := time.Since(before).Seconds() * 1000
-
 	cummResult := taskStatus.ChunkResult
-	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
+
+	if false {
+		slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
+	}
 
 	return result, nil
 }

@@ -49,8 +49,6 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 	// 	return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
 	// }
 
-	schemaObject := plan.Schema
-
 	// per field/slab processing
 	//
 	// could be parallelized
@@ -66,17 +64,17 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 		filtersSize := len(filtersGroup.Conditions)
 
 		slabMergerContext := BlockMergerContext{
-			Schema:         schemaObject,
+			Schema:         plan.Schema,
 			AbsOffsetStart: blockChunk.GlobalBlockOffset,
 
 			// filters applied to single column
 			FilterColumn: filtersGroup.Conditions,
 			FilterSize:   filtersSize,
 
-			Blocks:                    cache.blocks[:],
-			CurrentBlockProcessingIdx: 0,
-
+			Blocks:       cache.blocks[:],
 			AbsBlockMaps: cache.absBlockMaps[:],
+
+			CurrentBlockProcessingIdx: 0,
 		}
 
 		// preprocess segments into blocks
@@ -85,7 +83,7 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
 
-		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, cache.blocks[:], cache.indicesResultCache[:])
+		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, cache.indicesResultCache[:])
 		if chunkProcessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {

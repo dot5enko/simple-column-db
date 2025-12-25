@@ -8,7 +8,7 @@ import (
 	"github.com/fatih/color"
 )
 
-func ChunkSingleThreadProcessor(threadId int, sm *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
+func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
 
 	threadCache := &ChunkExecutorThreadCache{}
 
@@ -29,11 +29,13 @@ func ChunkSingleThreadProcessor(threadId int, sm *meta.SlabManager, tasksQueue <
 			continue
 		}
 
-		taskRes, err := ExecutePlanForChunk(threadCache, sm, task.Plan, task.Bchunk)
+		taskRes, err := ExecutePlanForChunk(threadCache, slabManager, task.Plan, task.Bchunk)
 		if err != nil {
 			curStatus.Err.Store(true)
 			curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
 		} else {
+
+			processed := curStatus.ChunksProcessed.Add(1)
 
 			func() {
 				curStatus.Lock.Lock()
@@ -41,12 +43,14 @@ func ChunkSingleThreadProcessor(threadId int, sm *meta.SlabManager, tasksQueue <
 
 				globalChunkResult := &curStatus.ChunkResult
 
+				if task.ChunkIdx == 5 {
+					slog.Info("chunk result", "chunk_idx", task.ChunkIdx, "processed_as", processed, "total_items", taskRes.TotalItems, "skipped_blocks", taskRes.SkippedBlocksDueToHeaderFiltering)
+				}
+
 				globalChunkResult.TotalItems += taskRes.TotalItems
 				globalChunkResult.WastedMerges += taskRes.WastedMerges
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
 			}()
-
-			processed := curStatus.ChunksProcessed.Add(1)
 
 			if processed == int32(curStatus.ChunksTotal) {
 				curStatus.Waiter.Done()

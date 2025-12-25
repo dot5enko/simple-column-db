@@ -39,7 +39,9 @@ func prepareBlockForMerger(
 	curRelativeBlockId := mergerContext.CurrentBlockProcessingIdx
 	mergerContext.CurrentBlockProcessingIdx++
 
-	for _, filter := range mergerContext.FilterColumn {
+	for idx := range mergerContext.FilterColumn {
+
+		filter := mergerContext.FilterColumn[idx]
 
 		var processFilterErr error
 		intersectType := schema.UnknownIntersection
@@ -62,7 +64,7 @@ func prepareBlockForMerger(
 		} else {
 
 			skipSingleBlock := intersectType == schema.NoIntersection
-			// here, so we override old data for sure
+
 			filter.Runtime.FilterLastBlockHeaderResult = intersectType
 
 			if skipSingleBlock {
@@ -154,14 +156,14 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	return nil
 }
 
-func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRuntimeInfo, indicesResultCache []uint16) (result SingleColumnProcessingResult, topErr error) {
+func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache []uint16) (result SingleColumnProcessingResult, topErr error) {
 
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
 
 	for blockRelativeIdx := range mCtx.CurrentBlockProcessingIdx {
 
-		blockData := &blocks[blockRelativeIdx]
+		blockData := &mCtx.Blocks[blockRelativeIdx]
 
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
 		if blockGroupMerger.FullSkip() {
@@ -171,7 +173,6 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, blocks []BlockRunt
 		// slog.Info("processing block OK", "block_relative_idx", blockRelativeIdx, "block_data_is_nil", blockData.Val == nil)
 
 		blockDataType := blockData.BlockHeader.DataType
-		// slabInfo := blockData.SlabHeader
 
 		for fIdx, filter := range mCtx.FilterColumn {
 
