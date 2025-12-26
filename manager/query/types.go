@@ -50,4 +50,9 @@ type (
 
 	QueryOptions struct {
 	}
+
+	Query struct {
+		Filter []FilterCondition
+		Select []Selector
+	}
 )
