@@ -121,6 +121,7 @@ func prepareBlockForMerger(
 type SingleColumnProcessingResult struct {
 	skippedBlocksDueToHeaderFiltering int
 	processedBlocks                   int
+	fullSkips                         int
 }
 
 func preprocessSegmentsIntoBlocksAndHeaderFilter(
@@ -177,6 +178,9 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
 		if blockGroupMerger.FullSkip() {
+
+			result.fullSkips += 1
+
 			continue
 		}
 

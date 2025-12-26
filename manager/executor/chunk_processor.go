@@ -12,6 +12,7 @@ import (
 type ChunkFilterProcessResult struct {
 	SkippedBlocksDueToHeaderFiltering int
 	ProcessedBlocks                   int
+	FullSkips                         int
 
 	TotalItems   int
 	WastedMerges int
@@ -70,6 +71,7 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 			// filters applied to single column
 			FilterColumn: filtersGroup.Conditions,
 
+			// todo use circular buffer per thread?
 			FilterColumnRuntimeCache: make([]query.RuntimeFilterCache, len(filtersGroup.Conditions)),
 
 			FilterSize: filtersSize,
@@ -92,6 +94,10 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 		} else {
 			result.SkippedBlocksDueToHeaderFiltering += singleColumnProcessResult.skippedBlocksDueToHeaderFiltering
 			result.ProcessedBlocks += singleColumnProcessResult.processedBlocks
+			result.FullSkips += singleColumnProcessResult.fullSkips
+
+			// slog.Info("single column processing done", "skipped", singleColumnProcessResult.skippedBlocksDueToHeaderFiltering, "processed", singleColumnProcessResult.processedBlocks, "total_processed", result.ProcessedBlocks, "block_offset", blockChunk.GlobalBlockOffset)
+
 		}
 	}
 

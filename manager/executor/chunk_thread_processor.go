@@ -46,6 +46,8 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 				globalChunkResult.TotalItems += taskRes.TotalItems
 				globalChunkResult.WastedMerges += taskRes.WastedMerges
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
+				globalChunkResult.ProcessedBlocks += taskRes.ProcessedBlocks
+				globalChunkResult.FullSkips += taskRes.FullSkips
 			}()
 
 			if processed == int32(curStatus.ChunksTotal) {

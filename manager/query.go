@@ -85,7 +85,7 @@ func (sm *Manager) Query(
 	queryTookMs := time.Since(before).Seconds() * 1000
 	cummResult := taskStatus.ChunkResult
 
-	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "processed_blocks", cummResult.ProcessedBlocks, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
+	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "processed_blocks", cummResult.ProcessedBlocks, "full_skips", cummResult.FullSkips, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
 
 	return result, nil
 }
