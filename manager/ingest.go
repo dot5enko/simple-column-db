@@ -65,7 +65,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 					return loadSlabErr
 				}
 
-				slabHeader = m.Slabs.GetSlabFromCache(col.ActiveSlab)
+				slabHeader = m.Slabs.GetSlabHeaderFromCache(col.ActiveSlab)
 			} else {
 				return fmt.Errorf("no active slab found for column %s", col.Name)
 			}

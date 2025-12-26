@@ -31,11 +31,14 @@ type SlabManager struct {
 	slabHeaderCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabHeaderCacheLocker sync.RWMutex
 
+	slabDataCache       map[uuid.UUID]*cache.SlabDataCacheItem
+	slabDataCacheLocker sync.RWMutex
+
 	// buffers
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
 	slabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
-	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabCacheItem]
+	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabDataCacheItem]
 
 	meta *MetaManager
 
@@ -48,15 +51,15 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 		storagePath:         storagePath,
 		cache:               map[[32]byte]BlockCacheItem{},
 		slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
-
-		meta: meta,
+		slabDataCache:       map[uuid.UUID]*cache.SlabDataCacheItem{},
+		meta:                meta,
 	}
 
 	// 1slab = ±10MB ram
 	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
 	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
 
-	sm.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabCacheItem](32)
+	sm.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32)
 
 	// slab reusing header
 	// todo profile and optimize
@@ -65,15 +68,29 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	return sm
 }
 
-func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
-	return m.getSlabFromCache(uid)
+func (m *SlabManager) GetSlabHeaderFromCache(uid uuid.UUID) *cache.SlabCacheItem {
+	return m.getSlabHeaderFromCache(uid)
 }
-func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
+func (m *SlabManager) getSlabHeaderFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 
 	m.slabHeaderCacheLocker.RLock()
 	defer m.slabHeaderCacheLocker.RUnlock()
 
 	if item, ok := m.slabHeaderCacheItem[uid]; ok {
+
+		item.RtStats.Reads++
+		return item
+	}
+
+	return nil
+}
+
+func (m *SlabManager) getSlabDataFromCache(uid uuid.UUID) *cache.SlabDataCacheItem {
+
+	m.slabDataCacheLocker.RLock()
+	defer m.slabDataCacheLocker.RUnlock()
+
+	if item, ok := m.slabDataCache[uid]; ok {
 
 		item.RtStats.Reads++
 		return item
@@ -145,19 +162,19 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			blockSize := blockHeader.DataType.BlockSize()
 			blockStartOffset = blockIdx * blockSize
 
-			slabCache := m.getSlabFromCache(slab.Uid)
-			if slabCache == nil || !slabCache.DataLoaded {
+			slabData := m.getSlabDataFromCache(slab.Uid)
+			if slabData == nil {
 				_, loadSlabErr := m.LoadSlabDataContents(&schemaObject, slab.Uid)
 				if loadSlabErr != nil {
 					return nil, loadSlabErr
 				}
-				slabCache = m.getSlabFromCache(slab.Uid)
-				if slabCache == nil {
+				slabData = m.getSlabDataFromCache(slab.Uid)
+				if slabData == nil {
 					panic("cache should be loaded by now, probably out of memory?")
 				}
 			}
 
-			blockRawData := slabCache.Data[blockStartOffset:]
+			blockRawData := slabData.Data[blockStartOffset:]
 
 			// log.Printf(" --- loading %s block. blockHeader.StartOffset:%d", blockHeader.Uid.String(), blockHeader.StartOffset)
 
@@ -174,7 +191,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				m.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
-					rtStats: &cache.CacheStats{CacheEntryId: slabCache.CacheEntryId, Created: time.Now(), Reads: 1},
+					rtStats: &cache.CacheStats{CacheEntryId: slabData.RtStats.CacheEntryId, Created: time.Now(), Reads: 1},
 				}
 
 				return runtimeBlockData, nil

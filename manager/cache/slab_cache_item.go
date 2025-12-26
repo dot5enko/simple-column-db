@@ -11,9 +11,6 @@ type SlabCacheItem struct {
 
 	Header *schema.DiskSlabHeader
 
-	DataLoaded bool
-	Data       [schema.SlabDiskContentsUncompressed]byte
-
 	//
 	RtStats *CacheStats
 }
@@ -21,8 +18,32 @@ type SlabCacheItem struct {
 // reset
 func (item *SlabCacheItem) Reset() {
 	item.Header = nil
-	item.DataLoaded = false
-	item.RtStats = &CacheStats{
-		Created: time.Now(),
+
+	if item.RtStats != nil {
+		item.RtStats.Reads = 0
+		item.RtStats.Created = time.Now()
+	} else {
+		item.RtStats = &CacheStats{
+			Created: time.Now(),
+		}
+	}
+}
+
+type SlabDataCacheItem struct {
+	Data [schema.SlabDiskContentsUncompressed]byte
+	// data is dirty flag ?
+
+	RtStats *CacheStats
+}
+
+func (item *SlabDataCacheItem) Reset() {
+
+	if item.RtStats != nil {
+		item.RtStats.Reads = 0
+		item.RtStats.Created = time.Now()
+	} else {
+		item.RtStats = &CacheStats{
+			Created: time.Now(),
+		}
 	}
 }

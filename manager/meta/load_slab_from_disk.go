@@ -3,6 +3,7 @@ package meta
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -16,7 +17,7 @@ import (
 // alloc free
 func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
-	slabHeader := m.getSlabFromCache(slabUid)
+	slabHeader := m.getSlabHeaderFromCache(slabUid)
 
 	if slabHeader != nil {
 		return slabHeader.Header, nil
@@ -123,60 +124,86 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 
 }
 
-func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid.UUID) (*cache.SlabCacheItem, error) {
+func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid.UUID) (*cache.SlabDataCacheItem, error) {
 
-	result, slabErr := m.LoadSlabHeaderToCache(schemaObject, uid)
-	if slabErr != nil {
-		return nil, slabErr
+	var result *schema.DiskSlabHeader
+
+	slabData := m.getSlabDataFromCache(uid)
+	if slabData != nil {
+		return slabData, nil
 	}
 
-	// read compressed data
-
-	allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
-	dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
-
-	fileReader, openErr := m.GetSlabFile(*schemaObject, uid, false)
-	if openErr != nil {
-		return nil, openErr
+	var headerLoadErr error
+	result, headerLoadErr = m.LoadSlabHeaderToCache(schemaObject, uid)
+	if headerLoadErr != nil {
+		return nil, headerLoadErr
 	}
-	defer fileReader.Close()
-	item, slabId := m.slabRuntimeCache.Get()
 
-	// todo improve this part
-	// should be done on .Get inside RingBuffer
-	item.CacheEntryId = slabId
-	item.Reset()
+	// fix key construction, do not use allocations
+	key := "d-" + uid.String()
 
-	// at this point we need to lock slab's data for reading
-	// as it may be compressed
-	readCompressedDataErr := fileReader.ReadAt(item.Data[:], dataOffset, int(result.CompressedSlabContentSize))
+	log.Printf("--load slab data contents: %s", key)
 
-	if readCompressedDataErr != nil {
-		return nil, readCompressedDataErr
-	} else {
+	v, err, _ := m.loadGroup.Do(key, func() (any, error) {
 
-		item.Header = result
+		// read compressed data
+		log.Printf("load slab data contents: %s", key)
 
-		if result.CompressionType != 0 {
+		allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
+		dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
 
-			panic("compression not implemented while LoadSlabDataContents")
-
-			switch result.CompressionType {
-			case 1:
-				_, decompressErr := compression.DecompressLz4(item.Data[:result.CompressedSlabContentSize], item.Data[:])
-				if decompressErr != nil {
-
-					spew.Dump("input buffers to decompress ", item.Data[:256])
-
-					return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
-				}
-			default:
-				return nil, fmt.Errorf("unsupported compression type: %d", result.CompressionType)
-			}
+		fileReader, openErr := m.GetSlabFile(*schemaObject, uid, false)
+		if openErr != nil {
+			return nil, openErr
 		}
 
-		//	 put into map of cached slabs
+		defer fileReader.Close()
+		item, slabId := m.slabRuntimeCache.Get()
 
-		return item, nil
+		// todo improve this part
+		// should be done on .Get inside RingBuffer
+		item.Reset()
+		item.RtStats.CacheEntryId = slabId
+
+		// at this point we need to lock slab's data for reading
+		// as it may be compressed
+		readCompressedDataErr := fileReader.ReadAt(item.Data[:], dataOffset, int(result.CompressedSlabContentSize))
+
+		if readCompressedDataErr != nil {
+			return nil, readCompressedDataErr
+		} else {
+
+			if result.CompressionType != 0 {
+
+				panic("compression not implemented while LoadSlabDataContents")
+
+				switch result.CompressionType {
+				case 1:
+					_, decompressErr := compression.DecompressLz4(item.Data[:result.CompressedSlabContentSize], item.Data[:])
+					if decompressErr != nil {
+
+						spew.Dump("input buffers to decompress ", item.Data[:256])
+
+						return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
+					}
+				default:
+					return nil, fmt.Errorf("unsupported compression type: %d", result.CompressionType)
+				}
+			}
+
+			m.slabDataCacheLocker.RLock()
+			defer m.slabDataCacheLocker.RUnlock()
+
+			m.slabDataCache[uid] = item
+
+			return item, nil
+		}
+	})
+
+	if err != nil {
+		return nil, err
 	}
+
+	return v.(*cache.SlabDataCacheItem), nil
+
 }
