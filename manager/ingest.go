@@ -60,7 +60,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 			// slab exists
 			if col.ActiveSlab != uuid.Nil {
 
-				_, loadSlabErr := m.Slabs.LoadSlabToCache(*schemaObject, col.ActiveSlab)
+				_, loadSlabErr := m.Slabs.LoadSlabToCache(schemaObject, col.ActiveSlab)
 				if loadSlabErr != nil {
 					return loadSlabErr
 				}
@@ -169,7 +169,7 @@ func (m *Manager) Ingest(schemaName string, data *IngestBuffer) error {
 				}
 
 				var loadErr error
-				sh, loadErr = m.Slabs.LoadSlabToCache(*schemaObject, newSlab.Uid)
+				sh, loadErr = m.Slabs.LoadSlabToCache(schemaObject, newSlab.Uid)
 				field.slab.Header = sh
 				if loadErr != nil {
 					return fmt.Errorf("unable to load just created slab: %s", loadErr.Error())

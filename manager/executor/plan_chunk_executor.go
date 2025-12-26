@@ -68,7 +68,10 @@ func prepareBlockForMerger(
 
 			skipSingleBlock := intersectType == schema.NoIntersection
 
-			mergerContext.FilterColumnRuntimeCache[idx].FilterLastBlockHeaderResult = intersectType
+			filterColumnCache := &mergerContext.FilterColumnRuntimeCache[idx]
+
+			filterColumnCache.FilterLastBlockHeaderResult = intersectType
+			filterColumnCache.FilterBounds = blockHeader.Bounds
 
 			if skipSingleBlock {
 				skipFilters++
@@ -101,12 +104,15 @@ func prepareBlockForMerger(
 		// preallocated for each thread executor
 		// check if works correctly
 		absBlockRTInfo.Reset()
-
 		absBlockRTInfo.SetFullSkip()
 	}
 
 	for filterIdx := range mergerContext.FilterColumn {
-		blockRT.HeaderFilterMatchResult[filterIdx] = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterLastBlockHeaderResult
+		refResult := &blockRT.HeaderFilterMatchResult[filterIdx]
+
+		//
+		refResult.MatchResult = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterLastBlockHeaderResult
+		refResult.Bounds = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterBounds
 	}
 
 	return nil
@@ -114,6 +120,7 @@ func prepareBlockForMerger(
 
 type SingleColumnProcessingResult struct {
 	skippedBlocksDueToHeaderFiltering int
+	processedBlocks                   int
 }
 
 func preprocessSegmentsIntoBlocksAndHeaderFilter(
@@ -126,7 +133,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 
 		slabBlockOffsetStart := segment.StartBlock
 
-		slabInfo, slabErr := sm.LoadSlabToCache(slabMergerContext.Schema, segment.Slab)
+		slabInfo, slabErr := sm.LoadSlabToCache(&slabMergerContext.Schema, segment.Slab)
 		if slabErr != nil {
 			return fmt.Errorf("unable to load slab : %s", slabErr.Error())
 		}
@@ -174,12 +181,12 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 		}
 
 		// slog.Info("processing block OK", "block_relative_idx", blockRelativeIdx, "block_data_is_nil", blockData.Val == nil)
-
 		blockDataType := blockData.BlockHeader.DataType
 
 		for fIdx, filter := range mCtx.FilterColumn {
 
-			headerMatchResult := blockData.HeaderFilterMatchResult[fIdx]
+			headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
+			headerMatchResult := headerMatchResultObj.MatchResult
 
 			isFull := headerMatchResult == schema.FullIntersection
 
@@ -189,6 +196,8 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 				blockGroupMerger.With(nil, false, true)
 				continue
 			}
+
+			result.processedBlocks += 1
 
 			{
 				var processFilterErr error
@@ -214,7 +223,7 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 					return SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 				}
 
-				// log.Printf(" -- [filtered] filteredSize : %d. sum of bitset = %d, bitcount = %d", filteredSize, blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
+				// slog.Info(" -- [filtered]", "filteredSize", filteredSize, "header_match_cached", headerMatchResult.String(), "arg", filter, "filter_bounds", headerMatchResultObj.Bounds)
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import (
 
 type ChunkFilterProcessResult struct {
 	SkippedBlocksDueToHeaderFiltering int
+	ProcessedBlocks                   int
 
 	TotalItems   int
 	WastedMerges int
@@ -24,7 +25,7 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 	for _, filtersGroup := range plan.FilterGroupedByFields {
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
 		for _, segment := range blockSegments {
-			_, err := slabs.LoadSlabToCache(schemaObject, segment.Slab)
+			_, err := slabs.LoadSlabToCache(&schemaObject, segment.Slab)
 			if err != nil {
 				return fmt.Errorf("unable to load slab : %s", err.Error())
 			}
@@ -60,7 +61,6 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 	for _, filtersGroup := range plan.FilterGroupedByFields {
 
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
-
 		filtersSize := len(filtersGroup.Conditions)
 
 		slabMergerContext := BlockMergerContext{
@@ -91,6 +91,7 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
 			result.SkippedBlocksDueToHeaderFiltering += singleColumnProcessResult.skippedBlocksDueToHeaderFiltering
+			result.ProcessedBlocks += singleColumnProcessResult.processedBlocks
 		}
 	}
 

@@ -12,7 +12,7 @@ import (
 
 // reading should be thread safe
 // alloc free
-func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
+func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
 	slabHeader := m.getSlabFromCache(slabUid)
 
@@ -34,7 +34,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject schema.Schema, slabUid uuid.U
 
 			// slog.Info("loading slab to cache from disk", "slab_uid", slabUid.String())
 
-			fileReader, openErr := m.GetSlabFile(schemaObject, slabUid, false)
+			fileReader, openErr := m.GetSlabFile(*schemaObject, slabUid, false)
 			if openErr != nil {
 				return nil, openErr
 			} else {

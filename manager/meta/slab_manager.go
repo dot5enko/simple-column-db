@@ -140,7 +140,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 			slabCache := m.getSlabFromCache(slab.Uid)
 			if slabCache == nil {
-				_, loadSlabErr := m.LoadSlabToCache(schemaObject, slab.Uid)
+				_, loadSlabErr := m.LoadSlabToCache(&schemaObject, slab.Uid)
 				if loadSlabErr != nil {
 					return nil, loadSlabErr
 				}

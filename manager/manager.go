@@ -23,7 +23,13 @@ type Manager struct {
 	Planner *query.QueryPlanner
 	Meta    *meta.MetaManager
 
+	queryOptions query.QueryOptions
+
 	chunksQueue chan *executor.ChunkProcessingTask
+}
+
+func (m *Manager) SetQueryOptions(qopts query.QueryOptions) {
+	m.queryOptions = qopts
 }
 
 func New(config ManagerConfig) *Manager {

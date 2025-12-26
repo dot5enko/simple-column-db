@@ -43,30 +43,38 @@ type (
 
 		FilterSize int
 	}
+
+	// chunk
+	SingleChunk struct {
+		segments      []Segment
+		blocks_filled int
+	}
+
+	ColumnChunks struct {
+		List []SingleChunk
+	}
 )
 
 func NewQueryPlanner() *QueryPlanner {
 	return &QueryPlanner{}
 }
 
+type QueryOptions struct {
+}
+
 func (qp *QueryPlanner) Plan(
 	schemaName string,
 	queryData Query,
 	metaManager *meta.MetaManager,
-
+	slabManager *meta.SlabManager,
+	options *QueryOptions,
 ) (QueryPlan, error) {
 	schemaObject := metaManager.GetSchema(schemaName)
 	if schemaObject == nil {
 		return QueryPlan{}, ErrSchemaNotFound
 	} else {
 
-		// should be big enough to hold all the entries to
-		// todo replace with bitset
-		// mergeIndicesCache := make([]uint16, schema.BlockRowsSize*len(query.Filter))
-		// var indicesCounter [schema.BlockRowsSize]uint16
-
-		// check fields before filtering data
-
+		// check that all fields are valid
 		for _, filter := range queryData.Filter {
 
 			found := false
@@ -83,13 +91,13 @@ func (qp *QueryPlanner) Plan(
 		}
 
 		// slabs
-
 		slabsFiltered := []uuid.UUID{}
 		// skippedBlocksDueToHeaderFiltering := 0
 
 		// full scan of all slabs and their blocks
 		slabsByColumns := map[string][]uuid.UUID{}
 
+		// collect slabs
 		for _, it := range schemaObject.Columns {
 			if len(it.Slabs) > 0 {
 
@@ -150,14 +158,6 @@ func (qp *QueryPlanner) Plan(
 		})
 
 		// total size of blocks in all segments == ExecutorChunkSizeBlocks
-		type SingleChunk struct {
-			segments      []Segment
-			blocks_filled int
-		}
-
-		type ColumnChunks struct {
-			List []SingleChunk
-		}
 
 		perColumnChunks := map[int]*ColumnChunks{}
 
@@ -167,6 +167,41 @@ func (qp *QueryPlanner) Plan(
 
 		maxChunks := 0
 
+		/*
+			// filter slab headers
+			for _, filtersGroup := range filterByColumnsArray {
+				slabs := slabsByColumns[filtersGroup.FieldName]
+
+				for _, slabUid := range slabs {
+
+					slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
+					if slabLoadErr != nil {
+						return QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
+					}
+
+					blockHeaders := slabInfo.BlockHeaders
+					for i := 0; i < int(slabInfo.BlocksFinalized); i++ {
+
+						idx := i + slabBlockOffsetStart
+						blockHeader := &blockHeaders[idx]
+
+						if idx > int(slabInfo.BlocksFinalized) {
+							break
+						}
+
+						preparationErr := prepareBlockForMerger(slabMergerContext,
+							slabInfo,
+							blockHeader,
+							sm,
+						)
+						if preparationErr != nil {
+							return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
+						}
+					}
+				}
+			} */
+
+		// chunk generator
 		for columnIdx, columnDef := range schemaObject.Columns {
 
 			blocksPerSlab := columnDef.Type.BlocksPerSlab()

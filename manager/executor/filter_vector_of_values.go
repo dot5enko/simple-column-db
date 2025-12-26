@@ -249,12 +249,7 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 		}
 
 		if operand <= blockBounds.Min {
-
-			if operand >= blockBounds.Max {
-				return schema.FullIntersection, nil
-			}
-
-			return schema.PartialIntersection, nil
+			return schema.FullIntersection, nil
 		}
 
 		return schema.PartialIntersection, nil

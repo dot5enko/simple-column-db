@@ -55,7 +55,7 @@ func (sm *Manager) Query(
 		return nil, fmt.Errorf("no such schema '%s'", schemaName)
 	}
 
-	plan, planErr := sm.Planner.Plan(schemaName, queryData, sm.Meta)
+	plan, planErr := sm.Planner.Plan(schemaName, queryData, sm.Meta, sm.Slabs, &sm.queryOptions)
 
 	// discard non intersecting blocks from the plan
 
@@ -85,7 +85,7 @@ func (sm *Manager) Query(
 	queryTookMs := time.Since(before).Seconds() * 1000
 	cummResult := taskStatus.ChunkResult
 
-	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
+	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "processed_blocks", cummResult.ProcessedBlocks, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
 
 	return result, nil
 }

@@ -1,6 +1,13 @@
 package executor
 
-import "github.com/dot5enko/simple-column-db/schema"
+import (
+	"github.com/dot5enko/simple-column-db/schema"
+)
+
+type BlockRuntimeFilterCache struct {
+	MatchResult schema.BoundsFilterMatchResult
+	Bounds      schema.BoundsFloat
+}
 
 type BlockRuntimeInfo struct {
 	Val *schema.RuntimeBlockData
@@ -9,5 +16,5 @@ type BlockRuntimeInfo struct {
 	SlabHeader  *schema.DiskSlabHeader
 
 	// 32 filters max ?
-	HeaderFilterMatchResult [4]schema.BoundsFilterMatchResult
+	HeaderFilterMatchResult [16]BlockRuntimeFilterCache
 }

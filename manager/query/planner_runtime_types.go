@@ -5,6 +5,7 @@ import "github.com/dot5enko/simple-column-db/schema"
 type RuntimeFilterCache struct {
 	// column                      schema.SchemaColumn
 	FilterLastBlockHeaderResult schema.BoundsFilterMatchResult
+	FilterBounds                schema.BoundsFloat
 }
 
 type FilterConditionRuntime struct {
