@@ -20,7 +20,7 @@ type Manager struct {
 	config ManagerConfig
 
 	Slabs   *meta.SlabManager
-	Planner *query.QueryPlanner
+	Planner *QueryPlanner
 	Meta    *meta.MetaManager
 
 	queryOptions query.QueryOptions
@@ -35,7 +35,7 @@ func (m *Manager) SetQueryOptions(qopts query.QueryOptions) {
 func New(config ManagerConfig) *Manager {
 
 	man := &Manager{
-		Planner:     query.NewQueryPlanner(),
+		Planner:     NewQueryPlanner(),
 		Meta:        meta.NewMetaManager(config.PathToStorage),
 		chunksQueue: make(chan *executor.ChunkProcessingTask, 100),
 	}
