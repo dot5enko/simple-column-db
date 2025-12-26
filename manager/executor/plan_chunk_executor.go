@@ -85,7 +85,7 @@ func prepareBlockForMerger(
 
 	blockRT := &mergerContext.Blocks[curRelativeBlockId]
 	blockRT.BlockHeader = blockHeader
-	blockRT.SlabHeader = slabInfo
+	// blockRT.SlabHeader = slabInfo
 
 	// increase current block pointer
 
@@ -136,7 +136,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 
 		slabBlockOffsetStart := segment.StartBlock
 
-		slabInfo, slabErr := sm.LoadSlabToCache(&slabMergerContext.Schema, segment.Slab)
+		slabInfo, slabErr := sm.LoadSlabHeaderToCache(&slabMergerContext.Schema, segment.Slab)
 		if slabErr != nil {
 			return fmt.Errorf("unable to load slab : %s", slabErr.Error())
 		}

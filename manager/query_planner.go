@@ -153,7 +153,7 @@ func (qp *QueryPlanner) Plan(
 			for _, slabUid := range slabs {
 				for _, filter := range filtersGroup.Conditions {
 
-					slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
+					slabInfo, slabLoadErr := slabManager.LoadSlabHeaderToCache(schemaObject, slabUid)
 					if slabLoadErr != nil {
 						return query.QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
 					}

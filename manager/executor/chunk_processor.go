@@ -19,7 +19,7 @@ type ChunkFilterProcessResult struct {
 	WastedMerges int
 }
 
-func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
+func preloadSlabHeaders(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
 
 	schemaObject := plan.Schema
 
@@ -27,7 +27,7 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 	for _, filtersGroup := range plan.FilterGroupedByFields {
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
 		for _, segment := range blockSegments {
-			_, err := slabs.LoadSlabToCache(&schemaObject, segment.Slab)
+			_, err := slabs.LoadSlabHeaderToCache(&schemaObject, segment.Slab)
 			if err != nil {
 				return fmt.Errorf("unable to load slab : %s", err.Error())
 			}

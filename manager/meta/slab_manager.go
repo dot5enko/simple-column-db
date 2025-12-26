@@ -24,19 +24,20 @@ const HeadersCacheSize = 256 * schema.TotalHeaderSize
 type SlabManager struct {
 	storagePath string
 
+	// runtime cache
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
 	slabHeaderCacheItem   map[uuid.UUID]*cache.SlabCacheItem
 	slabHeaderCacheLocker sync.RWMutex
 
+	// buffers
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
+	slabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
+	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabCacheItem]
 
-	slabHeaderCache *cache.TypedRingBuffer[schema.DiskSlabHeader]
-
-	meta         *MetaManager
-	cacheManager *cache.SlabCacheManager
+	meta *MetaManager
 
 	loadGroup singleflight.Group
 }
@@ -47,15 +48,15 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 		storagePath:         storagePath,
 		cache:               map[[32]byte]BlockCacheItem{},
 		slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
-		cacheManager:        cache.NewSlabCacheManager(),
-		meta:                meta,
-	}
 
-	sm.cacheManager.Prefill(32)
+		meta: meta,
+	}
 
 	// 1slab = ±10MB ram
 	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
 	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
+
+	sm.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabCacheItem](32)
 
 	// slab reusing header
 	// todo profile and optimize
@@ -145,8 +146,8 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			blockStartOffset = blockIdx * blockSize
 
 			slabCache := m.getSlabFromCache(slab.Uid)
-			if slabCache == nil {
-				_, loadSlabErr := m.LoadSlabToCache(&schemaObject, slab.Uid)
+			if slabCache == nil || !slabCache.DataLoaded {
+				_, loadSlabErr := m.LoadSlabDataContents(&schemaObject, slab.Uid)
 				if loadSlabErr != nil {
 					return nil, loadSlabErr
 				}
@@ -173,7 +174,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				m.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
-					rtStats: &cache.CacheStats{Created: time.Now(), Reads: 1},
+					rtStats: &cache.CacheStats{CacheEntryId: slabCache.CacheEntryId, Created: time.Now(), Reads: 1},
 				}
 
 				return runtimeBlockData, nil

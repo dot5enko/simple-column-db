@@ -130,9 +130,6 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		return nil, slabErr
 	}
 
-	slabReadCache, slabCacheIdx := m.fullSlabBufferRing.Get()
-	defer m.fullSlabBufferRing.Return(slabCacheIdx)
-
 	// read compressed data
 
 	allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
@@ -143,29 +140,33 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		return nil, openErr
 	}
 	defer fileReader.Close()
+	item, slabId := m.slabRuntimeCache.Get()
 
-	readCompressedDataErr := fileReader.ReadAt(slabReadCache, dataOffset, int(result.CompressedSlabContentSize))
+	// todo improve this part
+	// should be done on .Get inside RingBuffer
+	item.CacheEntryId = slabId
+	item.Reset()
+
+	// at this point we need to lock slab's data for reading
+	// as it may be compressed
+	readCompressedDataErr := fileReader.ReadAt(item.Data[:], dataOffset, int(result.CompressedSlabContentSize))
 
 	if readCompressedDataErr != nil {
 		return nil, readCompressedDataErr
 	} else {
 
-		item, cacheErr := m.cacheManager.GetCacheEntry()
-		if cacheErr != nil {
-			return nil, cacheErr
-		}
-
 		item.Header = result
 
-		if result.CompressionType == 0 {
-			copy(item.Data[:], slabReadCache[:result.CompressedSlabContentSize])
-		} else {
+		if result.CompressionType != 0 {
+
+			panic("compression not implemented while LoadSlabDataContents")
+
 			switch result.CompressionType {
 			case 1:
-				_, decompressErr := compression.DecompressLz4(slabReadCache[:result.CompressedSlabContentSize], item.Data[:])
+				_, decompressErr := compression.DecompressLz4(item.Data[:result.CompressedSlabContentSize], item.Data[:])
 				if decompressErr != nil {
 
-					spew.Dump("input buffers to decompress ", slabReadCache[:256])
+					spew.Dump("input buffers to decompress ", item.Data[:256])
 
 					return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
 				}
@@ -175,8 +176,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		}
 
 		//	 put into map of cached slabs
-		// on slab manager
 
-		return item.Header, nil
+		return item, nil
 	}
 }
