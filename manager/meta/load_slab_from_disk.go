@@ -3,16 +3,18 @@ package meta
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
 
 // reading should be thread safe
 // alloc free
-func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
+func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid uuid.UUID) (result *schema.DiskSlabHeader, e error) {
 
 	slabHeader := m.getSlabFromCache(slabUid)
 
@@ -50,7 +52,8 @@ func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.
 
 					// ioTime := time.Since(readStart).Seconds()
 
-					result = &schema.DiskSlabHeader{}
+					var headerCacheEntryId uint16
+					result, headerCacheEntryId = m.slabHeaderCache.Get()
 
 					headerBytes := bytes.NewReader(headerReadBuffer)
 					headerParseErr := result.FromBytes(headerBytes)
@@ -62,7 +65,7 @@ func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.
 						// todo use preallocated buffer
 						result.BlockHeaders = make([]schema.DiskHeader, result.BlocksTotal)
 
-						allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
+						// allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
 						nonEmptyHeadersSize := int(result.BlocksFinalized) * int(schema.TotalHeaderSize) // finalized + current
 
 						if result.BlocksFinalized < result.BlocksTotal {
@@ -93,47 +96,19 @@ func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.
 							}
 						}
 
-						// read compressed data
-						dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
-						readCompressedDataErr := fileReader.ReadAt(slabReadCache, dataOffset, int(result.CompressedSlabContentSize))
-
-						if readCompressedDataErr != nil {
-							return nil, readCompressedDataErr
-						} else {
-
-							item, cacheErr := m.cacheManager.GetCacheEntry()
-							if cacheErr != nil {
-								return nil, cacheErr
-							}
-
-							item.Header = result
-
-							if result.CompressionType == 0 {
-								copy(item.Data[:], slabReadCache[:result.CompressedSlabContentSize])
-							} else {
-								switch result.CompressionType {
-								case 1:
-									_, decompressErr := compression.DecompressLz4(slabReadCache[:result.CompressedSlabContentSize], item.Data[:])
-									if decompressErr != nil {
-
-										spew.Dump("input buffers to decompress ", slabReadCache[:256])
-
-										return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
-									}
-								default:
-									return nil, fmt.Errorf("unsupported compression type: %d", result.CompressionType)
-								}
-							}
-
-							m.slabCacheLocker.Lock()
-							defer m.slabCacheLocker.Unlock()
-
-							m.slabCacheItem[slabUid] = item
-
-							return item.Header, nil
-						}
-
 					}
+
+					m.slabHeaderCacheLocker.Lock()
+					defer m.slabHeaderCacheLocker.Unlock()
+
+					m.slabHeaderCacheItem[slabUid] = &cache.SlabCacheItem{
+						CacheEntryId: headerCacheEntryId,
+						Header:       result,
+						RtStats:      &cache.CacheStats{Created: time.Now()},
+					}
+
+					return result, nil
+
 				}
 			}
 		})
@@ -146,4 +121,62 @@ func (m *SlabManager) LoadSlabToCache(schemaObject *schema.Schema, slabUid uuid.
 
 	}
 
+}
+
+func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid.UUID) (*cache.SlabCacheItem, error) {
+
+	result, slabErr := m.LoadSlabHeaderToCache(schemaObject, uid)
+	if slabErr != nil {
+		return nil, slabErr
+	}
+
+	slabReadCache, slabCacheIdx := m.fullSlabBufferRing.Get()
+	defer m.fullSlabBufferRing.Return(slabCacheIdx)
+
+	// read compressed data
+
+	allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
+	dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
+
+	fileReader, openErr := m.GetSlabFile(*schemaObject, uid, false)
+	if openErr != nil {
+		return nil, openErr
+	}
+	defer fileReader.Close()
+
+	readCompressedDataErr := fileReader.ReadAt(slabReadCache, dataOffset, int(result.CompressedSlabContentSize))
+
+	if readCompressedDataErr != nil {
+		return nil, readCompressedDataErr
+	} else {
+
+		item, cacheErr := m.cacheManager.GetCacheEntry()
+		if cacheErr != nil {
+			return nil, cacheErr
+		}
+
+		item.Header = result
+
+		if result.CompressionType == 0 {
+			copy(item.Data[:], slabReadCache[:result.CompressedSlabContentSize])
+		} else {
+			switch result.CompressionType {
+			case 1:
+				_, decompressErr := compression.DecompressLz4(slabReadCache[:result.CompressedSlabContentSize], item.Data[:])
+				if decompressErr != nil {
+
+					spew.Dump("input buffers to decompress ", slabReadCache[:256])
+
+					return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
+				}
+			default:
+				return nil, fmt.Errorf("unsupported compression type: %d", result.CompressionType)
+			}
+		}
+
+		//	 put into map of cached slabs
+		// on slab manager
+
+		return item.Header, nil
+	}
 }

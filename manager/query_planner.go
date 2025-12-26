@@ -179,7 +179,7 @@ func (qp *QueryPlanner) Plan(
 							matchResult, matchErr = filters.ProcessFilterOnBounds[float32](filter.Filter, &blockHeader.Bounds)
 
 						default:
-							panic(fmt.Sprintf("unsupported type in query planner : %s", ftype.String()))
+							panic(fmt.Sprintf("unsupported type in query planner : %s (field_name : %s)", ftype.String(), filtersGroup.FieldName))
 						}
 
 						if matchErr != nil {

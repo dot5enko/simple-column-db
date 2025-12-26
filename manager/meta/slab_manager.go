@@ -27,11 +27,13 @@ type SlabManager struct {
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
-	slabCacheItem   map[uuid.UUID]*cache.SlabCacheItem
-	slabCacheLocker sync.RWMutex
+	slabHeaderCacheItem   map[uuid.UUID]*cache.SlabCacheItem
+	slabHeaderCacheLocker sync.RWMutex
 
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
+
+	slabHeaderCache *cache.TypedRingBuffer[schema.DiskSlabHeader]
 
 	meta         *MetaManager
 	cacheManager *cache.SlabCacheManager
@@ -42,11 +44,11 @@ type SlabManager struct {
 // todo : remove const/literals, add config param
 func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	sm := &SlabManager{
-		storagePath:   storagePath,
-		cache:         map[[32]byte]BlockCacheItem{},
-		slabCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
-		cacheManager:  cache.NewSlabCacheManager(),
-		meta:          meta,
+		storagePath:         storagePath,
+		cache:               map[[32]byte]BlockCacheItem{},
+		slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
+		cacheManager:        cache.NewSlabCacheManager(),
+		meta:                meta,
 	}
 
 	sm.cacheManager.Prefill(32)
@@ -54,6 +56,10 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	// 1slab = ±10MB ram
 	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
 	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
+
+	// slab reusing header
+	// todo profile and optimize
+	sm.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128)
 
 	return sm
 }
@@ -63,10 +69,10 @@ func (m *SlabManager) GetSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 }
 func (m *SlabManager) getSlabFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 
-	m.slabCacheLocker.RLock()
-	defer m.slabCacheLocker.RUnlock()
+	m.slabHeaderCacheLocker.RLock()
+	defer m.slabHeaderCacheLocker.RUnlock()
 
-	if item, ok := m.slabCacheItem[uid]; ok {
+	if item, ok := m.slabHeaderCacheItem[uid]; ok {
 
 		item.RtStats.Reads++
 		return item
