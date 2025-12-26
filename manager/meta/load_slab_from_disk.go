@@ -3,7 +3,6 @@ package meta
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -142,13 +141,9 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 	// fix key construction, do not use allocations
 	key := "d-" + uid.String()
 
-	log.Printf("--load slab data contents: %s", key)
-
 	v, err, _ := m.loadGroup.Do(key, func() (any, error) {
 
 		// read compressed data
-		log.Printf("load slab data contents: %s", key)
-
 		allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
 		dataOffset := int(schema.SlabHeaderFixedSize) + allBlocksHeaderSize
 
