@@ -17,9 +17,7 @@ func TestHeaderFullIntersectFilter(t *testing.T) {
 		Arguments: []any{float32(0.4999)},
 	}
 
-	matchResult, matchErr := ProcessFilterOnBlockHeader[float32](filter, &schema.DiskHeader{
-		Bounds: bounds,
-	})
+	matchResult, matchErr := ProcessFilterOnBounds[float32](filter, &bounds)
 
 	if matchErr != nil {
 		t.Errorf("unexpected error %v", matchErr)
@@ -38,9 +36,7 @@ func TestHeaderNoIntersectFilter(t *testing.T) {
 		Arguments: []any{float32(0.4999)},
 	}
 
-	matchResult, matchErr := ProcessFilterOnBlockHeader[float32](filter, &schema.DiskHeader{
-		Bounds: bounds,
-	})
+	matchResult, matchErr := ProcessFilterOnBounds[float32](filter, &bounds)
 
 	if matchErr != nil {
 		t.Errorf("unexpected error %v", matchErr)
@@ -60,9 +56,7 @@ func TestHeaderPartialIntersectFilter(t *testing.T) {
 		Arguments: []any{float32(0.5999)},
 	}
 
-	matchResult, matchErr := ProcessFilterOnBlockHeader[float32](filter, &schema.DiskHeader{
-		Bounds: bounds,
-	})
+	matchResult, matchErr := ProcessFilterOnBounds[float32](filter, &bounds)
 
 	if matchErr != nil {
 		t.Errorf("unexpected error %v", matchErr)

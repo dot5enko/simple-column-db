@@ -97,8 +97,20 @@ func (qp *QueryPlanner) Plan(
 		// full scan of all slabs and their blocks
 		slabsByColumns := map[string][]uuid.UUID{}
 
+		type ColumnPrecachedInfo struct {
+			BlocksPerSlab int16
+		}
+		columnPrecalculatedInfo := map[string]ColumnPrecachedInfo{}
+
 		// collect slabs
+		maxBlocks := 0
 		for _, it := range schemaObject.Columns {
+
+			fieldBlocksPerSlab := it.Type.BlocksPerSlab()
+			columnPrecalculatedInfo[it.Name] = ColumnPrecachedInfo{
+				BlocksPerSlab: fieldBlocksPerSlab,
+			}
+
 			if len(it.Slabs) > 0 {
 
 				// global
@@ -110,8 +122,13 @@ func (qp *QueryPlanner) Plan(
 					slabsByColumns[it.Name] = old
 				}
 
-				// todo filter by header bounds, etc
 				slabsByColumns[it.Name] = append(old, it.Slabs...)
+
+				slabsSize := len(slabsByColumns[it.Name])
+				blocksAtMax := slabsSize * int(fieldBlocksPerSlab)
+				if blocksAtMax > maxBlocks {
+					maxBlocks = blocksAtMax
+				}
 			}
 		}
 
@@ -168,38 +185,43 @@ func (qp *QueryPlanner) Plan(
 		maxChunks := 0
 
 		/*
+			absBlocksFullSkipArray := make([]uint8, maxBlocks)
+
 			// filter slab headers
 			for _, filtersGroup := range filterByColumnsArray {
 				slabs := slabsByColumns[filtersGroup.FieldName]
 
 				for _, slabUid := range slabs {
+					for _, filter := range filtersGroup.Conditions {
 
-					slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
-					if slabLoadErr != nil {
-						return QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
-					}
-
-					blockHeaders := slabInfo.BlockHeaders
-					for i := 0; i < int(slabInfo.BlocksFinalized); i++ {
-
-						idx := i + slabBlockOffsetStart
-						blockHeader := &blockHeaders[idx]
-
-						if idx > int(slabInfo.BlocksFinalized) {
-							break
+						slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
+						if slabLoadErr != nil {
+							return QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
 						}
 
-						preparationErr := prepareBlockForMerger(slabMergerContext,
-							slabInfo,
-							blockHeader,
-							sm,
-						)
-						if preparationErr != nil {
-							return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
+						blockHeaders := slabInfo.BlockHeaders
+						for i := 0; i < int(slabInfo.BlocksFinalized); i++ {
+
+							blockHeader := &blockHeaders[i]
+
+							if i > int(slabInfo.BlocksFinalized) {
+								break
+							}
+
+							// blockHeader.Bounds
+
+							// skip already filtered out blocks
+							absOffset := i + int(slabInfo.SlabOffsetBlocks)
+
+							// absBlocksFullSkipArray[absOffset]
+
+							// executor.ProcessFilterOnBlockHeader()
+
 						}
 					}
 				}
-			} */
+			}
+		*/
 
 		// chunk generator
 		for columnIdx, columnDef := range schemaObject.Columns {

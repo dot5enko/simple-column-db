@@ -203,15 +203,12 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	merger.With(indicesCache[:itemsFiltered], false, false)
 
 	return itemsFiltered, nil
-
 }
 
-func ProcessFilterOnBlockHeader[T ops.NumericTypes](
+func ProcessFilterOnBounds[T ops.NumericTypes](
 	filter query.FilterCondition,
-	block *schema.DiskHeader,
+	bounds *schema.BoundsFloat,
 ) (matchResult schema.BoundsFilterMatchResult, err error) {
-
-	blockBounds := block.Bounds
 
 	switch filter.Operand {
 	case query.RANGE:
@@ -225,14 +222,13 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 			operandFrom = temp
 		}
 
-		matchResult = blockBounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo))
-
+		matchResult = bounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo))
 		return matchResult, nil
 
 	case query.EQ:
 
 		operand := float64(filter.Arguments[0].(T))
-		contains := blockBounds.Contains(operand)
+		contains := bounds.Contains(operand)
 
 		if !contains {
 			return schema.NoIntersection, nil
@@ -244,11 +240,11 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 
 		operand := float64(filter.Arguments[0].(T))
 
-		if operand > blockBounds.Max {
+		if operand > bounds.Max {
 			return schema.NoIntersection, nil
 		}
 
-		if operand <= blockBounds.Min {
+		if operand <= bounds.Min {
 			return schema.FullIntersection, nil
 		}
 
@@ -258,18 +254,18 @@ func ProcessFilterOnBlockHeader[T ops.NumericTypes](
 
 		operand := float64(filter.Arguments[0].(T))
 
-		if operand < blockBounds.Min {
+		if operand < bounds.Min {
 			return schema.NoIntersection, nil
 		}
 
-		if operand >= blockBounds.Max {
+		if operand >= bounds.Max {
 			return schema.FullIntersection, nil
 		}
 
 		return schema.PartialIntersection, nil
 
 	default:
-		return schema.UnknownIntersection, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBlockHEader[%s]", filter.Operand, block.DataType.String())
+		return schema.UnknownIntersection, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBounds", filter.Operand)
 	}
 
 	return schema.UnknownIntersection, nil

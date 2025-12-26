@@ -55,7 +55,12 @@ func (sm *Manager) Query(
 		return nil, fmt.Errorf("no such schema '%s'", schemaName)
 	}
 
-	plan, planErr := sm.Planner.Plan(schemaName, queryData, sm.Meta, sm.Slabs, &sm.queryOptions)
+	plan, planErr := sm.Planner.Plan(
+		schemaName, queryData,
+		sm.Meta,
+		sm.Slabs,
+		&sm.queryOptions,
+	)
 
 	// discard non intersecting blocks from the plan
 

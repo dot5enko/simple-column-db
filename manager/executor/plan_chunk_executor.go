@@ -51,13 +51,13 @@ func prepareBlockForMerger(
 
 		switch slabInfo.Type {
 		case schema.Uint64FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBlockHeader[uint64](filter.Filter, blockHeader)
+			intersectType, processFilterErr = ProcessFilterOnBounds[uint64](filter.Filter, &blockHeader.Bounds)
 		case schema.Uint8FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBlockHeader[uint8](filter.Filter, blockHeader)
+			intersectType, processFilterErr = ProcessFilterOnBounds[uint8](filter.Filter, &blockHeader.Bounds)
 		case schema.Float32FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBlockHeader[float32](filter.Filter, blockHeader)
+			intersectType, processFilterErr = ProcessFilterOnBounds[float32](filter.Filter, &blockHeader.Bounds)
 		case schema.Float64FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBlockHeader[float64](filter.Filter, blockHeader)
+			intersectType, processFilterErr = ProcessFilterOnBounds[float64](filter.Filter, &blockHeader.Bounds)
 		default:
 			return fmt.Errorf("unsupported type %v while filtering block headers", slabInfo.Type.String())
 		}
