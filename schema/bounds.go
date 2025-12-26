@@ -21,10 +21,10 @@ const BoundsSize = 8 + 8
 type BoundsFilterMatchResult uint8
 
 const (
-	NoIntersection BoundsFilterMatchResult = iota
+	UnknownIntersection BoundsFilterMatchResult = iota
 	PartialIntersection
 	FullIntersection
-	UnknownIntersection
+	NoIntersection
 )
 
 func (b BoundsFilterMatchResult) String() string {

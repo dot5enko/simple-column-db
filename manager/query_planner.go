@@ -2,9 +2,12 @@ package manager
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -140,46 +143,68 @@ func (qp *QueryPlanner) Plan(
 
 		maxChunks := 0
 
-		/*
-			absBlocksFullSkipArray := make([]uint8, maxBlocks)
+		absBlocksFullSkipArray := make([]uint8, maxBlocks)
 
-			// filter slab headers
-			for _, filtersGroup := range filterByColumnsArray {
-				slabs := slabsByColumns[filtersGroup.FieldName]
+		// filter slab headers
+		blockPrunningStart := time.Now()
+		for _, filtersGroup := range filterByColumnsArray {
+			slabs := slabsByColumns[filtersGroup.FieldName]
 
-				for _, slabUid := range slabs {
-					for _, filter := range filtersGroup.Conditions {
+			for _, slabUid := range slabs {
+				for _, filter := range filtersGroup.Conditions {
 
-						slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
-						if slabLoadErr != nil {
-							return query.QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
+					slabInfo, slabLoadErr := slabManager.LoadSlabToCache(schemaObject, slabUid)
+					if slabLoadErr != nil {
+						return query.QueryPlan{}, fmt.Errorf("error loading slab into cache : %s", slabLoadErr.Error())
+					}
+
+					blockHeaders := slabInfo.BlockHeaders
+					for i := 0; i < int(slabInfo.BlocksFinalized); i++ {
+
+						blockHeader := &blockHeaders[i]
+
+						if i > int(slabInfo.BlocksFinalized) {
+							break
 						}
 
-						blockHeaders := slabInfo.BlockHeaders
-						for i := 0; i < int(slabInfo.BlocksFinalized); i++ {
+						var matchResult schema.BoundsFilterMatchResult
+						var matchErr error
 
-							blockHeader := &blockHeaders[i]
+						ftype := filtersGroup.ColumnSchemaInfo.Type
 
-							if i > int(slabInfo.BlocksFinalized) {
-								break
-							}
+						switch ftype {
+						case schema.Uint64FieldType:
+							matchResult, matchErr = filters.ProcessFilterOnBounds[uint64](filter.Filter, &blockHeader.Bounds)
+						case schema.Float32FieldType:
+							matchResult, matchErr = filters.ProcessFilterOnBounds[float32](filter.Filter, &blockHeader.Bounds)
 
-							filters.ProcessFilterOnBounds[uint64](filter, &blockHeader.Bounds)
+						default:
+							panic(fmt.Sprintf("unsupported type in query planner : %s", ftype.String()))
+						}
 
-							// blockHeader.Bounds
+						if matchErr != nil {
+							return query.QueryPlan{}, fmt.Errorf("error filtering bounds on block header : %s", matchErr.Error())
+						}
 
-							// skip already filtered out blocks
+						if matchResult == schema.NoIntersection {
 							absOffset := i + int(slabInfo.SlabOffsetBlocks)
-
-							// absBlocksFullSkipArray[absOffset]
-
-							// executor.ProcessFilterOnBlockHeader()
-
+							absBlocksFullSkipArray[absOffset] = 1
 						}
 					}
 				}
 			}
-		*/
+		}
+
+		blockPrunningTook := time.Since(blockPrunningStart).Seconds() * 1000.0
+
+		blocksToSkip := 0
+		for _, skip := range absBlocksFullSkipArray {
+			if skip == 1 {
+				blocksToSkip += 1
+			}
+		}
+
+		slog.Info("blocks prunned", "took", fmt.Sprintf("%.4fms", blockPrunningTook), "prunned_blocks", blocksToSkip)
 
 		// chunk generator
 		for columnIdx, columnDef := range schemaObject.Columns {
