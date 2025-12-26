@@ -186,8 +186,8 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 				}
 			}
 
-			m.slabDataCacheLocker.RLock()
-			defer m.slabDataCacheLocker.RUnlock()
+			m.slabDataCacheLocker.Lock()
+			defer m.slabDataCacheLocker.Unlock()
 
 			m.slabDataCache[uid] = item
 
