@@ -1,10 +1,11 @@
-package executor
+package filters
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -13,7 +14,7 @@ import (
 
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	filter query.FilterCondition,
-	blockData *BlockRuntimeInfo,
+	blockData *executortypes.BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
 ) (int, error) {
@@ -72,7 +73,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 	slab *schema.DiskSlabHeader,
 	filter query.FilterCondition,
-	blockData *BlockRuntimeInfo,
+	blockData *executortypes.BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
 ) (int, error) {
@@ -133,7 +134,7 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	// slab *schema.DiskSlabHeader,
 	filter query.FilterCondition,
-	blockData *BlockRuntimeInfo,
+	blockData *executortypes.BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
 	indicesCache []uint16,
 ) (int, error) {
@@ -203,71 +204,4 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	merger.With(indicesCache[:itemsFiltered], false, false)
 
 	return itemsFiltered, nil
-}
-
-func ProcessFilterOnBounds[T ops.NumericTypes](
-	filter query.FilterCondition,
-	bounds *schema.BoundsFloat,
-) (matchResult schema.BoundsFilterMatchResult, err error) {
-
-	switch filter.Operand {
-	case query.RANGE:
-
-		operandFrom := float64(filter.Arguments[0].(T))
-		operandTo := float64(filter.Arguments[1].(T))
-
-		if operandFrom > operandTo {
-			temp := operandTo
-			operandTo = operandFrom
-			operandFrom = temp
-		}
-
-		matchResult = bounds.Intersects(schema.NewBoundsFromValues(operandFrom, operandTo))
-		return matchResult, nil
-
-	case query.EQ:
-
-		operand := float64(filter.Arguments[0].(T))
-		contains := bounds.Contains(operand)
-
-		if !contains {
-			return schema.NoIntersection, nil
-		} else if contains {
-			return schema.PartialIntersection, nil
-		}
-
-	case query.GT:
-
-		operand := float64(filter.Arguments[0].(T))
-
-		if operand > bounds.Max {
-			return schema.NoIntersection, nil
-		}
-
-		if operand <= bounds.Min {
-			return schema.FullIntersection, nil
-		}
-
-		return schema.PartialIntersection, nil
-
-	case query.LT:
-
-		operand := float64(filter.Arguments[0].(T))
-
-		if operand < bounds.Min {
-			return schema.NoIntersection, nil
-		}
-
-		if operand >= bounds.Max {
-			return schema.FullIntersection, nil
-		}
-
-		return schema.PartialIntersection, nil
-
-	default:
-		return schema.UnknownIntersection, fmt.Errorf("unsupported operand type=%v while ProcessFilterOnBounds", filter.Operand)
-	}
-
-	return schema.UnknownIntersection, nil
-
 }

@@ -1,4 +1,4 @@
-package executor
+package executortypes
 
 import (
 	"github.com/dot5enko/simple-column-db/schema"

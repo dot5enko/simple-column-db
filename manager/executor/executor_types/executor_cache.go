@@ -1,4 +1,4 @@
-package executor
+package executortypes
 
 import (
 	"github.com/dot5enko/simple-column-db/lists"
@@ -7,17 +7,17 @@ import (
 )
 
 type ChunkExecutorThreadCache struct {
-	absBlockMaps       [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
-	blocks             [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
-	indicesResultCache [schema.BlockRowsSize]uint16
+	AbsBlockMaps       [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
+	Blocks             [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
+	IndicesResultCache [schema.BlockRowsSize]uint16
 }
 
 func (c *ChunkExecutorThreadCache) Reset() {
 
 	for i := range query.ExecutorChunkSizeBlocks {
-		c.absBlockMaps[i].Reset()
+		c.AbsBlockMaps[i].Reset()
 
-		bRef := &c.blocks[i]
+		bRef := &c.Blocks[i]
 
 		bRef.BlockHeader = nil
 		bRef.Val = nil

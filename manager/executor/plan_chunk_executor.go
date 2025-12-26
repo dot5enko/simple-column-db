@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
+	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -21,7 +23,7 @@ type BlockMergerContext struct {
 
 	FilterSize int
 
-	Blocks                    []BlockRuntimeInfo
+	Blocks                    []executortypes.BlockRuntimeInfo
 	CurrentBlockProcessingIdx int
 
 	AbsBlockMaps []lists.IndiceUnmerged
@@ -51,13 +53,13 @@ func prepareBlockForMerger(
 
 		switch slabInfo.Type {
 		case schema.Uint64FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBounds[uint64](filter.Filter, &blockHeader.Bounds)
+			intersectType, processFilterErr = filters.ProcessFilterOnBounds[uint64](filter.Filter, &blockHeader.Bounds)
 		case schema.Uint8FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBounds[uint8](filter.Filter, &blockHeader.Bounds)
+			intersectType, processFilterErr = filters.ProcessFilterOnBounds[uint8](filter.Filter, &blockHeader.Bounds)
 		case schema.Float32FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBounds[float32](filter.Filter, &blockHeader.Bounds)
+			intersectType, processFilterErr = filters.ProcessFilterOnBounds[float32](filter.Filter, &blockHeader.Bounds)
 		case schema.Float64FieldType:
-			intersectType, processFilterErr = ProcessFilterOnBounds[float64](filter.Filter, &blockHeader.Bounds)
+			intersectType, processFilterErr = filters.ProcessFilterOnBounds[float64](filter.Filter, &blockHeader.Bounds)
 		default:
 			return fmt.Errorf("unsupported type %v while filtering block headers", slabInfo.Type.String())
 		}
@@ -210,13 +212,13 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
 				default:
 					return SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}

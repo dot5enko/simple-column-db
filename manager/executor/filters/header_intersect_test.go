@@ -1,4 +1,4 @@
-package executor
+package filters
 
 import (
 	"testing"

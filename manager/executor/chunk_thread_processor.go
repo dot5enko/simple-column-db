@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/fatih/color"
 )
 
 func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
 
-	threadCache := &ChunkExecutorThreadCache{}
+	threadCache := &executortypes.ChunkExecutorThreadCache{}
 
 	slog.Info("worker started", "thread_id", threadId)
 	defer slog.Info("worker stopped", "thread_id", threadId)

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 )
@@ -41,7 +42,7 @@ func preloadChunks(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *q
 	return nil
 }
 
-func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
+func ExecutePlanForChunk(cache *executortypes.ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
 
 	cache.Reset()
 
@@ -76,8 +77,8 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 
 			FilterSize: filtersSize,
 
-			Blocks:       cache.blocks[:],
-			AbsBlockMaps: cache.absBlockMaps[:],
+			Blocks:       cache.Blocks[:],
+			AbsBlockMaps: cache.AbsBlockMaps[:],
 
 			CurrentBlockProcessingIdx: 0,
 		}
@@ -88,7 +89,7 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
 
-		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, cache.indicesResultCache[:])
+		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, cache.IndicesResultCache[:])
 		if chunkProcessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
@@ -107,7 +108,7 @@ func ExecutePlanForChunk(cache *ChunkExecutorThreadCache, sm *meta.SlabManager, 
 	// filter merged blocks info
 	for idx := range query.ExecutorChunkSizeBlocks {
 
-		blockFilterMask := &cache.absBlockMaps[idx]
+		blockFilterMask := &cache.AbsBlockMaps[idx]
 
 		if blockFilterMask.Merges() == plan.FilterSize {
 			amount := blockFilterMask.ResultBitset.Count()
