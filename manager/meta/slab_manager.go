@@ -19,8 +19,6 @@ type BlockCacheItem struct {
 	rtStats *cache.CacheStats
 }
 
-const HeadersCacheSize = 256 * schema.TotalHeaderSize
-
 type SlabManager struct {
 	storagePath string
 

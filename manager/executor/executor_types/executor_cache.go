@@ -6,6 +6,7 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
+// todo realocate with arena to allow dynamic size of blocks and chunks?
 type ChunkExecutorThreadCache struct {
 	AbsBlockMaps       [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
 	Blocks             [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
