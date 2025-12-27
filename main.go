@@ -190,48 +190,52 @@ func main() {
 			totalDuration[i] = cummResult.TotalQueryDuration
 			planTook[i] = cummResult.PlanTook
 
-			// slog.Info("merge info",
-			// 	"ok_blocks", cummResult.ProcessedBlocks,
-			// 	"skips_all", cummResult.FullSkips,
-			// 	"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
-			// 	"matched", cummResult.TotalItems,
-			// 	"took_ms", fmt.Sprintf("%.2f", cummResult.TotalQueryDuration.Seconds()*1000),
-			// 	"wait_ms", fmt.Sprintf("%.2f", cummResult.PureLock.Seconds()*1000),
-			// 	"chunks", cummResult.TotalChunks,
-			// 	"chunk_lock", cummResult.LockTook.Nanoseconds(),
-			// 	"task_chunk_lock", totalCoordinationLock,
-			// )
+			if testN < 100 {
+				slog.Info("merge info",
+					"ok_blocks", cummResult.ProcessedBlocks,
+					"skips_all", cummResult.FullSkips,
+					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
+					"matched", cummResult.TotalItems,
+					"took_ms", fmt.Sprintf("%.2f", cummResult.TotalQueryDuration.Seconds()*1000),
+					"wait_ms", fmt.Sprintf("%.2f", cummResult.PureLock.Seconds()*1000),
+					"chunks", cummResult.TotalChunks,
+					"chunk_lock", cummResult.LockTook.Nanoseconds(),
+					"task_chunk_lock", totalCoordinationLock,
+				)
+			}
 		}
 	}
 
-	getP := func(arr []time.Duration, pct float64) time.Duration {
-		n := len(arr)
-		idx := int(float64(n)*pct)/100 - 1
+	if testN > 1 {
+		getP := func(arr []time.Duration, pct float64) time.Duration {
+			n := len(arr)
+			idx := int(float64(n)*pct)/100 - 1
 
-		return arr[idx]
-	}
-
-	calcPS := func(propName string, arr []time.Duration) {
-
-		slices.Sort(arr)
-
-		totalValue := time.Duration(0)
-		for _, v := range arr {
-			totalValue += v
+			return arr[idx]
 		}
 
-		slog.Info(fmt.Sprintf("property [%s] stats", propName),
-			"total", totalValue,
-			fmt.Sprintf("%s_p%d", propName, 50), getP(arr, 50),
-			fmt.Sprintf("%s_p%d", propName, 95), getP(arr, 95),
-			fmt.Sprintf("%s_p%d", propName, 99), getP(arr, 99.9),
-		)
+		calcPS := func(propName string, arr []time.Duration) {
 
+			slices.Sort(arr)
+
+			totalValue := time.Duration(0)
+			for _, v := range arr {
+				totalValue += v
+			}
+
+			slog.Info(fmt.Sprintf("property [%s] stats", propName),
+				"total", totalValue,
+				fmt.Sprintf("%s_p%d", propName, 50), getP(arr, 50),
+				fmt.Sprintf("%s_p%d", propName, 95), getP(arr, 95),
+				fmt.Sprintf("%s_p%d", propName, 99), getP(arr, 99.9),
+			)
+
+		}
+
+		calcPS("lock", locks)
+		calcPS("dura", totalDuration)
+		calcPS("plan", planTook)
 	}
-
-	calcPS("lock", locks)
-	calcPS("dura", totalDuration)
-	calcPS("plan", planTook)
 
 	if *pprofEnabled {
 		waiter.Wait()

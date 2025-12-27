@@ -50,6 +50,12 @@ func (b *Bitfield) And(other Bitfield) {
 }
 
 func (b *Bitfield) FromSorted(bits []uint16) {
+
+	// t0 := time.Now()
+	// defer func() {
+	// 	slog.Info("From Sorted took", "time", time.Since(t0), "items", len(bits))
+	// }()
+
 	arr := b[:] // removes bounds checks in indexing
 	if len(bits) == 0 {
 		return

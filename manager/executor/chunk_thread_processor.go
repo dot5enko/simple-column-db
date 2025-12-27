@@ -14,9 +14,6 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 	threadCache := &executortypes.ChunkExecutorThreadCache{}
 
-	slog.Info("worker started", "thread_id", threadId)
-	defer slog.Info("worker stopped", "thread_id", threadId)
-
 	for task := range tasksQueue {
 
 		curStatus := task.Status
