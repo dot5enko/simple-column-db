@@ -2,8 +2,10 @@ package manager
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -141,10 +143,16 @@ func (qp *QueryPlanner) Plan(
 
 		maxChunks := 0
 
-		absBlocksFullSkipArray := make([]uint8, maxBlocks)
+		type SkipArrayCacheEntry struct {
+			Full    int8
+			Partial int8
+			None    int8
+		}
+
+		absBlocksFullSkipArray := make([]SkipArrayCacheEntry, maxBlocks)
 
 		// filter slab headers
-		// blockPrunningStart := time.Now()
+		blockPrunningStart := time.Now()
 		for _, filtersGroup := range filterByColumnsArray {
 			slabs := slabsByColumns[filtersGroup.FieldName]
 
@@ -184,89 +192,50 @@ func (qp *QueryPlanner) Plan(
 							return query.QueryPlan{}, fmt.Errorf("error filtering bounds on block header : %s", matchErr.Error())
 						}
 
+						absOffset := i + int(slabInfo.SlabOffsetBlocks)
+
 						if matchResult == schema.NoIntersection {
-							absOffset := i + int(slabInfo.SlabOffsetBlocks)
-							absBlocksFullSkipArray[absOffset] = 1
+							absBlocksFullSkipArray[absOffset].None += 1
 						}
+
+						if matchResult == schema.FullIntersection {
+							absBlocksFullSkipArray[absOffset].Full += 1
+						}
+
+						if matchResult == schema.PartialIntersection || matchResult == schema.UnknownIntersection {
+							absBlocksFullSkipArray[absOffset].Partial += 1
+						}
+
 					}
 				}
 			}
 		}
 
-		// blockPrunningTook := time.Since(blockPrunningStart).Seconds() * 1000.0
+		blockPrunningTook := time.Since(blockPrunningStart).Seconds() * 1000.0
 
 		blocksToSkip := 0
 		blocksOk := 0
+		blocksFull := 0
+
 		for _, skip := range absBlocksFullSkipArray {
-			if skip == 1 {
+			if skip.None > 0 {
 				blocksToSkip += 1
 			} else {
-				blocksOk += 1
+
+				// slog.Info("normal block", "blocks_info", []int8{
+				// 	skip.None, skip.Full, skip.Partial,
+				// })
+
+				if skip.Full == 3 {
+					blocksFull += 1
+				} else {
+					blocksOk += 1
+				}
 			}
 		}
 
-		// slog.Info("blocks prunned", "took", fmt.Sprintf("%.4fms", blockPrunningTook), "prunned_blocks", blocksToSkip, "good_blocks", blocksOk)
-
-		// chunk generator
 		if false {
-			for columnIdx, columnDef := range schemaObject.Columns {
-
-				blocksPerSlab := columnDef.Type.BlocksPerSlab()
-
-				curChunkSlabs, ok := perColumnChunks[columnIdx]
-				if !ok {
-					curChunkSlabs = &query.ColumnChunks{List: []query.SingleChunk{}}
-					perColumnChunks[columnIdx] = curChunkSlabs
-				}
-
-				var curChunkSlabsItem = newSingleChunk()
-
-				for _, slabUid := range columnDef.Slabs {
-					leftoverBlocks := int(blocksPerSlab)
-					used := 0
-
-					for leftoverBlocks > 0 {
-
-						curSize := query.ExecutorChunkSizeBlocks
-
-						if leftoverBlocks <= query.ExecutorChunkSizeBlocks {
-							curSize = leftoverBlocks
-						}
-
-						leftoverCurrentChunk := query.ExecutorChunkSizeBlocks - curChunkSlabsItem.BlocksFilled
-
-						if curSize > leftoverCurrentChunk {
-							curSize = leftoverCurrentChunk
-						}
-
-						segment := query.Segment{
-							Slab:       slabUid,
-							StartBlock: used,
-							Size:       curSize,
-						}
-
-						leftoverBlocks -= curSize
-						used += curSize
-						curChunkSlabsItem.BlocksFilled += curSize
-
-						curChunkSlabsItem.Segments = append(curChunkSlabsItem.Segments, segment)
-
-						if curChunkSlabsItem.BlocksFilled > query.ExecutorChunkSizeBlocks {
-							panic(fmt.Sprintf("this should not happen. never. Number of blocks filled %d, exceeds executor chunk size %d", curChunkSlabsItem.BlocksFilled, query.ExecutorChunkSizeBlocks))
-						}
-
-						if curChunkSlabsItem.BlocksFilled == query.ExecutorChunkSizeBlocks {
-							curChunkSlabs.List = append(curChunkSlabs.List, *curChunkSlabsItem)
-							curChunkSlabsItem = newSingleChunk()
-						}
-					}
-				}
-
-				curChunks := len(curChunkSlabs.List)
-				if curChunks > maxChunks {
-					maxChunks = curChunks
-				}
-			}
+			slog.Info("blocks prunned", "took", fmt.Sprintf("%.4fms", blockPrunningTook), "prunned_blocks", blocksToSkip, "good_blocks", blocksOk, "full_blocks", blocksFull)
 		}
 
 		for columnIdx, columnDef := range schemaObject.Columns {
@@ -290,7 +259,7 @@ func (qp *QueryPlanner) Plan(
 
 					// skip blacklisted blocks
 					absBlockIdx := absSlabBase + block
-					if absBlocksFullSkipArray[absBlockIdx] != 0 {
+					if absBlocksFullSkipArray[absBlockIdx].None > 0 {
 						block++
 						continue
 					}
@@ -307,7 +276,7 @@ func (qp *QueryPlanner) Plan(
 
 					for block < blocksPerSlab && size < leftoverChunk {
 						absBlockIdx = absSlabBase + block
-						if absBlocksFullSkipArray[absBlockIdx] != 0 {
+						if absBlocksFullSkipArray[absBlockIdx].None > 0 {
 							break
 						}
 						size++
