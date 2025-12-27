@@ -39,14 +39,22 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 	return &swg
 }
 
+type QueryResult struct {
+	Data map[string][]any
+
+	Metrics executor.ChunkFilterProcessResult
+
+	Error error
+}
+
 func (sm *Manager) Query(
 	schemaName string,
 	queryData query.Query,
 	ctx context.Context,
-) ([]map[string]any, error) {
+) (*QueryResult, error) {
 
 	before := time.Now()
-	result := []map[string]any{}
+	result := &QueryResult{}
 
 	// var indicesResultCache [schema.BlockRowsSize]uint16
 
@@ -61,6 +69,8 @@ func (sm *Manager) Query(
 		sm.Slabs,
 		&sm.queryOptions,
 	)
+
+	planTime := time.Since(before)
 
 	// discard non intersecting blocks from the plan
 
@@ -84,13 +94,20 @@ func (sm *Manager) Query(
 			Status: taskStatus,
 		}
 	}
-
+	timeBefore := time.Now()
 	taskStatus.Waiter.Wait()
+	waitTookMs := time.Since(timeBefore)
 
-	queryTookMs := time.Since(before).Seconds() * 1000
+	queryTookMs := time.Since(before)
+
 	cummResult := taskStatus.ChunkResult
 
-	slog.Info("merge info", "wasted_merges", cummResult.WastedMerges, "processed_blocks", cummResult.ProcessedBlocks, "full_skips", cummResult.FullSkips, "skipped_blocks", cummResult.SkippedBlocksDueToHeaderFiltering, "total_filtered", cummResult.TotalItems, "took_ms", fmt.Sprintf("%.2f", queryTookMs))
+	cummResult.PureLock = waitTookMs
+	cummResult.TotalQueryDuration = time.Duration(queryTookMs)
+	cummResult.PlanTook = planTime
+	cummResult.TotalChunks = bChunksSize
+
+	result.Metrics = cummResult
 
 	return result, nil
 }

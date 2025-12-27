@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"math/rand"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -138,6 +140,12 @@ func main() {
 
 	m.StartWorkers(*workerThreads, workersCtx)
 
+	totalCoordinationLock := time.Duration(0)
+
+	locks := make([]time.Duration, testN)
+	totalDuration := make([]time.Duration, testN)
+	planTook := make([]time.Duration, testN)
+
 	for i := 0; i < testN; i++ {
 
 		result, qerr := m.Query(testSchemaName, query.Query{
@@ -173,9 +181,57 @@ func main() {
 		if qerr != nil {
 			panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
 		} else {
-			_ = result
+
+			cummResult := result.Metrics
+
+			totalCoordinationLock += cummResult.LockTook
+
+			locks[i] = cummResult.LockTook
+			totalDuration[i] = cummResult.TotalQueryDuration
+			planTook[i] = cummResult.PlanTook
+
+			// slog.Info("merge info",
+			// 	"ok_blocks", cummResult.ProcessedBlocks,
+			// 	"skips_all", cummResult.FullSkips,
+			// 	"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
+			// 	"matched", cummResult.TotalItems,
+			// 	"took_ms", fmt.Sprintf("%.2f", cummResult.TotalQueryDuration.Seconds()*1000),
+			// 	"wait_ms", fmt.Sprintf("%.2f", cummResult.PureLock.Seconds()*1000),
+			// 	"chunks", cummResult.TotalChunks,
+			// 	"chunk_lock", cummResult.LockTook.Nanoseconds(),
+			// 	"task_chunk_lock", totalCoordinationLock,
+			// )
 		}
 	}
+
+	getP := func(arr []time.Duration, pct float64) time.Duration {
+		n := len(arr)
+		idx := int(float64(n)*pct)/100 - 1
+
+		return arr[idx]
+	}
+
+	calcPS := func(propName string, arr []time.Duration) {
+
+		slices.Sort(arr)
+
+		totalValue := time.Duration(0)
+		for _, v := range arr {
+			totalValue += v
+		}
+
+		slog.Info(fmt.Sprintf("property [%s] stats", propName),
+			"total", totalValue,
+			fmt.Sprintf("%s_p%d", propName, 50), getP(arr, 50),
+			fmt.Sprintf("%s_p%d", propName, 95), getP(arr, 95),
+			fmt.Sprintf("%s_p%d", propName, 99), getP(arr, 99.9),
+		)
+
+	}
+
+	calcPS("lock", locks)
+	calcPS("dura", totalDuration)
+	calcPS("plan", planTook)
 
 	if *pprofEnabled {
 		waiter.Wait()

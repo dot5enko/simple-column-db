@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -19,6 +20,8 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	for task := range tasksQueue {
 
 		curStatus := task.Status
+
+		start := time.Now()
 
 		if curStatus.Err.Load() {
 
@@ -38,12 +41,23 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 			processed := curStatus.ChunksProcessed.Add(1)
 
+			processingTook := time.Since(start).Seconds() * 1000.0
+
+			if false {
+				slog.Info("chunk processing done ", "chunk_id", task.ChunkIdx, "took_ms", fmt.Sprintf("%.2f", processingTook))
+			}
+
 			func() {
+
+				timeB := time.Now()
+
 				curStatus.Lock.Lock()
+				lockTook := time.Since(timeB)
 				defer curStatus.Lock.Unlock()
 
 				globalChunkResult := &curStatus.ChunkResult
 
+				globalChunkResult.LockTook += lockTook
 				globalChunkResult.TotalItems += taskRes.TotalItems
 				globalChunkResult.WastedMerges += taskRes.WastedMerges
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering

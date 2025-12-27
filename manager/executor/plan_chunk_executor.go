@@ -11,9 +11,6 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
-type PlanExecutor struct {
-}
-
 type BlockMergerContext struct {
 	Schema         schema.Schema
 	AbsOffsetStart uint64
