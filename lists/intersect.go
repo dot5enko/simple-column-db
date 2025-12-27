@@ -81,9 +81,6 @@ func IntersectIndicesFastTwoListBitset(a, b, out []uint16) int {
 	aBitset := convertArrayIndicesToBitset(a)
 	bBitset := convertArrayIndicesToBitset(b)
 
-	// t.StopTimer()
-	// defer t.StartTimer()
-
 	resultBitset := bits.MergeAND(aBitset, bBitset)
 
 	if resultBitset.Any() {

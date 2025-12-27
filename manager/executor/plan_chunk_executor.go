@@ -196,7 +196,7 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 			if isFull {
 				result.skippedBlocksDueToHeaderFiltering += 1
 
-				blockGroupMerger.With(nil, false, true)
+				blockGroupMerger.WithBitset(nil, false, true)
 				continue
 			}
 
@@ -209,13 +209,13 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger)
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger)
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger)
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger, indicesResultCache[:])
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger)
 				default:
 					return SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}

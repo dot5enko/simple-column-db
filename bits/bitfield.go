@@ -35,13 +35,13 @@ func NewFullBitfield() (bf Bitfield) {
 	return
 }
 
-func (b *Bitfield) FromOther(other Bitfield) {
+func (b *Bitfield) FromOther(other *Bitfield) {
 	for i := range other {
 		b[i] = other[i]
 	}
 }
 
-func (b *Bitfield) And(other Bitfield) {
+func (b *Bitfield) And(other *Bitfield) {
 
 	for i := range other {
 		b[i] &= other[i]

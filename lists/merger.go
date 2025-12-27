@@ -58,7 +58,30 @@ func (i *IndiceUnmerged) Merges() int {
 
 // }
 
-func (i *IndiceUnmerged) With(input []uint16, isEmpty, isFull bool) {
+func (i *IndiceUnmerged) WithBitset(input *bits.Bitfield, isEmpty, isFull bool) {
+
+	i.merges += 1
+
+	if isFull {
+		i.withFull()
+		return
+	}
+
+	if isEmpty {
+		i.withEmpty()
+		return
+	}
+
+	if !i.initialized {
+		i.ResultBitset.FromOther(input)
+		i.initialized = true
+		return
+	}
+
+	i.ResultBitset.And(input)
+}
+
+func (i *IndiceUnmerged) _With(input []uint16, isEmpty, isFull bool) {
 
 	i.merges += 1
 

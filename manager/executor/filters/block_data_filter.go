@@ -2,22 +2,22 @@ package filters
 
 import (
 	"fmt"
-	"log"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/lists"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 )
 
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	filter query.FilterCondition,
 	blockData *executortypes.BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
-	indicesCache []uint16,
 ) (int, error) {
+
+	var outputBitset bits.Bitfield
 
 	var itemsFiltered int
 
@@ -39,32 +39,27 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 
 		}
 
-		itemsFiltered = ops.CompareValuesAreInRangeUnsignedInts(inputArray, operandA, operandB, indicesCache)
+		itemsFiltered = ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(inputArray, operandA, operandB, &outputBitset)
 		// log.Printf(" end of input array offset : %v", arrayEndOffset)
-
-		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
-		}
 	case query.EQ:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
 
 	case query.GT:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreBiggerBitset(inputArray, operand, &outputBitset)
 	case query.LT:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
 
 	default:
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered], false, false)
+	merger.WithBitset(&outputBitset, false, false)
 
 	return itemsFiltered, nil
 
@@ -79,6 +74,8 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 ) (int, error) {
 
 	var itemsFiltered int
+
+	var outputBitset bits.Bitfield
 
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
@@ -100,32 +97,27 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 
 		}
 
-		itemsFiltered = ops.CompareValuesAreInRangeSignedInts(inputArray, operandA, operandB, indicesCache)
-		// log.Printf(" end of input array offset : %v", arrayEndOffset)
+		itemsFiltered = ops.CompareValuesAreInRangeSignedIntsBitset(inputArray, operandA, operandB, &outputBitset)
 
-		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
-		}
 	case query.EQ:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
 
 	case query.GT:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
 	case query.LT:
 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
 
 	default:
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered], false, false)
+	merger.WithBitset(&outputBitset, false, false)
 
 	return itemsFiltered, nil
 
@@ -136,22 +128,13 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	filter query.FilterCondition,
 	blockData *executortypes.BlockRuntimeInfo,
 	merger *lists.IndiceUnmerged,
-	indicesCache []uint16,
 ) (int, error) {
 
 	var itemsFiltered int
+	var outBitset bits.Bitfield
 
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
-
-	// log.Printf("[slab %s] filter: %v, type = %s. offset %p[%d]. block %p",
-	// 	slab.Uid.String(),
-	// 	filter.Field,
-	// 	blockData.BlockHeader.DataType.String(),
-	// 	directBlockArray,
-	// 	arrayEndOffset,
-	// 	runtimeBlockInfo,
-	// )
 
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
@@ -168,40 +151,27 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 
 		}
 
-		itemsFiltered = ops.CompareValuesAreInRangeFloats(inputArray, operandA, operandB, indicesCache)
-		// log.Printf(" end of input array offset : %v", arrayEndOffset)
-
-		if false && itemsFiltered > 0 {
-			log.Printf("filtered %v items from block by range %s. ", itemsFiltered, blockData.BlockHeader.Uid.String())
-			color.Red(" operands %v <-> %v. %s block range : [%e: max %e]", operandA, operandB, blockData.BlockHeader.Uid.String(), blockData.BlockHeader.Bounds.Min, blockData.BlockHeader.Bounds.Max)
-			valuesFiltered := []T{}
-
-			for _, i := range indicesCache[:itemsFiltered] {
-				valuesFiltered = append(valuesFiltered, inputArray[i])
-			}
-
-			color.Green("-- filtered : %#+v", valuesFiltered)
-		}
+		itemsFiltered = ops.CompareValuesAreInRangeFloatsBitsetUnrolled(inputArray, operandA, operandB, &outBitset)
 
 	case query.EQ:
 
 		operand := filter.Arguments[0].(T)
-		itemsFiltered = ops.CompareNumericValuesAreEqual(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outBitset)
 
 	case query.GT:
 
 		operand := filter.Arguments[0].(T)
-		itemsFiltered = ops.CompareValuesAreBigger(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreBiggerBitset(inputArray, operand, &outBitset)
 	case query.LT:
 
 		operand := filter.Arguments[0].(T)
-		itemsFiltered = ops.CompareValuesAreSmaller(inputArray, operand, indicesCache)
+		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outBitset)
 
 	default:
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
 	}
 
-	merger.With(indicesCache[:itemsFiltered], false, false)
+	merger.WithBitset(&outBitset, false, false)
 
 	return itemsFiltered, nil
 }

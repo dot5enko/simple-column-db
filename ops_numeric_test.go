@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/ops"
 )
 
@@ -95,7 +96,7 @@ func TestRangeBlockAndTail(t *testing.T) {
 
 func BenchmarkRangeUnsigned(b *testing.B) {
 
-	size := 40000
+	size := 30000
 
 	var fromBounds uint64 = 4096
 	var toBounds uint64 = 8192
@@ -109,7 +110,7 @@ func BenchmarkRangeUnsigned(b *testing.B) {
 		val := uint64(rand.Int63n(50000))
 		input[i] = val
 
-		if val >= fromBounds && val <= toBounds {
+		if val > fromBounds && val < toBounds {
 			totalCount++
 			totalSum += int(val)
 		}
@@ -122,6 +123,120 @@ func BenchmarkRangeUnsigned(b *testing.B) {
 
 	for b.Loop() {
 		totalBenchCount := ops.CompareValuesAreInRangeUnsignedInts(input[:], fromBounds, toBounds, out)
+		if totalCount != totalBenchCount {
+			b.Fatalf("Benchmark failed: expected %d but got %d", totalCount, totalBenchCount)
+		}
+	}
+}
+
+func BenchmarkRangeUnsignedAndConvertToBitset(b *testing.B) {
+
+	size := 30000
+
+	var fromBounds uint64 = 4096
+	var toBounds uint64 = 8192
+
+	totalCount := 0
+	totalSum := 0
+
+	input := make([]uint64, size)
+
+	for i := 0; i < size; i++ {
+		val := uint64(rand.Int63n(50000))
+		input[i] = val
+
+		if val > fromBounds && val < toBounds {
+			totalCount++
+			totalSum += int(val)
+		}
+
+	}
+
+	out := make([]uint16, size)
+
+	log.Printf("amount %d", totalCount)
+
+	for b.Loop() {
+		totalBenchCount := ops.CompareValuesAreInRangeUnsignedInts(input[:], fromBounds, toBounds, out)
+
+		bitsetResult := bits.Bitfield{}
+		bitsetResult.FromSorted(out)
+
+		bitsetSize := bitsetResult.Count()
+
+		if totalCount != totalBenchCount {
+			b.Fatalf("Benchmark failed: expected %d but got %d. bitset Size: %d", totalCount, totalBenchCount, bitsetSize)
+		}
+	}
+}
+
+func BenchmarkRangeUnsignedBitsetFast(b *testing.B) {
+
+	size := 30000
+
+	var fromBounds uint64 = 4096
+	var toBounds uint64 = 8192
+
+	totalCount := 0
+	totalSum := 0
+
+	input := make([]uint64, size)
+
+	for i := 0; i < size; i++ {
+		val := uint64(rand.Int63n(50000))
+		input[i] = val
+
+		if val > fromBounds && val < toBounds {
+			totalCount++
+			totalSum += int(val)
+		}
+
+	}
+
+	log.Printf("amount %d", totalCount)
+
+	for b.Loop() {
+
+		out := &bits.Bitfield{}
+
+		totalBenchCount := ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(input[:], fromBounds, toBounds, out)
+		if totalCount != totalBenchCount {
+			b.Fatalf("Benchmark failed: expected %d but got %d", totalCount, totalBenchCount)
+		}
+	}
+
+}
+
+func BenchmarkRangeUnsignedBitset(b *testing.B) {
+
+	size := 30000
+
+	var fromBounds uint64 = 4096
+	var toBounds uint64 = 8192
+
+	totalCount := 0
+	totalSum := 0
+
+	input := make([]uint64, size)
+
+	for i := 0; i < size; i++ {
+		val := uint64(rand.Int63n(50000))
+		input[i] = val
+
+		if val > fromBounds && val < toBounds {
+			totalCount++
+			totalSum += int(val)
+		}
+
+	}
+
+	log.Printf("amount %d", totalCount)
+
+	for b.Loop() {
+
+		out := &bits.Bitfield{}
+
+		totalBenchCount := ops.CompareValuesAreInRangeUnsignedIntsBitsetSlow(input[:], fromBounds, toBounds, out)
 		if totalCount != totalBenchCount {
 			b.Fatalf("Benchmark failed: expected %d but got %d", totalCount, totalBenchCount)
 		}
