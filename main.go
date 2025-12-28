@@ -483,6 +483,8 @@ func main() {
 
 	multithreadWg.Wait()
 
+	m.Slabs.PrintBufferEffectivityReport()
+
 	cancelWorkers()
 
 }

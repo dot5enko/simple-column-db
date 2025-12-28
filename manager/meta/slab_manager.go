@@ -2,6 +2,9 @@ package meta
 
 import (
 	"fmt"
+	"log"
+	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +44,33 @@ type SlabManager struct {
 	meta *MetaManager
 
 	loadGroup singleflight.Group
+}
+
+// buffers report
+func printSingleBufferReport(name string, bufStats *cache.Stats) {
+	slog.Info("buffer effectivety report",
+		"size", bufStats.Size,
+		"total_reads", bufStats.Reads.Load(),
+		"returns", bufStats.Returns.Load(),
+		"wait_time_ns", time.Duration(bufStats.WaitTime.Load()),
+		"buf_name", name,
+	)
+}
+func (m *SlabManager) PrintBufferEffectivityReport() {
+
+	headerSize := 32
+
+	headerPart := strings.Repeat("-", headerSize)
+
+	log.Printf("%s%s%s", headerPart, "buffer effectivety", headerPart)
+
+	printSingleBufferReport("headerReaderBufferRing", m.headerReaderBufferRing.GetStats())
+	printSingleBufferReport("fullSlabBufferRing", m.fullSlabBufferRing.GetStats())
+	printSingleBufferReport("slabHeaderCache", m.slabHeaderCache.GetStats())
+	printSingleBufferReport("slabRuntimeCache", m.slabRuntimeCache.GetStats())
+
+	log.Println(headerPart)
+
 }
 
 // todo : remove const/literals, add config param
