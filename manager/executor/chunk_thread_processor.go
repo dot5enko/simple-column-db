@@ -7,6 +7,7 @@ import (
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
+	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/fatih/color"
 )
 
@@ -60,6 +61,18 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
 				globalChunkResult.ProcessedBlocks += taskRes.ProcessedBlocks
 				globalChunkResult.FullSkips += taskRes.FullSkips
+
+				// copy bitset to global result bitset
+				// perform selectors according to query
+
+				for idx := range query.ExecutorChunkSizeBlocks {
+
+					blockFilterMask := &threadCache.AbsBlockMaps[idx]
+
+					if blockFilterMask.Merges() == task.Plan.FilterSize {
+					}
+				}
+
 			}()
 
 			if processed == int32(curStatus.ChunksTotal) {

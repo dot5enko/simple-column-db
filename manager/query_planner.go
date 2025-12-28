@@ -315,6 +315,8 @@ func (qp *QueryPlanner) Plan(
 				curChunkObject := &chunks[chunkIdx]
 
 				if curChunkObject.ChunkSegmentsByFieldIndexMap == nil {
+
+					// include selector unique fields
 					curChunkObject.ChunkSegmentsByFieldIndexMap = make([][]query.Segment, fieldsCount)
 					curChunkObject.GlobalBlockOffset = uint64(chunkIdx) * query.ExecutorChunkSizeBlocks
 				}

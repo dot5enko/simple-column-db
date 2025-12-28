@@ -743,6 +743,27 @@ func CompareValuesAreInRangeFloats[T Floats](
 	return filled
 }
 
+//go:inline
+func b2u64(b bool) uint64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func mask8[T Floats](a []T, from, width T, base uint) uint64 {
+	var m uint64
+	m |= b2u64((a[0]-from) < width) << (base + 0)
+	m |= b2u64((a[1]-from) < width) << (base + 1)
+	m |= b2u64((a[2]-from) < width) << (base + 2)
+	m |= b2u64((a[3]-from) < width) << (base + 3)
+	m |= b2u64((a[4]-from) < width) << (base + 4)
+	m |= b2u64((a[5]-from) < width) << (base + 5)
+	m |= b2u64((a[6]-from) < width) << (base + 6)
+	m |= b2u64((a[7]-from) < width) << (base + 7)
+	return m
+}
+
 func CompareValuesAreInRangeFloatsBitsetUnrolled[T Floats](
 	arr []T, from, to T, out *bits.Bitfield,
 ) int {
@@ -750,210 +771,19 @@ func CompareValuesAreInRangeFloatsBitsetUnrolled[T Floats](
 	n := len(arr)
 	i := 0
 
+	width := to - from
+
 	for ; i+63 < n; i += 64 {
-		a := arr[i:] // bounds-check elimination
+		a := arr[i:]
 		var m uint64
-
-		if a[0] >= from && a[0] < to {
-			m |= 1 << 0
-		}
-		if a[1] >= from && a[1] < to {
-			m |= 1 << 1
-		}
-		if a[2] >= from && a[2] < to {
-			m |= 1 << 2
-		}
-		if a[3] >= from && a[3] < to {
-			m |= 1 << 3
-		}
-		if a[4] >= from && a[4] < to {
-			m |= 1 << 4
-		}
-		if a[5] >= from && a[5] < to {
-			m |= 1 << 5
-		}
-		if a[6] >= from && a[6] < to {
-			m |= 1 << 6
-		}
-		if a[7] >= from && a[7] < to {
-			m |= 1 << 7
-		}
-
-		if a[8] >= from && a[8] < to {
-			m |= 1 << 8
-		}
-		if a[9] >= from && a[9] < to {
-			m |= 1 << 9
-		}
-		if a[10] >= from && a[10] < to {
-			m |= 1 << 10
-		}
-		if a[11] >= from && a[11] < to {
-			m |= 1 << 11
-		}
-		if a[12] >= from && a[12] < to {
-			m |= 1 << 12
-		}
-		if a[13] >= from && a[13] < to {
-			m |= 1 << 13
-		}
-		if a[14] >= from && a[14] < to {
-			m |= 1 << 14
-		}
-		if a[15] >= from && a[15] < to {
-			m |= 1 << 15
-		}
-
-		if a[16] >= from && a[16] < to {
-			m |= 1 << 16
-		}
-		if a[17] >= from && a[17] < to {
-			m |= 1 << 17
-		}
-		if a[18] >= from && a[18] < to {
-			m |= 1 << 18
-		}
-		if a[19] >= from && a[19] < to {
-			m |= 1 << 19
-		}
-		if a[20] >= from && a[20] < to {
-			m |= 1 << 20
-		}
-		if a[21] >= from && a[21] < to {
-			m |= 1 << 21
-		}
-		if a[22] >= from && a[22] < to {
-			m |= 1 << 22
-		}
-		if a[23] >= from && a[23] < to {
-			m |= 1 << 23
-		}
-
-		if a[24] >= from && a[24] < to {
-			m |= 1 << 24
-		}
-		if a[25] >= from && a[25] < to {
-			m |= 1 << 25
-		}
-		if a[26] >= from && a[26] < to {
-			m |= 1 << 26
-		}
-		if a[27] >= from && a[27] < to {
-			m |= 1 << 27
-		}
-		if a[28] >= from && a[28] < to {
-			m |= 1 << 28
-		}
-		if a[29] >= from && a[29] < to {
-			m |= 1 << 29
-		}
-		if a[30] >= from && a[30] < to {
-			m |= 1 << 30
-		}
-		if a[31] >= from && a[31] < to {
-			m |= 1 << 31
-		}
-
-		if a[32] >= from && a[32] < to {
-			m |= 1 << 32
-		}
-		if a[33] >= from && a[33] < to {
-			m |= 1 << 33
-		}
-		if a[34] >= from && a[34] < to {
-			m |= 1 << 34
-		}
-		if a[35] >= from && a[35] < to {
-			m |= 1 << 35
-		}
-		if a[36] >= from && a[36] < to {
-			m |= 1 << 36
-		}
-		if a[37] >= from && a[37] < to {
-			m |= 1 << 37
-		}
-		if a[38] >= from && a[38] < to {
-			m |= 1 << 38
-		}
-		if a[39] >= from && a[39] < to {
-			m |= 1 << 39
-		}
-
-		if a[40] >= from && a[40] < to {
-			m |= 1 << 40
-		}
-		if a[41] >= from && a[41] < to {
-			m |= 1 << 41
-		}
-		if a[42] >= from && a[42] < to {
-			m |= 1 << 42
-		}
-		if a[43] >= from && a[43] < to {
-			m |= 1 << 43
-		}
-		if a[44] >= from && a[44] < to {
-			m |= 1 << 44
-		}
-		if a[45] >= from && a[45] < to {
-			m |= 1 << 45
-		}
-		if a[46] >= from && a[46] < to {
-			m |= 1 << 46
-		}
-		if a[47] >= from && a[47] < to {
-			m |= 1 << 47
-		}
-
-		if a[48] >= from && a[48] < to {
-			m |= 1 << 48
-		}
-		if a[49] >= from && a[49] < to {
-			m |= 1 << 49
-		}
-		if a[50] >= from && a[50] < to {
-			m |= 1 << 50
-		}
-		if a[51] >= from && a[51] < to {
-			m |= 1 << 51
-		}
-		if a[52] >= from && a[52] < to {
-			m |= 1 << 52
-		}
-		if a[53] >= from && a[53] < to {
-			m |= 1 << 53
-		}
-		if a[54] >= from && a[54] < to {
-			m |= 1 << 54
-		}
-		if a[55] >= from && a[55] < to {
-			m |= 1 << 55
-		}
-
-		if a[56] >= from && a[56] < to {
-			m |= 1 << 56
-		}
-		if a[57] >= from && a[57] < to {
-			m |= 1 << 57
-		}
-		if a[58] >= from && a[58] < to {
-			m |= 1 << 58
-		}
-		if a[59] >= from && a[59] < to {
-			m |= 1 << 59
-		}
-		if a[60] >= from && a[60] < to {
-			m |= 1 << 60
-		}
-		if a[61] >= from && a[61] < to {
-			m |= 1 << 61
-		}
-		if a[62] >= from && a[62] < to {
-			m |= 1 << 62
-		}
-		if a[63] >= from && a[63] < to {
-			m |= 1 << 63
-		}
-
+		m |= mask8(a[0:], from, width, 0)
+		m |= mask8(a[8:], from, width, 8)
+		m |= mask8(a[16:], from, width, 16)
+		m |= mask8(a[24:], from, width, 24)
+		m |= mask8(a[32:], from, width, 32)
+		m |= mask8(a[40:], from, width, 40)
+		m |= mask8(a[48:], from, width, 48)
+		m |= mask8(a[56:], from, width, 56)
 		out[i>>6] |= m
 	}
 

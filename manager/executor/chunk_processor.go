@@ -49,15 +49,14 @@ func preloadSlabHeaders(slabs *meta.SlabManager, plan *query.QueryPlan, blockChu
 	return nil
 }
 
-func ExecutePlanForChunk(cache *executortypes.ChunkExecutorThreadCache, sm *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) (ChunkFilterProcessResult, error) {
+func ExecutePlanForChunk(
+	cache *executortypes.ChunkExecutorThreadCache,
+	sm *meta.SlabManager,
+	plan *query.QueryPlan,
+	blockChunk *query.BlockChunk,
+) (ChunkFilterProcessResult, error) {
 
 	cache.Reset()
-
-	// preload all slabs that are in the chunk
-	// preloadErr := preloadChunks(sm, plan, blockChunk)
-	// if preloadErr != nil {
-	// 	return ChunkFilterProcessResult{}, fmt.Errorf("unable to preload chunks : %s", preloadErr.Error())
-	// }
 
 	// per field/slab processing
 	//

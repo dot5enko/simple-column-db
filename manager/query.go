@@ -80,7 +80,10 @@ func (sm *Manager) Query(
 
 	bChunksSize := len(plan.BlockChunks)
 
-	taskStatus := &executor.TaskStatus{ChunksTotal: bChunksSize}
+	taskStatus := &executor.TaskStatus{
+		ChunksTotal: bChunksSize,
+	}
+
 	taskStatus.Waiter.Add(1)
 
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
@@ -96,8 +99,8 @@ func (sm *Manager) Query(
 	}
 	timeBefore := time.Now()
 	taskStatus.Waiter.Wait()
-	waitTookMs := time.Since(timeBefore)
 
+	waitTookMs := time.Since(timeBefore)
 	queryTookMs := time.Since(before)
 
 	cummResult := taskStatus.ChunkResult
