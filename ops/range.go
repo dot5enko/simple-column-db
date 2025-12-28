@@ -1,6 +1,10 @@
 package ops
 
-import "github.com/dot5enko/simple-column-db/bits"
+import (
+	"unsafe"
+
+	"github.com/dot5enko/simple-column-db/bits"
+)
 
 type NumericTypes interface {
 	SignedInts | UnsignedInts | Floats
@@ -745,10 +749,7 @@ func CompareValuesAreInRangeFloats[T Floats](
 
 //go:inline
 func b2u64(b bool) uint64 {
-	if b {
-		return 1
-	}
-	return 0
+	return uint64(*(*uint8)(unsafe.Pointer(&b)))
 }
 
 func mask8[T Floats](a []T, from, width T, base uint) uint64 {
