@@ -4,12 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
+
+	"github.com/dot5enko/simple-column-db/perf"
 )
 
 type FileReader struct {
-	path   string
-	file   *os.File
-	opened bool
+	path      string
+	file      *os.File
+	opened    bool
+	perfStats *perf.PerformanceMetrics
 }
 
 func NewFileReader(path string) *FileReader {
@@ -19,6 +23,10 @@ func NewFileReader(path string) *FileReader {
 	}
 
 	return freader
+}
+
+func (f *FileReader) SetPerfStats(stats *perf.PerformanceMetrics) {
+	f.perfStats = stats
 }
 
 func (f *FileReader) Raw() *os.File {
@@ -58,7 +66,13 @@ func (f *FileReader) ReadAt(out []byte, off, length int) (err error) {
 	}
 
 	var readBytes int
+	t0 := time.Now()
 	readBytes, err = f.file.ReadAt(out[:length], int64(off))
+
+	if f.perfStats != nil {
+		took := time.Since(t0)
+		f.perfStats.IoTime += took
+	}
 
 	if readBytes != length {
 		err = fmt.Errorf("read bytes mismatch, wanted %d, got %d", length, readBytes)

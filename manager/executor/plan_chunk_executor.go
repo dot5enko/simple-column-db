@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/lists"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
@@ -26,6 +27,8 @@ type BlockMergerContext struct {
 	AbsBlockMaps []lists.IndiceUnmerged
 
 	QueryPlan *query.QueryPlan
+
+	IoTime time.Duration
 }
 
 func prepareBlockForMerger(
@@ -88,6 +91,7 @@ func prepareBlockForMerger(
 
 	if !fullSkipBlock {
 		// todo fix
+		// mergerContext.IoTime += time.Since(load)
 		blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
 
 		// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)

@@ -22,7 +22,7 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 		return slabHeader.Header, nil
 	} else {
 
-		v, err, _ := m.loadGroup.Do(slabUid.String(), func() (any, error) {
+		v, err, _ := m.rt.loadGroup.Do(slabUid.String(), func() (any, error) {
 
 			slabReadCache, slabCacheIdx := m.fullSlabBufferRing.Get()
 			headerReadBuffer, headerBufferIdx := m.headerReaderBufferRing.Get()
@@ -37,14 +37,14 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 			// slog.Info("loading slab to cache from disk", "slab_uid", slabUid.String())
 
 			fileReader, openErr := m.GetSlabFile(*schemaObject, slabUid, false)
+			fileReader.SetPerfStats(m.session)
+
 			if openErr != nil {
 				return nil, openErr
 			} else {
 				defer fileReader.Close()
 
-				// readStart := time.Now()
 				headerReadErr := fileReader.ReadAt(headerReadBuffer, 0, int(schema.SlabHeaderFixedSize))
-				// slog.Info("read slab from disk", "slab_uid", slabUid.String())
 
 				if headerReadErr != nil {
 					return nil, fmt.Errorf("unable to read slab header : %s", headerReadErr.Error())
@@ -98,10 +98,10 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 
 					}
 
-					m.slabHeaderCacheLocker.Lock()
-					defer m.slabHeaderCacheLocker.Unlock()
+					m.rt.slabHeaderCacheLocker.Lock()
+					defer m.rt.slabHeaderCacheLocker.Unlock()
 
-					m.slabHeaderCacheItem[slabUid] = &cache.SlabCacheItem{
+					m.rt.slabHeaderCacheItem[slabUid] = &cache.SlabCacheItem{
 						CacheEntryId: headerCacheEntryId,
 						Header:       result,
 						RtStats:      &cache.CacheStats{Created: time.Now()},
@@ -141,7 +141,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 	// fix key construction, do not use allocations
 	key := "d-" + uid.String()
 
-	v, err, _ := m.loadGroup.Do(key, func() (any, error) {
+	v, err, _ := m.rt.loadGroup.Do(key, func() (any, error) {
 
 		// read compressed data
 		allBlocksHeaderSize := int(result.BlocksTotal) * int(schema.TotalHeaderSize)
@@ -151,6 +151,8 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		if openErr != nil {
 			return nil, openErr
 		}
+
+		fileReader.SetPerfStats(m.session)
 
 		defer fileReader.Close()
 		item, slabId := m.slabRuntimeCache.Get()
@@ -186,10 +188,10 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 				}
 			}
 
-			m.slabDataCacheLocker.Lock()
-			defer m.slabDataCacheLocker.Unlock()
+			m.rt.slabDataCacheLocker.Lock()
+			defer m.rt.slabDataCacheLocker.Unlock()
 
-			m.slabDataCache[uid] = item
+			m.rt.slabDataCache[uid] = item
 
 			return item, nil
 		}

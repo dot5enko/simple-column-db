@@ -10,6 +10,7 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
+	"github.com/dot5enko/simple-column-db/perf"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 	"golang.org/x/sync/singleflight"
@@ -22,10 +23,7 @@ type BlockCacheItem struct {
 	rtStats *cache.CacheStats
 }
 
-type SlabManager struct {
-	storagePath string
-
-	// runtime cache
+type SlabManagerRuntimeCache struct {
 	cache  map[[32]byte]BlockCacheItem
 	locker sync.RWMutex
 
@@ -35,6 +33,15 @@ type SlabManager struct {
 	slabDataCache       map[uuid.UUID]*cache.SlabDataCacheItem
 	slabDataCacheLocker sync.RWMutex
 
+	loadGroup singleflight.Group
+}
+
+type SlabManager struct {
+	storagePath string
+
+	// runtime cache
+	rt *SlabManagerRuntimeCache
+
 	// buffers
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
@@ -43,7 +50,29 @@ type SlabManager struct {
 
 	meta *MetaManager
 
-	loadGroup singleflight.Group
+	session *perf.PerformanceMetrics
+}
+
+// copy with session
+func (sm *SlabManager) NewSession() *SlabManager {
+	newSm := &SlabManager{
+		storagePath:            sm.storagePath,
+		rt:                     sm.rt,
+		headerReaderBufferRing: sm.headerReaderBufferRing,
+		fullSlabBufferRing:     sm.fullSlabBufferRing,
+		slabHeaderCache:        sm.slabHeaderCache,
+		slabRuntimeCache:       sm.slabRuntimeCache,
+		meta:                   sm.meta,
+		session: &perf.PerformanceMetrics{
+			IoTime: time.Duration(0),
+		},
+	}
+
+	return newSm
+}
+
+func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
+	return sm.session
 }
 
 // buffers report
@@ -75,12 +104,15 @@ func (m *SlabManager) PrintBufferEffectivityReport() {
 
 // todo : remove const/literals, add config param
 func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
+
 	sm := &SlabManager{
-		storagePath:         storagePath,
-		cache:               map[[32]byte]BlockCacheItem{},
-		slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
-		slabDataCache:       map[uuid.UUID]*cache.SlabDataCacheItem{},
-		meta:                meta,
+		storagePath: storagePath,
+		rt: &SlabManagerRuntimeCache{
+			cache:               map[[32]byte]BlockCacheItem{},
+			slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
+			slabDataCache:       map[uuid.UUID]*cache.SlabDataCacheItem{},
+		},
+		meta: meta,
 	}
 
 	// 1slab = ±10MB ram
@@ -101,10 +133,10 @@ func (m *SlabManager) GetSlabHeaderFromCache(uid uuid.UUID) *cache.SlabCacheItem
 }
 func (m *SlabManager) getSlabHeaderFromCache(uid uuid.UUID) *cache.SlabCacheItem {
 
-	m.slabHeaderCacheLocker.RLock()
-	defer m.slabHeaderCacheLocker.RUnlock()
+	m.rt.slabHeaderCacheLocker.RLock()
+	defer m.rt.slabHeaderCacheLocker.RUnlock()
 
-	if item, ok := m.slabHeaderCacheItem[uid]; ok {
+	if item, ok := m.rt.slabHeaderCacheItem[uid]; ok {
 
 		item.RtStats.Reads++
 		return item
@@ -115,10 +147,10 @@ func (m *SlabManager) getSlabHeaderFromCache(uid uuid.UUID) *cache.SlabCacheItem
 
 func (m *SlabManager) getSlabDataFromCache(uid uuid.UUID) *cache.SlabDataCacheItem {
 
-	m.slabDataCacheLocker.RLock()
-	defer m.slabDataCacheLocker.RUnlock()
+	m.rt.slabDataCacheLocker.RLock()
+	defer m.rt.slabDataCacheLocker.RUnlock()
 
-	if item, ok := m.slabDataCache[uid]; ok {
+	if item, ok := m.rt.slabDataCache[uid]; ok {
 
 		item.RtStats.Reads++
 		return item
@@ -141,12 +173,12 @@ func GetUniqueBlockId(slab, block uuid.UUID) [32]byte {
 
 func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
-	m.locker.RLock()
-	defer m.locker.RUnlock()
+	m.rt.locker.RLock()
+	defer m.rt.locker.RUnlock()
 
 	uid := GetUniqueBlockId(slab, block)
 
-	if item, ok := m.cache[uid]; ok {
+	if item, ok := m.rt.cache[uid]; ok {
 
 		// log.Printf(" --- reading block %s from cache : %d", block.String(), item.rtStats.Reads)
 
@@ -203,20 +235,17 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			}
 
 			blockRawData := slabData.Data[blockStartOffset:]
-
-			// log.Printf(" --- loading %s block. blockHeader.StartOffset:%d", blockHeader.Uid.String(), blockHeader.StartOffset)
-
 			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, &blockHeader)
 
 			if runtimeDecodeErr != nil {
 				return nil, fmt.Errorf("unable to decoded raw block data for slab %s. block %s: %s", slab.Uid.String(), block.String(), runtimeDecodeErr.Error())
 			} else {
-				m.locker.Lock()
-				defer m.locker.Unlock()
+				m.rt.locker.Lock()
+				defer m.rt.locker.Unlock()
 
 				blockId := GetUniqueBlockId(slab.Uid, block)
 
-				m.cache[blockId] = BlockCacheItem{
+				m.rt.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
 					rtStats: &cache.CacheStats{CacheEntryId: slabData.RtStats.CacheEntryId, Created: time.Now(), Reads: 1},

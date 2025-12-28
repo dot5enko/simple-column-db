@@ -23,6 +23,8 @@ type ChunkFilterProcessResult struct {
 	PureLock           time.Duration
 	TotalQueryDuration time.Duration
 
+	IoTime time.Duration
+
 	TotalChunks int
 }
 

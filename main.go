@@ -419,11 +419,12 @@ func main() {
 					"skips_all", cummResult.FullSkips,
 					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
 					"matched", cummResult.TotalItems,
-					"took_ms", fmt.Sprintf("%.2f", cummResult.TotalQueryDuration.Seconds()*1000),
-					"wait_ms", fmt.Sprintf("%.2f", cummResult.PureLock.Seconds()*1000),
-					"chunks", cummResult.TotalChunks,
-					"chunk_lock", cummResult.LockTook.Nanoseconds(),
-					"task_chunk_lock", totalCoordinationLock,
+					"took", cummResult.TotalQueryDuration,
+					"wait", cummResult.PureLock,
+					"n_chunks", cummResult.TotalChunks,
+					"chunk_lock", cummResult.LockTook,
+					"coordination_lock", totalCoordinationLock,
+					"io", cummResult.IoTime,
 				)
 			}
 

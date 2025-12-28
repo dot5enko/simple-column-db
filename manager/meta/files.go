@@ -47,7 +47,5 @@ func (sm *SlabManager) GetSlabFile(s schema.Schema, id uuid.UUID, writeAccess bo
 	fileManager := io.NewFileReader(slabPath)
 	openErr := fileManager.Open(!writeAccess)
 
-	// log.Printf(" --- opening[write:%v] : %s", writeAccess, slabPath)
-
 	return fileManager, openErr
 }

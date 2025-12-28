@@ -18,7 +18,6 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	for task := range tasksQueue {
 
 		curStatus := task.Status
-
 		start := time.Now()
 
 		if curStatus.Err.Load() {
@@ -31,7 +30,9 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			continue
 		}
 
-		taskRes, err := ExecutePlanForChunk(threadCache, slabManager, task.Plan, task.Bchunk)
+		sManager := slabManager.NewSession()
+
+		taskRes, err := ExecutePlanForChunk(threadCache, sManager, task.Plan, task.Bchunk)
 		if err != nil {
 			curStatus.Err.Store(true)
 			curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
@@ -55,12 +56,15 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 				globalChunkResult := &curStatus.ChunkResult
 
+				session := sManager.GetSession()
+
 				globalChunkResult.LockTook += lockTook
 				globalChunkResult.TotalItems += taskRes.TotalItems
 				globalChunkResult.WastedMerges += taskRes.WastedMerges
 				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
 				globalChunkResult.ProcessedBlocks += taskRes.ProcessedBlocks
 				globalChunkResult.FullSkips += taskRes.FullSkips
+				globalChunkResult.IoTime += session.IoTime
 
 				// copy bitset to global result bitset
 				// perform selectors according to query
