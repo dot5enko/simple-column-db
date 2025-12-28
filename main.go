@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"runtime/pprof"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,9 +21,7 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
-
-	"net/http"
-	_ "net/http/pprof"
+	"github.com/google/uuid"
 )
 
 func testCycles(n int, label string, testSize int, cb func()) {
@@ -93,16 +93,28 @@ func main() {
 
 	flag.Parse()
 
-	waiter := sync.WaitGroup{}
-	waiter.Add(1)
+	var cpuProfileFile *os.File
 
 	if *pprofEnabled {
-		go func() {
-			defer func() {
-				waiter.Done()
-				log.Printf(" >> done pprof server")
-			}()
-			log.Println(http.ListenAndServe("localhost:6060", nil))
+
+		uuid := uuid.New().String()
+
+		profileName := fmt.Sprintf("./cpu.%s.pprof", strings.ReplaceAll(uuid, "-", ""))
+
+		var createErr error
+		cpuProfileFile, createErr = os.Create(profileName)
+
+		if createErr != nil {
+			panic(fmt.Sprintf("unable to create profile file : %s", createErr.Error()))
+		}
+
+		pprof.StartCPUProfile(cpuProfileFile)
+		defer func() {
+			pprof.StopCPUProfile()
+			cpuProfileFile.Close()
+
+			slog.Info("cpu profile written", "file_name", profileName)
+
 		}()
 	}
 
@@ -470,11 +482,6 @@ func main() {
 	color.Yellow("waiting for the tests done...")
 
 	multithreadWg.Wait()
-
-	if *pprofEnabled {
-		waiter.Wait()
-
-	}
 
 	cancelWorkers()
 
