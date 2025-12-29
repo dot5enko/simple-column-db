@@ -24,7 +24,7 @@ type BlockCacheItem struct {
 }
 
 type SlabManagerRuntimeCache struct {
-	cache  map[[32]byte]BlockCacheItem
+	cache  sync.Map
 	locker sync.RWMutex
 
 	slabHeaderCacheItem   map[uuid.UUID]*cache.SlabCacheItem
@@ -108,7 +108,6 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	sm := &SlabManager{
 		storagePath: storagePath,
 		rt: &SlabManagerRuntimeCache{
-			cache:               map[[32]byte]BlockCacheItem{},
 			slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
 			slabDataCache:       map[uuid.UUID]*cache.SlabDataCacheItem{},
 		},
@@ -178,7 +177,11 @@ func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
 	uid := GetUniqueBlockId(slab, block)
 
-	if item, ok := m.rt.cache[uid]; ok {
+	itemA, ok := m.rt.cache.Load(uid)
+
+	if ok {
+
+		item := itemA.(BlockCacheItem)
 
 		// log.Printf(" --- reading block %s from cache : %d", block.String(), item.rtStats.Reads)
 
@@ -240,16 +243,14 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 			if runtimeDecodeErr != nil {
 				return nil, fmt.Errorf("unable to decoded raw block data for slab %s. block %s: %s", slab.Uid.String(), block.String(), runtimeDecodeErr.Error())
 			} else {
-				m.rt.locker.Lock()
-				defer m.rt.locker.Unlock()
 
 				blockId := GetUniqueBlockId(slab.Uid, block)
 
-				m.rt.cache[blockId] = BlockCacheItem{
+				m.rt.cache.Store(blockId, BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
 					rtStats: &cache.CacheStats{CacheEntryId: slabData.RtStats.CacheEntryId, Created: time.Now(), Reads: 1},
-				}
+				})
 
 				return runtimeBlockData, nil
 			}

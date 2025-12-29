@@ -60,9 +60,6 @@ func ExecutePlanForChunk(
 
 	cache.Reset()
 
-	// runtime.LockOSThread()
-	// defer runtime.UnlockOSThread()
-
 	// per field/slab processing
 	//
 	// could be parallelized

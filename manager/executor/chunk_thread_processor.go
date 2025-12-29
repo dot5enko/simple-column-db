@@ -3,7 +3,6 @@ package executor
 import (
 	"fmt"
 	"log/slog"
-	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -17,12 +16,14 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 	threadCache := &executortypes.ChunkExecutorThreadCache{}
 
+	// runtime.LockOSThread()
+	// defer runtime.UnlockOSThread()
+
 	for {
 
 		task, ok := tasksQueue.Pop()
 		if !ok {
 			// todo profile ?
-			runtime.Gosched()
 			continue
 		}
 
