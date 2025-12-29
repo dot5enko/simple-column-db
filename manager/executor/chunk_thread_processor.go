@@ -24,6 +24,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 		task, ok := tasksQueue.Pop()
 		if !ok {
 			// todo profile ?
+
 			continue
 		}
 

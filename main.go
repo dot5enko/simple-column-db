@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"runtime/pprof"
 	"runtime/trace"
 	"slices"
 	"strings"
@@ -93,6 +94,8 @@ func main() {
 
 	flag.Parse()
 
+	var cpuProfileFile *os.File
+
 	if *pprofEnabled {
 
 		uuid := uuid.New().String()
@@ -103,14 +106,16 @@ func main() {
 			return fmt.Sprintf("./%s.%s.pprof", prefix, uidPrepared)
 		}
 
+		profileName := profName("cpu")
+
 		var createErr error
-		// cpuProfileFile, createErr := os.Create(profName("cpu"))
+		cpuProfileFile, createErr = os.Create(profileName)
 
 		if createErr != nil {
 			panic(fmt.Sprintf("unable to create profile file : %s", createErr.Error()))
 		}
 
-		// pprof.StartCPUProfile(cpuProfileFile)
+		pprof.StartCPUProfile(cpuProfileFile)
 
 		ftrace, _ := os.Create(profName("trace"))
 		trace.Start(ftrace)
@@ -122,15 +127,14 @@ func main() {
 
 		defer func() {
 
-			// pprof.StopCPUProfile()
-			// cpuProfileFile.Close()
-
+			pprof.StopCPUProfile()
+			cpuProfileFile.Close()
 			trace.Stop()
 			ftrace.Close()
 
 			// pprof.Lookup("block").WriteTo(fblock, 0)
 
-			slog.Info("profile written", "file_name", uidPrepared)
+			slog.Info("cpu profile written", "file_name", profileName)
 
 		}()
 	}
@@ -169,9 +173,220 @@ func main() {
 
 	m.StartWorkers(workersCtx)
 
-	totalCoordinationLock := time.Duration(0)
+	fromNowFilter := func(offset time.Duration, fieldName string) query.FilterCondition {
 
-	predefinedFilters := gen_test_filters()
+		tnow := time.Now()
+
+		return query.FilterCondition{
+			Field:     fieldName,
+			Operand:   query.RANGE,
+			Arguments: []any{uint64(tnow.Add(-offset).Unix()), uint64(tnow.Unix())},
+		}
+	}
+
+	year := time.Hour * 24 * 30 * 12
+	month := time.Hour * 24 * 30
+
+	predefinedFilters := [][]query.FilterCondition{
+
+		{
+			fromNowFilter(year*4, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.RANGE,
+				Arguments: []any{uint64(4), uint64(6)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.4999)},
+			},
+			// {
+			// 	Field:     "value",
+			// 	Operand:   query.LT,
+			// 	Arguments: []any{float32(0.4999)},
+			// },
+		},
+
+		{
+			fromNowFilter(year*4, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(4)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.6999)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.8)},
+			},
+		},
+		{
+			fromNowFilter(year*4, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(4)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.6999)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.8)},
+			},
+		},
+		{
+			fromNowFilter(year*4, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(6)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.6499)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.7)},
+			},
+		},
+		{
+			fromNowFilter(year*4, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(5)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.6499)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.75)},
+			},
+		},
+
+		{
+			fromNowFilter(year, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(4)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.GT,
+				Arguments: []any{float32(0.75)},
+			},
+		},
+		{
+			fromNowFilter(year, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(4)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.75)},
+			},
+		},
+		{
+			fromNowFilter(year, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(5)},
+			},
+		},
+		{
+			fromNowFilter(month*8, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(6)},
+			},
+		},
+		{
+			fromNowFilter(month*32, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(7)},
+			},
+		},
+		{
+			fromNowFilter(month*24, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(2)},
+			},
+		},
+		{
+			fromNowFilter(month*24, "created_at"),
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(1)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.6)},
+			},
+		},
+		{
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(1)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.LT,
+				Arguments: []any{float32(0.6)},
+			},
+		},
+		{
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(6)},
+			},
+			{
+				Field:     "value",
+				Operand:   query.RANGE,
+				Arguments: []any{float32(0.65), float32(0.75)},
+			},
+		},
+		{
+			{
+				Field:     "monitor_id",
+				Operand:   query.EQ,
+				Arguments: []any{uint64(1)},
+			},
+		},
+		{
+			fromNowFilter(month*24, "created_at"),
+		},
+	}
 
 	predefinedFiltersLen := len(predefinedFilters)
 
@@ -191,7 +406,7 @@ func main() {
 		return &item
 	}
 
-	performQueryWithFilter := func(filter []query.FilterCondition, testIdx int, groupResults *GroupResults) {
+	performQueryWithFilter := func(filter []query.FilterCondition, testIdx int) *manager.QueryResult {
 		result, qerr := m.Query(testSchemaName, query.Query{
 			Filter: filter,
 			Select: []query.Selector{
@@ -209,14 +424,33 @@ func main() {
 		if qerr != nil {
 			panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
 		} else {
+			return result
+		}
+	}
 
-			cummResult := result.Metrics
+	testLoopWithOffset := func(name string, filterOffset int, wg *sync.WaitGroup) {
 
-			totalCoordinationLock += time.Duration(cummResult.LockTook)
+		defer wg.Done()
 
-			groupResults.locks[testIdx] = time.Duration(cummResult.LockTook)
-			groupResults.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
-			groupResults.planTook[testIdx] = time.Duration(cummResult.PlanTook)
+		groupMetrics := initGroupResults()
+
+		results := make([]*manager.QueryResult, testN)
+
+		for i := 0; i < testN; i++ {
+			go func() {
+				results[i] = performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i)
+			}()
+		}
+
+		time.Sleep(time.Millisecond * 2000)
+
+		// results processing.
+		for testIdx, result := range results {
+
+			cummResult := result.GetMetrics()
+
+			groupMetrics.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
+			groupMetrics.planTook[testIdx] = time.Duration(cummResult.PlanTook)
 
 			if testN < 100 {
 
@@ -228,24 +462,10 @@ func main() {
 					"took", time.Duration(cummResult.TotalQueryDuration),
 					"wait", time.Duration(cummResult.PureLock),
 					"n_chunks", cummResult.TotalChunks,
-					"chunk_lock", time.Duration(cummResult.LockTook),
-					"coordination_lock", time.Duration(totalCoordinationLock),
 					"io", time.Duration(cummResult.IoTime),
 				)
 
 			}
-
-		}
-	}
-
-	testLoopWithOffset := func(name string, filterOffset int, wg *sync.WaitGroup) {
-
-		defer wg.Done()
-
-		groupMetrics := initGroupResults()
-
-		for i := 0; i < testN; i++ {
-			performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i, groupMetrics)
 		}
 
 		if testN > 1 {
@@ -274,7 +494,6 @@ func main() {
 
 			}
 
-			calcPS("lock "+name, groupMetrics.locks)
 			calcPS("dura "+name, groupMetrics.totalDuration)
 			calcPS("plan "+name, groupMetrics.planTook)
 		}

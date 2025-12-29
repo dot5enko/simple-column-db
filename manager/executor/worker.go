@@ -3,6 +3,7 @@ package executor
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -18,6 +19,8 @@ type TaskStatus struct {
 	ChunkResult ChunkFilterProcessResult
 
 	Waiter sync.WaitGroup
+
+	StartTime time.Time
 }
 
 type ChunkProcessingTask struct {
