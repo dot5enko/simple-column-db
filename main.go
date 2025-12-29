@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
-	"runtime/pprof"
 	"runtime/trace"
 	"slices"
 	"strings"
@@ -94,8 +93,6 @@ func main() {
 
 	flag.Parse()
 
-	var cpuProfileFile *os.File
-
 	if *pprofEnabled {
 
 		uuid := uuid.New().String()
@@ -106,16 +103,14 @@ func main() {
 			return fmt.Sprintf("./%s.%s.pprof", prefix, uidPrepared)
 		}
 
-		profileName := profName("cpu")
-
 		var createErr error
-		cpuProfileFile, createErr = os.Create(profileName)
+		// cpuProfileFile, createErr := os.Create(profName("cpu"))
 
 		if createErr != nil {
 			panic(fmt.Sprintf("unable to create profile file : %s", createErr.Error()))
 		}
 
-		pprof.StartCPUProfile(cpuProfileFile)
+		// pprof.StartCPUProfile(cpuProfileFile)
 
 		ftrace, _ := os.Create(profName("trace"))
 		trace.Start(ftrace)
@@ -127,21 +122,23 @@ func main() {
 
 		defer func() {
 
-			pprof.StopCPUProfile()
-			cpuProfileFile.Close()
+			// pprof.StopCPUProfile()
+			// cpuProfileFile.Close()
+
 			trace.Stop()
 			ftrace.Close()
 
 			// pprof.Lookup("block").WriteTo(fblock, 0)
 
-			slog.Info("cpu profile written", "file_name", profileName)
+			slog.Info("profile written", "file_name", uidPrepared)
 
 		}()
 	}
 
 	m := manager.New(manager.ManagerConfig{
-		PathToStorage: "./storage",
-		CacheMaxBytes: 0,
+		PathToStorage:                "./storage",
+		CacheMaxBytes:                0,
+		ExecutorsMaxConcurentThreads: *workerThreads,
 	})
 
 	testSchemaName := "health_cheks_"
@@ -170,224 +167,11 @@ func main() {
 
 	workersCtx, cancelWorkers := context.WithCancel(context.Background())
 
-	m.StartWorkers(*workerThreads, workersCtx)
+	m.StartWorkers(workersCtx)
 
 	totalCoordinationLock := time.Duration(0)
 
-	fromNowFilter := func(offset time.Duration, fieldName string) query.FilterCondition {
-
-		tnow := time.Now()
-
-		return query.FilterCondition{
-			Field:     fieldName,
-			Operand:   query.RANGE,
-			Arguments: []any{uint64(tnow.Add(-offset).Unix()), uint64(tnow.Unix())},
-		}
-	}
-
-	year := time.Hour * 24 * 30 * 12
-	month := time.Hour * 24 * 30
-
-	predefinedFilters := [][]query.FilterCondition{
-
-		{
-			fromNowFilter(year*4, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.RANGE,
-				Arguments: []any{uint64(4), uint64(6)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.4999)},
-			},
-			// {
-			// 	Field:     "value",
-			// 	Operand:   query.LT,
-			// 	Arguments: []any{float32(0.4999)},
-			// },
-		},
-
-		{
-			fromNowFilter(year*4, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(4)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.6999)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.8)},
-			},
-		},
-		{
-			fromNowFilter(year*4, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(4)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.6999)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.8)},
-			},
-		},
-		{
-			fromNowFilter(year*4, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(6)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.6499)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.7)},
-			},
-		},
-		{
-			fromNowFilter(year*4, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(5)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.6499)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.75)},
-			},
-		},
-
-		{
-			fromNowFilter(year, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(4)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.GT,
-				Arguments: []any{float32(0.75)},
-			},
-		},
-		{
-			fromNowFilter(year, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(4)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.75)},
-			},
-		},
-		{
-			fromNowFilter(year, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(5)},
-			},
-		},
-		{
-			fromNowFilter(month*8, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(6)},
-			},
-		},
-		{
-			fromNowFilter(month*32, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(7)},
-			},
-		},
-		{
-			fromNowFilter(month*24, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(2)},
-			},
-		},
-		{
-			fromNowFilter(month*24, "created_at"),
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(1)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.6)},
-			},
-		},
-		{
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(1)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.LT,
-				Arguments: []any{float32(0.6)},
-			},
-		},
-		{
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(6)},
-			},
-			{
-				Field:     "value",
-				Operand:   query.RANGE,
-				Arguments: []any{float32(0.65), float32(0.75)},
-			},
-		},
-		{
-			{
-				Field:     "monitor_id",
-				Operand:   query.EQ,
-				Arguments: []any{uint64(1)},
-			},
-		},
-		{
-			fromNowFilter(month*24, "created_at"),
-		},
-	}
+	predefinedFilters := gen_test_filters()
 
 	predefinedFiltersLen := len(predefinedFilters)
 

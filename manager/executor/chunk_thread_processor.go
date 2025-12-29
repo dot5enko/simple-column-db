@@ -3,19 +3,28 @@ package executor
 import (
 	"fmt"
 	"log/slog"
+	"runtime"
 	"sync/atomic"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/lightsync"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/fatih/color"
 )
 
-func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
+func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue *lightsync.RingQueue[ChunkProcessingTask]) {
 
 	threadCache := &executortypes.ChunkExecutorThreadCache{}
 
-	for task := range tasksQueue {
+	for {
+
+		task, ok := tasksQueue.Pop()
+		if !ok {
+			// todo profile ?
+			runtime.Gosched()
+			continue
+		}
 
 		curStatus := task.Status
 		start := time.Now()

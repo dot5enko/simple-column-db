@@ -88,7 +88,7 @@ func (sm *Manager) Query(
 	taskStatus.Waiter.Add(1)
 
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
-		sm.chunksQueue <- &executor.ChunkProcessingTask{
+		sm.SubmitTask(executor.ChunkProcessingTask{
 			Bchunk: &plan.BlockChunks[bChunkIdx],
 			Slabs:  sm.Slabs,
 			Plan:   &plan,
@@ -96,7 +96,7 @@ func (sm *Manager) Query(
 			ChunkIdx: bChunkIdx,
 
 			Status: taskStatus,
-		}
+		})
 	}
 	timeBefore := time.Now()
 	taskStatus.Waiter.Wait()

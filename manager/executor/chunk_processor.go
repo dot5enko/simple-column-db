@@ -3,7 +3,6 @@ package executor
 import (
 	"fmt"
 	"log/slog"
-	"runtime"
 	"time"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
@@ -59,10 +58,10 @@ func ExecutePlanForChunk(
 	blockChunk *query.BlockChunk,
 ) (ChunkFilterProcessResult, error) {
 
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
 	cache.Reset()
+
+	// runtime.LockOSThread()
+	// defer runtime.UnlockOSThread()
 
 	// per field/slab processing
 	//

@@ -2,7 +2,9 @@ package manager
 
 import (
 	"runtime"
+	"sync/atomic"
 
+	"github.com/dot5enko/simple-column-db/lightsync"
 	"github.com/dot5enko/simple-column-db/manager/executor"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -25,19 +27,33 @@ type Manager struct {
 
 	queryOptions query.QueryOptions
 
-	chunksQueue chan *executor.ChunkProcessingTask
+	jobs atomic.Uint64
+
+	workerQueues []*lightsync.RingQueue[executor.ChunkProcessingTask]
 }
 
 func (m *Manager) SetQueryOptions(qopts query.QueryOptions) {
 	m.queryOptions = qopts
 }
 
+// submit chunk to workers
+func (m *Manager) SubmitTask(task executor.ChunkProcessingTask) {
+
+	// resize if too much waiting ?
+
+	idx := m.jobs.Add(1) % uint64(m.config.ExecutorsMaxConcurentThreads)
+
+	for !m.workerQueues[idx].Push(task) {
+		runtime.Gosched()
+	}
+
+}
+
 func New(config ManagerConfig) *Manager {
 
 	man := &Manager{
-		Planner:     NewQueryPlanner(),
-		Meta:        meta.NewMetaManager(config.PathToStorage),
-		chunksQueue: make(chan *executor.ChunkProcessingTask, 100),
+		Planner: NewQueryPlanner(),
+		Meta:    meta.NewMetaManager(config.PathToStorage),
 	}
 
 	man.Slabs = meta.NewSlabManager(config.PathToStorage, man.Meta)
