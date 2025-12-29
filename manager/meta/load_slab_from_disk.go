@@ -53,7 +53,7 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 					// ioTime := time.Since(readStart).Seconds()
 
 					var headerCacheEntryId uint16
-					result, headerCacheEntryId = m.slabHeaderCache.Get()
+					result = m.slabHeaderCache.Get()
 
 					headerBytes := bytes.NewReader(headerReadBuffer)
 					headerParseErr := result.FromBytes(headerBytes)
@@ -155,12 +155,11 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		fileReader.SetPerfStats(m.session)
 
 		defer fileReader.Close()
-		item, slabId := m.slabRuntimeCache.Get()
+		item := m.slabRuntimeCache.Get()
 
 		// todo improve this part
 		// should be done on .Get inside RingBuffer
 		item.Reset()
-		item.RtStats.CacheEntryId = slabId
 
 		// at this point we need to lock slab's data for reading
 		// as it may be compressed
