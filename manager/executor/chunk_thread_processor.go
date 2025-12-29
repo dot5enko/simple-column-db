@@ -69,6 +69,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			// }
 
 			if processed == int32(curStatus.ChunksTotal) {
+				globalChunkResult.TotalQueryDuration = time.Since(task.Status.StartTime)
 				curStatus.Waiter.Done()
 			}
 

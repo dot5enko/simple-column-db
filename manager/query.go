@@ -42,9 +42,37 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 type QueryResult struct {
 	Data map[string][]any
 
-	Metrics executor.ChunkFilterProcessResult
+	finalized bool
+	metrics   executor.ChunkFilterProcessResult
+
+	task *executor.TaskStatus
 
 	Error error
+}
+
+func (q *QueryResult) GetMetrics() executor.ChunkFilterProcessResult {
+
+	if !q.finalized {
+		q.Wait()
+	}
+
+	return q.metrics
+}
+
+func (q *QueryResult) Wait() {
+
+	taskStatus := q.task
+
+	timeBefore := time.Now()
+	taskStatus.Waiter.Wait()
+	waitTookMs := time.Since(timeBefore)
+
+	cummResult := taskStatus.ChunkResult
+
+	cummResult.PureLock = waitTookMs.Nanoseconds()
+
+	q.finalized = true
+	q.metrics = cummResult
 }
 
 func (sm *Manager) Query(
@@ -55,8 +83,6 @@ func (sm *Manager) Query(
 
 	before := time.Now()
 	result := &QueryResult{}
-
-	// var indicesResultCache [schema.BlockRowsSize]uint16
 
 	schemaObject := sm.Meta.GetSchema(schemaName)
 	if schemaObject == nil {
@@ -72,8 +98,6 @@ func (sm *Manager) Query(
 
 	planTime := time.Since(before)
 
-	// discard non intersecting blocks from the plan
-
 	if planErr != nil {
 		return nil, fmt.Errorf("unable to construct query execution plan : %s", planErr.Error())
 	}
@@ -81,8 +105,11 @@ func (sm *Manager) Query(
 	bChunksSize := len(plan.BlockChunks)
 
 	taskStatus := &executor.TaskStatus{
+		StartTime:   time.Now(),
 		ChunksTotal: bChunksSize,
 	}
+	taskStatus.ChunkResult.PlanTook = planTime.Nanoseconds()
+	taskStatus.ChunkResult.TotalChunks = int64(bChunksSize)
 
 	// taskStatus.Waiter.SetSleepStep(time.Microsecond * 500)
 	taskStatus.Waiter.Add(1)
@@ -98,20 +125,8 @@ func (sm *Manager) Query(
 			Status: taskStatus,
 		}
 	}
-	timeBefore := time.Now()
-	taskStatus.Waiter.Wait()
 
-	waitTookMs := time.Since(timeBefore)
-	queryTookMs := time.Since(before)
-
-	cummResult := taskStatus.ChunkResult
-
-	cummResult.PureLock = waitTookMs.Nanoseconds()
-	cummResult.TotalQueryDuration = queryTookMs.Nanoseconds()
-	cummResult.PlanTook = planTime.Nanoseconds()
-	cummResult.TotalChunks = int64(bChunksSize)
-
-	result.Metrics = cummResult
+	result.task = taskStatus
 
 	return result, nil
 }

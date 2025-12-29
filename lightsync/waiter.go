@@ -50,7 +50,6 @@ func (w *Waiter) Wait() error {
 
 		w.wasted.Add(1)
 		time.Sleep(w.sleepStep)
-
 	}
 
 	return nil

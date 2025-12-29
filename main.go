@@ -405,7 +405,7 @@ func main() {
 		return &item
 	}
 
-	performQueryWithFilter := func(filter []query.FilterCondition, testIdx int, groupResults *GroupResults) {
+	performQueryWithFilter := func(filter []query.FilterCondition, testIdx int) *manager.QueryResult {
 		result, qerr := m.Query(testSchemaName, query.Query{
 			Filter: filter,
 			Select: []query.Selector{
@@ -423,11 +423,31 @@ func main() {
 		if qerr != nil {
 			panic(fmt.Sprintf("unable to get data out of schema: %s", qerr.Error()))
 		} else {
+			return result
+		}
+	}
 
-			cummResult := result.Metrics
+	testLoopWithOffset := func(name string, filterOffset int, wg *sync.WaitGroup) {
 
-			groupResults.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
-			groupResults.planTook[testIdx] = time.Duration(cummResult.PlanTook)
+		defer wg.Done()
+
+		groupMetrics := initGroupResults()
+
+		results := make([]*manager.QueryResult, testN)
+
+		for i := 0; i < testN; i++ {
+			results[i] = performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i)
+		}
+
+		time.Sleep(time.Second * 1)
+
+		// results processing.
+		for testIdx, result := range results {
+
+			cummResult := result.GetMetrics()
+
+			groupMetrics.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
+			groupMetrics.planTook[testIdx] = time.Duration(cummResult.PlanTook)
 
 			if testN < 100 {
 
@@ -443,18 +463,6 @@ func main() {
 				)
 
 			}
-
-		}
-	}
-
-	testLoopWithOffset := func(name string, filterOffset int, wg *sync.WaitGroup) {
-
-		defer wg.Done()
-
-		groupMetrics := initGroupResults()
-
-		for i := 0; i < testN; i++ {
-			performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i, groupMetrics)
 		}
 
 		if testN > 1 {

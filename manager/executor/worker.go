@@ -1,14 +1,17 @@
 package executor
 
 import (
-	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/dot5enko/simple-column-db/lightsync"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 )
 
 type TaskStatus struct {
+	StartTime time.Time
+
 	ChunksTotal     int
 	ChunksProcessed atomic.Int32
 
@@ -17,7 +20,7 @@ type TaskStatus struct {
 
 	ChunkResult ChunkFilterProcessResult
 
-	Waiter sync.WaitGroup
+	Waiter lightsync.Waiter
 }
 
 type ChunkProcessingTask struct {

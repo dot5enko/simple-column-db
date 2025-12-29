@@ -18,14 +18,15 @@ type ChunkFilterProcessResult struct {
 	TotalItems   int64
 	WastedMerges int64
 
-	LockTook           int64
-	PlanTook           int64
-	PureLock           int64
-	TotalQueryDuration int64
+	LockTook int64
+	PlanTook int64
+	PureLock int64
 
 	IoTime int64
 
-	TotalChunks int64
+	// set on query planner
+	TotalChunks        int64
+	TotalQueryDuration time.Duration
 }
 
 func preloadSlabHeaders(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
