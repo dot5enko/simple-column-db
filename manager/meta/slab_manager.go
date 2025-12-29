@@ -77,7 +77,7 @@ func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
 
 // buffers report
 func printSingleBufferReport(name string, bufStats *cache.Stats) {
-	slog.Info("buffer effectivety report",
+	slog.Info("buffer effectiveness report",
 		"size", bufStats.Size,
 		"total_reads", bufStats.Reads.Load(),
 		"returns", bufStats.Returns.Load(),
@@ -91,7 +91,7 @@ func (m *SlabManager) PrintBufferEffectivityReport() {
 
 	headerPart := strings.Repeat("-", headerSize)
 
-	log.Printf("%s%s%s", headerPart, "buffer effectivety", headerPart)
+	log.Printf("%s%s%s", headerPart, "buffer effectiveness", headerPart)
 
 	printSingleBufferReport("headerReaderBufferRing", m.headerReaderBufferRing.GetStats())
 	printSingleBufferReport("fullSlabBufferRing", m.fullSlabBufferRing.GetStats())

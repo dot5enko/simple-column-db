@@ -172,8 +172,6 @@ func main() {
 
 	m.StartWorkers(*workerThreads, workersCtx)
 
-	totalCoordinationLock := time.Duration(0)
-
 	fromNowFilter := func(offset time.Duration, fieldName string) query.FilterCondition {
 
 		tnow := time.Now()
@@ -428,9 +426,6 @@ func main() {
 
 			cummResult := result.Metrics
 
-			totalCoordinationLock += time.Duration(cummResult.LockTook)
-
-			groupResults.locks[testIdx] = time.Duration(cummResult.LockTook)
 			groupResults.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
 			groupResults.planTook[testIdx] = time.Duration(cummResult.PlanTook)
 
@@ -444,8 +439,6 @@ func main() {
 					"took", time.Duration(cummResult.TotalQueryDuration),
 					"wait", time.Duration(cummResult.PureLock),
 					"n_chunks", cummResult.TotalChunks,
-					"chunk_lock", time.Duration(cummResult.LockTook),
-					"coordination_lock", time.Duration(totalCoordinationLock),
 					"io", time.Duration(cummResult.IoTime),
 				)
 
@@ -490,7 +483,6 @@ func main() {
 
 			}
 
-			calcPS("lock "+name, groupMetrics.locks)
 			calcPS("dura "+name, groupMetrics.totalDuration)
 			calcPS("plan "+name, groupMetrics.planTook)
 		}

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const ExecutorChunkSizeBlocks = 12
+const ExecutorChunkSizeBlocks = 40
 
 var (
 	ErrSchemaNotFound = fmt.Errorf("schema not found")
