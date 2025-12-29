@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 	"log/slog"
+	"runtime"
 	"time"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
@@ -11,21 +12,21 @@ import (
 )
 
 type ChunkFilterProcessResult struct {
-	SkippedBlocksDueToHeaderFiltering int
-	ProcessedBlocks                   int
-	FullSkips                         int
+	SkippedBlocksDueToHeaderFiltering int64
+	ProcessedBlocks                   int64
+	FullSkips                         int64
 
-	TotalItems   int
-	WastedMerges int
+	TotalItems   int64
+	WastedMerges int64
 
-	LockTook           time.Duration
-	PlanTook           time.Duration
-	PureLock           time.Duration
-	TotalQueryDuration time.Duration
+	LockTook           int64
+	PlanTook           int64
+	PureLock           int64
+	TotalQueryDuration int64
 
-	IoTime time.Duration
+	IoTime int64
 
-	TotalChunks int
+	TotalChunks int64
 }
 
 func preloadSlabHeaders(slabs *meta.SlabManager, plan *query.QueryPlan, blockChunk *query.BlockChunk) error {
@@ -57,6 +58,9 @@ func ExecutePlanForChunk(
 	plan *query.QueryPlan,
 	blockChunk *query.BlockChunk,
 ) (ChunkFilterProcessResult, error) {
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	cache.Reset()
 
@@ -101,9 +105,9 @@ func ExecutePlanForChunk(
 		if chunkProcessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
-			result.SkippedBlocksDueToHeaderFiltering += singleColumnProcessResult.skippedBlocksDueToHeaderFiltering
-			result.ProcessedBlocks += singleColumnProcessResult.processedBlocks
-			result.FullSkips += singleColumnProcessResult.fullSkips
+			result.SkippedBlocksDueToHeaderFiltering += int64(singleColumnProcessResult.skippedBlocksDueToHeaderFiltering)
+			result.ProcessedBlocks += int64(singleColumnProcessResult.processedBlocks)
+			result.FullSkips += int64(singleColumnProcessResult.fullSkips)
 
 			// slog.Info("single column processing done", "skipped", singleColumnProcessResult.skippedBlocksDueToHeaderFiltering, "processed", singleColumnProcessResult.processedBlocks, "total_processed", result.ProcessedBlocks, "block_offset", blockChunk.GlobalBlockOffset)
 
@@ -127,11 +131,8 @@ func ExecutePlanForChunk(
 		}
 	}
 
-	result.TotalItems = totalItems
-	result.WastedMerges = wastedMerges
-
-	// todo cleanup
-	// absBlockMaps
+	result.TotalItems = int64(totalItems)
+	result.WastedMerges = int64(wastedMerges)
 
 	return result, nil
 }

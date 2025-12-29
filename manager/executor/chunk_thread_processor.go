@@ -3,11 +3,11 @@ package executor
 import (
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
-	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/fatih/color"
 )
 
@@ -46,38 +46,27 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 				slog.Info("chunk processing done ", "chunk_id", task.ChunkIdx, "took_ms", fmt.Sprintf("%.2f", processingTook))
 			}
 
-			func() {
+			globalChunkResult := &curStatus.ChunkResult
 
-				timeB := time.Now()
+			session := sManager.GetSession()
 
-				curStatus.Lock.Lock()
-				lockTook := time.Since(timeB)
-				defer curStatus.Lock.Unlock()
+			atomic.AddInt64(&globalChunkResult.TotalItems, taskRes.TotalItems)
+			atomic.AddInt64(&globalChunkResult.WastedMerges, taskRes.WastedMerges)
+			atomic.AddInt64(&globalChunkResult.SkippedBlocksDueToHeaderFiltering, taskRes.SkippedBlocksDueToHeaderFiltering)
+			atomic.AddInt64(&globalChunkResult.ProcessedBlocks, taskRes.ProcessedBlocks)
+			atomic.AddInt64(&globalChunkResult.FullSkips, taskRes.FullSkips)
+			atomic.AddInt64(&globalChunkResult.IoTime, session.IoTime.Nanoseconds())
 
-				globalChunkResult := &curStatus.ChunkResult
+			// copy bitset to global result bitset
+			// perform selectors according to query
 
-				session := sManager.GetSession()
+			// for idx := range query.ExecutorChunkSizeBlocks {
 
-				globalChunkResult.LockTook += lockTook
-				globalChunkResult.TotalItems += taskRes.TotalItems
-				globalChunkResult.WastedMerges += taskRes.WastedMerges
-				globalChunkResult.SkippedBlocksDueToHeaderFiltering += taskRes.SkippedBlocksDueToHeaderFiltering
-				globalChunkResult.ProcessedBlocks += taskRes.ProcessedBlocks
-				globalChunkResult.FullSkips += taskRes.FullSkips
-				globalChunkResult.IoTime += session.IoTime
+			// 	blockFilterMask := &threadCache.AbsBlockMaps[idx]
 
-				// copy bitset to global result bitset
-				// perform selectors according to query
-
-				for idx := range query.ExecutorChunkSizeBlocks {
-
-					blockFilterMask := &threadCache.AbsBlockMaps[idx]
-
-					if blockFilterMask.Merges() == task.Plan.FilterSize {
-					}
-				}
-
-			}()
+			// 	if blockFilterMask.Merges() == task.Plan.FilterSize {
+			// 	}
+			// }
 
 			if processed == int32(curStatus.ChunksTotal) {
 				curStatus.Waiter.Done()

@@ -18,7 +18,6 @@ type TaskStatus struct {
 	ChunkResult ChunkFilterProcessResult
 
 	Waiter sync.WaitGroup
-	Lock   sync.Mutex
 }
 
 type ChunkProcessingTask struct {

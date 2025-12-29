@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime/pprof"
+	"runtime/trace"
 	"slices"
 	"strings"
 	"sync"
@@ -99,7 +100,13 @@ func main() {
 
 		uuid := uuid.New().String()
 
-		profileName := fmt.Sprintf("./cpu.%s.pprof", strings.ReplaceAll(uuid, "-", ""))
+		uidPrepared := strings.ReplaceAll(uuid, "-", "")
+
+		profName := func(prefix string) string {
+			return fmt.Sprintf("./%s.%s.pprof", prefix, uidPrepared)
+		}
+
+		profileName := profName("cpu")
 
 		var createErr error
 		cpuProfileFile, createErr = os.Create(profileName)
@@ -109,9 +116,23 @@ func main() {
 		}
 
 		pprof.StartCPUProfile(cpuProfileFile)
+
+		ftrace, _ := os.Create(profName("trace"))
+		trace.Start(ftrace)
+
+		// runtime.SetBlockProfileRate(1)
+
+		// runtime.SetMutexProfileFraction(1)
+		// fblock, _ := os.Create(profName("block"))
+
 		defer func() {
+
 			pprof.StopCPUProfile()
 			cpuProfileFile.Close()
+			trace.Stop()
+			ftrace.Close()
+
+			// pprof.Lookup("block").WriteTo(fblock, 0)
 
 			slog.Info("cpu profile written", "file_name", profileName)
 
@@ -407,25 +428,27 @@ func main() {
 
 			cummResult := result.Metrics
 
-			totalCoordinationLock += cummResult.LockTook
+			totalCoordinationLock += time.Duration(cummResult.LockTook)
 
-			groupResults.locks[testIdx] = cummResult.LockTook
-			groupResults.totalDuration[testIdx] = cummResult.TotalQueryDuration
-			groupResults.planTook[testIdx] = cummResult.PlanTook
+			groupResults.locks[testIdx] = time.Duration(cummResult.LockTook)
+			groupResults.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
+			groupResults.planTook[testIdx] = time.Duration(cummResult.PlanTook)
 
 			if testN < 100 {
-				slog.Info("merge info",
+
+				slog.Info("mmerge info",
 					"ok_blocks", cummResult.ProcessedBlocks,
 					"skips_all", cummResult.FullSkips,
 					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
 					"matched", cummResult.TotalItems,
-					"took", cummResult.TotalQueryDuration,
-					"wait", cummResult.PureLock,
+					"took", time.Duration(cummResult.TotalQueryDuration),
+					"wait", time.Duration(cummResult.PureLock),
 					"n_chunks", cummResult.TotalChunks,
-					"chunk_lock", cummResult.LockTook,
-					"coordination_lock", totalCoordinationLock,
-					"io", cummResult.IoTime,
+					"chunk_lock", time.Duration(cummResult.LockTook),
+					"coordination_lock", time.Duration(totalCoordinationLock),
+					"io", time.Duration(cummResult.IoTime),
 				)
+
 			}
 
 		}

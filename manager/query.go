@@ -84,6 +84,7 @@ func (sm *Manager) Query(
 		ChunksTotal: bChunksSize,
 	}
 
+	// taskStatus.Waiter.SetSleepStep(time.Microsecond * 500)
 	taskStatus.Waiter.Add(1)
 
 	for bChunkIdx := 0; bChunkIdx < bChunksSize; bChunkIdx++ {
@@ -105,10 +106,10 @@ func (sm *Manager) Query(
 
 	cummResult := taskStatus.ChunkResult
 
-	cummResult.PureLock = waitTookMs
-	cummResult.TotalQueryDuration = time.Duration(queryTookMs)
-	cummResult.PlanTook = planTime
-	cummResult.TotalChunks = bChunksSize
+	cummResult.PureLock = waitTookMs.Nanoseconds()
+	cummResult.TotalQueryDuration = queryTookMs.Nanoseconds()
+	cummResult.PlanTook = planTime.Nanoseconds()
+	cummResult.TotalChunks = int64(bChunksSize)
 
 	result.Metrics = cummResult
 
