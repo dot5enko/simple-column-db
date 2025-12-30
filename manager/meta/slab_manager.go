@@ -10,6 +10,7 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/perf"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -36,6 +37,11 @@ type SlabManagerRuntimeCache struct {
 	loadGroup singleflight.Group
 }
 
+type SlabManagerSession struct {
+	perf_stats *perf.PerformanceMetrics
+	cache      *executortypes.ChunkExecutorThreadCache
+}
+
 type SlabManager struct {
 	storagePath string
 
@@ -50,11 +56,11 @@ type SlabManager struct {
 
 	meta *MetaManager
 
-	session *perf.PerformanceMetrics
+	session *SlabManagerSession
 }
 
 // copy with session
-func (sm *SlabManager) NewSession() *SlabManager {
+func (sm *SlabManager) NewSession(cache *executortypes.ChunkExecutorThreadCache) *SlabManager {
 	newSm := &SlabManager{
 		storagePath:            sm.storagePath,
 		rt:                     sm.rt,
@@ -63,8 +69,11 @@ func (sm *SlabManager) NewSession() *SlabManager {
 		slabHeaderCache:        sm.slabHeaderCache,
 		slabRuntimeCache:       sm.slabRuntimeCache,
 		meta:                   sm.meta,
-		session: &perf.PerformanceMetrics{
-			IoTime: time.Duration(0),
+		session: &SlabManagerSession{
+			perf_stats: &perf.PerformanceMetrics{
+				IoTime: time.Duration(0),
+			},
+			cache: cache,
 		},
 	}
 
@@ -72,7 +81,11 @@ func (sm *SlabManager) NewSession() *SlabManager {
 }
 
 func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
-	return sm.session
+
+	if sm.session == nil {
+		return nil
+	}
+	return sm.session.perf_stats
 }
 
 // buffers report
@@ -151,7 +164,6 @@ func (m *SlabManager) getSlabDataFromCache(uid uuid.UUID) *cache.SlabDataCacheIt
 	defer m.rt.slabDataCacheLocker.RUnlock()
 
 	if item, ok := m.rt.slabDataCache[uid]; ok {
-
 		item.RtStats.Reads++
 		return item
 	}

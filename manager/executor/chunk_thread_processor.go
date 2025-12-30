@@ -30,8 +30,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			continue
 		}
 
-		sManager := slabManager.NewSession()
-
+		sManager := slabManager.NewSession(threadCache)
 		taskRes, err := ExecutePlanForChunk(threadCache, sManager, task.Plan, task.Bchunk)
 		if err != nil {
 			curStatus.Err.Store(true)

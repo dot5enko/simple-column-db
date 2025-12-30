@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
@@ -88,28 +89,40 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
-	pprofEnabled := flag.Bool("pprof", false, "enable pprof server")
+	pprofEnabled := flag.Bool("trace", false, "enable pprof server")
+	cpuProf := flag.Bool("cpuprof", false, "cpu pprof")
+	blockProf := flag.Bool("blockprof", false, "collect blocking pprof")
+
 	testIterations := flag.Int("test_iterations", 1, "number of iterations")
 	workerThreads := flag.Int("worker_threads", 1, "number of worker threads")
 
 	flag.Parse()
 
-	var cpuProfileFile *os.File
+	uuid := uuid.New().String()
+	uidPrepared := strings.ReplaceAll(uuid, "-", "")
+	profName := func(prefix string) string {
+		return fmt.Sprintf("./%s.%s.pprof", prefix, uidPrepared)
+	}
 
-	if *pprofEnabled {
+	if *blockProf {
 
-		uuid := uuid.New().String()
+		runtime.SetBlockProfileRate(1)
 
-		uidPrepared := strings.ReplaceAll(uuid, "-", "")
+		profileFile, _ := os.Create(profName("block"))
 
-		profName := func(prefix string) string {
-			return fmt.Sprintf("./%s.%s.pprof", prefix, uidPrepared)
-		}
+		defer func() {
 
+			profileInfo := pprof.Lookup("block")
+			profileInfo.WriteTo(profileFile, 0)
+			profileFile.Close()
+		}()
+	}
+
+	if *cpuProf {
 		profileName := profName("cpu")
 
 		var createErr error
-		cpuProfileFile, createErr = os.Create(profileName)
+		cpuProfileFile, createErr := os.Create(profileName)
 
 		if createErr != nil {
 			panic(fmt.Sprintf("unable to create profile file : %s", createErr.Error()))
@@ -117,24 +130,25 @@ func main() {
 
 		pprof.StartCPUProfile(cpuProfileFile)
 
-		ftrace, _ := os.Create(profName("trace"))
-		trace.Start(ftrace)
-
-		// runtime.SetBlockProfileRate(1)
-
-		// runtime.SetMutexProfileFraction(1)
-		// fblock, _ := os.Create(profName("block"))
-
 		defer func() {
 
 			pprof.StopCPUProfile()
 			cpuProfileFile.Close()
+			slog.Info("cpu profile written", "file_name", uidPrepared)
+		}()
+	}
+
+	if *pprofEnabled {
+
+		ftrace, _ := os.Create(profName("trace"))
+		trace.Start(ftrace)
+
+		defer func() {
+
 			trace.Stop()
 			ftrace.Close()
 
-			// pprof.Lookup("block").WriteTo(fblock, 0)
-
-			slog.Info("cpu profile written", "file_name", profileName)
+			slog.Info("trace profile written", "file_name", uidPrepared)
 
 		}()
 	}
