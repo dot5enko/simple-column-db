@@ -48,6 +48,10 @@ type BoundsFloat struct {
 	Max float64
 }
 
+func (b *BoundsFloat) Deinit() {
+	b.initialized = false
+}
+
 func (b BoundsFloat) Intersects(other BoundsFloat) BoundsFilterMatchResult {
 
 	if !other.initialized || !b.initialized {

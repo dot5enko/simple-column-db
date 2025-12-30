@@ -171,7 +171,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	return nil
 }
 
-func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache []uint16) (result SingleColumnProcessingResult, topErr error) {
+func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext) (result SingleColumnProcessingResult, topErr error) {
 
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
@@ -210,6 +210,8 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext, indicesResultCache
 			{
 				var processFilterErr error
 				var filteredSize int
+
+				// slog.Info("processing filter", "filter_type", blockDataType.String())
 
 				// process filter on a block
 				switch blockDataType {

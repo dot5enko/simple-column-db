@@ -92,6 +92,7 @@ func main() {
 	pprofEnabled := flag.Bool("trace", false, "enable pprof server")
 	cpuProf := flag.Bool("cpuprof", false, "cpu pprof")
 	blockProf := flag.Bool("blockprof", false, "collect blocking pprof")
+	heapProf := flag.Bool("heapprof", false, "collect heap pprof")
 
 	testIterations := flag.Int("test_iterations", 1, "number of iterations")
 	workerThreads := flag.Int("worker_threads", 1, "number of worker threads")
@@ -114,6 +115,19 @@ func main() {
 
 			profileInfo := pprof.Lookup("block")
 			profileInfo.WriteTo(profileFile, 0)
+			profileFile.Close()
+		}()
+	}
+
+	if *heapProf {
+
+		profileFile, _ := os.Create(profName("heap"))
+		runtime.MemProfileRate = 1
+
+		defer func() {
+
+			pprof.WriteHeapProfile(profileFile)
+
 			profileFile.Close()
 		}()
 	}

@@ -8,6 +8,7 @@ import (
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
+	"github.com/dot5enko/simple-column-db/schema"
 )
 
 type ChunkFilterProcessResult struct {
@@ -64,15 +65,24 @@ func ExecutePlanForChunk(
 
 	cache.Reset()
 
-	// per field/slab processing
-	//
+	result := ChunkFilterProcessResult{}
+
 	// could be parallelized
 	// but synchronization is needed which could be less effective
 	// than chunk process parallelization
 
-	result := ChunkFilterProcessResult{}
-
+	// per field/slab processing
 	for _, filtersGroup := range plan.FilterGroupedByFields {
+
+		conds := len(filtersGroup.Conditions)
+		filterColumnRTCache := cache.FilterCache[:conds]
+
+		// cleanup filter cache
+		for filterCacheIdx := range conds {
+			r := &filterColumnRTCache[filterCacheIdx]
+			r.FilterLastBlockHeaderResult = schema.UnknownIntersection
+			r.FilterBounds.Deinit()
+		}
 
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
 		filtersSize := len(filtersGroup.Conditions)
@@ -85,7 +95,7 @@ func ExecutePlanForChunk(
 			FilterColumn: filtersGroup.Conditions,
 
 			// todo use circular buffer per thread?
-			FilterColumnRuntimeCache: make([]query.RuntimeFilterCache, len(filtersGroup.Conditions)),
+			FilterColumnRuntimeCache: filterColumnRTCache,
 
 			FilterSize: filtersSize,
 
@@ -95,13 +105,19 @@ func ExecutePlanForChunk(
 			CurrentBlockProcessingIdx: 0,
 		}
 
-		// preprocess segments into blocks
+		// preprocess segments into blocks for column/slab
 		blocksPreprocessErr := preprocessSegmentsIntoBlocksAndHeaderFilter(sm, &slabMergerContext, blockSegments)
 		if blocksPreprocessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
 
-		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext, cache.IndicesResultCache[:])
+		// groupType := filtersGroup.ColumnSchemaInfo.Type.String()
+
+		// for _, filter := range slabMergerContext.FilterColumn {
+		// 	slog.Info("perform filter on whole slab", "slab_type", groupType, "operand", filter.Filter.Operand.String())
+		// }
+
+		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext)
 		if chunkProcessErr != nil {
 			return ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {

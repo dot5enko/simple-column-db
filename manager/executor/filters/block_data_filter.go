@@ -27,6 +27,8 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
 
+	// slog.Info("perform UINT filter on columns ", "filter", filter.Operand.String(), "block", blockData.BlockHeader.StartOffset)
+
 	switch filter.Operand {
 	case query.RANGE:
 		operandA := filter.Arguments[0].(T)
@@ -79,8 +81,6 @@ func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
 
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
-
-	// log.Printf("[slab %s] processing numeric filter on column %v, type = %s", slab.Uid.String(), filter.Field, blockData.BlockHeader.DataType.String())
 
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
@@ -138,6 +138,8 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 
 	arrayCasted := directBlockArray.([]T)
 	inputArray := arrayCasted[:arrayEndOffset]
+
+	// slog.Info("perform FLOAT filter on columns ", "filter", filter.Operand.String(), "block", blockData.BlockHeader.StartOffset)
 
 	switch filter.Operand {
 	case query.RANGE:

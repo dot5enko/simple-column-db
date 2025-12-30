@@ -3,14 +3,16 @@ package executortypes
 import (
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/query"
-	"github.com/dot5enko/simple-column-db/schema"
 )
+
+const MaxFiltersPerField = 16
 
 // todo realocate with arena to allow dynamic size of blocks and chunks?
 type ChunkExecutorThreadCache struct {
-	AbsBlockMaps       [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
-	Blocks             [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
-	IndicesResultCache [schema.BlockRowsSize]uint16
+	AbsBlockMaps [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
+	Blocks       [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
+
+	FilterCache [MaxFiltersPerField]query.RuntimeFilterCache
 }
 
 func (c *ChunkExecutorThreadCache) Reset() {
