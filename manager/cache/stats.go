@@ -5,6 +5,6 @@ import "time"
 type CacheStats struct {
 	CacheEntryId uint16
 
-	Reads   int
+	Reads   int64
 	Created time.Time
 }

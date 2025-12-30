@@ -37,7 +37,7 @@ func New(config ManagerConfig) *Manager {
 	man := &Manager{
 		Planner:     NewQueryPlanner(),
 		Meta:        meta.NewMetaManager(config.PathToStorage),
-		chunksQueue: make(chan *executor.ChunkProcessingTask, 100),
+		chunksQueue: make(chan *executor.ChunkProcessingTask, 512),
 	}
 
 	man.Slabs = meta.NewSlabManager(config.PathToStorage, man.Meta)

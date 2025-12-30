@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
@@ -35,11 +36,14 @@ type SlabManagerRuntimeCache struct {
 	slabDataCacheLocker sync.RWMutex
 
 	loadGroup singleflight.Group
+
+	globalSessionCounter uint64
 }
 
 type SlabManagerSession struct {
 	perf_stats *perf.PerformanceMetrics
 	cache      *executortypes.ChunkExecutorThreadCache
+	idx        uint64
 }
 
 type SlabManager struct {
@@ -74,6 +78,7 @@ func (sm *SlabManager) NewSession(cache *executortypes.ChunkExecutorThreadCache)
 				IoTime: time.Duration(0),
 			},
 			cache: cache,
+			idx:   atomic.AddUint64(&sm.rt.globalSessionCounter, 1),
 		},
 	}
 
@@ -192,9 +197,7 @@ func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
 	if item, ok := m.rt.cache[uid]; ok {
 
-		// log.Printf(" --- reading block %s from cache : %d", block.String(), item.rtStats.Reads)
-
-		item.rtStats.Reads++
+		atomic.AddInt64(&item.rtStats.Reads, 1)
 		return &item
 	}
 
@@ -256,6 +259,8 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				defer m.rt.locker.Unlock()
 
 				blockId := GetUniqueBlockId(slab.Uid, block)
+
+				// slog.Info("cache entry put", "entry_id", slabData.RtStats.CacheEntryId)
 
 				m.rt.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
