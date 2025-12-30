@@ -464,12 +464,12 @@ func main() {
 		results := make([]*manager.QueryResult, testN)
 
 		for i := 0; i < testN; i++ {
-			go func() {
-				results[i] = performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i)
-			}()
+			// go func() {
+			results[i] = performQueryWithFilter(predefinedFilters[(i+filterOffset)%predefinedFiltersLen], i)
+			// }()
 		}
 
-		time.Sleep(time.Second * 10)
+		// time.Sleep(time.Second * 10)
 
 		// results processing.
 		for testIdx, result := range results {
@@ -481,7 +481,7 @@ func main() {
 
 			if testN < 100 {
 
-				slog.Info("mmerge info",
+				slog.Info("result",
 					"ok_blocks", cummResult.ProcessedBlocks,
 					"skips_all", cummResult.FullSkips,
 					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,

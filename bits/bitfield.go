@@ -6,6 +6,18 @@ import (
 
 type Bitfield [64 * 8]uint64
 
+func (b *Bitfield) Count() int {
+
+	c := 0
+	for i := 0; i < len(b); i += 4 {
+		c += bits.OnesCount64(b[i+0])
+		c += bits.OnesCount64(b[i+1])
+		c += bits.OnesCount64(b[i+2])
+		c += bits.OnesCount64(b[i+3])
+	}
+	return c
+}
+
 func (b *Bitfield) Set(bit int) {
 	word := bit >> 6 // bit / 64
 	mask := uint64(1) << (bit & 63)
@@ -140,17 +152,6 @@ func (b *Bitfield) Sum() int {
 
 	return total
 
-}
-
-func (b *Bitfield) Count() int {
-	c := 0
-	for i := 0; i < len(b); i += 4 {
-		c += bits.OnesCount64(b[i+0])
-		c += bits.OnesCount64(b[i+1])
-		c += bits.OnesCount64(b[i+2])
-		c += bits.OnesCount64(b[i+3])
-	}
-	return c
 }
 
 func MergeOR(a, b Bitfield) (out Bitfield) {

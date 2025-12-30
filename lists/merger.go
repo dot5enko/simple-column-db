@@ -37,6 +37,14 @@ func (i *IndiceUnmerged) SetFullSkip() {
 	i.fullSkip = true
 }
 
+func (i *IndiceUnmerged) Count() int {
+	if !i.initialized {
+		return -1
+	} else {
+		return i.ResultBitset.Count()
+	}
+}
+
 func (i *IndiceUnmerged) FullSkip() bool {
 	return i.fullSkip
 }
