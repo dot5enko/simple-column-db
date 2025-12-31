@@ -2,9 +2,7 @@ package executor
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/dot5enko/simple-column-db/lists"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -12,27 +10,8 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
-type BlockMergerContext struct {
-	Schema         schema.Schema
-	AbsOffsetStart uint64
-	FilterColumn   []query.FilterConditionRuntime
-
-	FilterColumnRuntimeCache []query.RuntimeFilterCache
-
-	FilterSize int
-
-	Blocks                    []executortypes.BlockRuntimeInfo
-	CurrentBlockProcessingIdx int
-
-	AbsBlockMaps []lists.IndiceUnmerged
-
-	QueryPlan *query.QueryPlan
-
-	IoTime time.Duration
-}
-
 func prepareBlockForMerger(
-	mergerContext *BlockMergerContext,
+	mergerContext *executortypes.BlockMergerContext,
 
 	slabInfo *schema.DiskSlabHeader,
 	blockHeader *schema.DiskHeader,
@@ -122,15 +101,9 @@ func prepareBlockForMerger(
 	return nil
 }
 
-type SingleColumnProcessingResult struct {
-	skippedBlocksDueToHeaderFiltering int
-	processedBlocks                   int
-	fullSkips                         int
-}
-
 func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	sm *meta.SlabManager,
-	slabMergerContext *BlockMergerContext,
+	slabMergerContext *executortypes.BlockMergerContext,
 	segments []query.Segment,
 ) error {
 
@@ -171,7 +144,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	return nil
 }
 
-func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext) (result SingleColumnProcessingResult, topErr error) {
+func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (result executortypes.SingleColumnProcessingResult, topErr error) {
 
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
@@ -183,7 +156,7 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext) (result SingleColu
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
 		if blockGroupMerger.FullSkip() {
 
-			result.fullSkips += 1
+			result.FullSkips += 1
 
 			continue
 		}
@@ -199,13 +172,13 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext) (result SingleColu
 			isFull := headerMatchResult == schema.FullIntersection
 
 			if isFull {
-				result.skippedBlocksDueToHeaderFiltering += 1
+				result.SkippedBlocksDueToHeaderFiltering += 1
 
 				blockGroupMerger.WithBitset(nil, false, true)
 				continue
 			}
 
-			result.processedBlocks += 1
+			result.ProcessedBlocks += 1
 
 			{
 				var processFilterErr error
@@ -224,13 +197,13 @@ func processFiltersOnPreparedBlocks(mCtx *BlockMergerContext) (result SingleColu
 				case schema.Float64FieldType:
 					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger)
 				default:
-					return SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
+					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}
 
 				_ = filteredSize
 
 				if processFilterErr != nil {
-					return SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
+					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 				}
 
 				// slog.Info(" -- [filtered]", "filteredSize", filteredSize, "header_match_cached", headerMatchResult.String(), "arg", filter, "filter_bounds", headerMatchResultObj.Bounds)

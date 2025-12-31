@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/executor"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/query"
 )
 
@@ -43,14 +44,14 @@ type QueryResult struct {
 	Data map[string][]any
 
 	finalized bool
-	metrics   executor.ChunkFilterProcessResult
+	metrics   executortypes.ChunkFilterProcessResult
 
 	task *executor.TaskStatus
 
 	Error error
 }
 
-func (q *QueryResult) GetMetrics() executor.ChunkFilterProcessResult {
+func (q *QueryResult) GetMetrics() executortypes.ChunkFilterProcessResult {
 
 	if !q.finalized {
 		q.Wait()

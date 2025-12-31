@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dot5enko/simple-column-db/lightsync"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 )
@@ -18,7 +19,7 @@ type TaskStatus struct {
 	Err       atomic.Bool
 	ErrObject error
 
-	ChunkResult ChunkFilterProcessResult
+	ChunkResult executortypes.ChunkFilterProcessResult
 
 	Waiter lightsync.Waiter
 }

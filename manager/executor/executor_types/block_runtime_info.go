@@ -14,7 +14,6 @@ type BlockRuntimeInfo struct {
 
 	BlockHeader *schema.DiskHeader
 
-	// 16 filters max ?
 	// if a query has more than that app panics
-	HeaderFilterMatchResult [16]BlockRuntimeFilterCache
+	HeaderFilterMatchResult [MaxFiltersPerField]BlockRuntimeFilterCache
 }
