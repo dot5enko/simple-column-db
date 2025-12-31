@@ -23,18 +23,25 @@ func ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks[T ops.{{typeAlias.Name}}](s
 			{% endfor %}
 
 			{% if filter.Name == "RANGE" %}
-			if operand1 > operand2 {
-				temp := operand2
-				operand2 = operand1
-				operand1 = temp
+			if operand0 > operand1 {
+				temp := operand1
+				operand1 = operand0
+				operand0 = temp
 			}
             {% endif %}
 
+			{# check if filter has specific impl for given typeAlias, otherwise fallback to generic #}
 
-			SpecificFilter{{filter.Name|capitalize}}On{{typeAlias.Name}}BlocksProcessor(slabMergerContext{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %})
+			{% set curTypeAlias = typeAlias.Name %}
+			{% set tempFilter = config.Filters[filtersIndexes[filter.Name]] %}
+			{% if !(tempFilter.Implementations[curTypeAlias]) %}
+				{% set curTypeAlias = "NumericTypes" %}
+			{% endif %}
+
+			SpecificFilter{{filter.Name|capitalize}}On{{curTypeAlias}}BlocksProcessor(slabMergerContext{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %})
 {% endfor %}
 		default:
-			return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
+			return result, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks[%s]", filter.Operand.String(),filterType.String())
 		}
 
 	}
