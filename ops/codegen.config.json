@@ -1,0 +1,102 @@
+{
+    "filters": [
+        {
+            "name": "EQ",
+            "args": 1,
+            "implementations": {
+                "Numeric": "ops.CompareNumericValuesAreEqualBitset"
+            }
+        },
+        {
+            "name": "GT",
+            "args": 1,
+            "implementations": {
+                "Numeric": "ops.CompareValuesAreBiggerBitset"
+            }
+        },
+        {
+            "name": "LT",
+            "args": 1,
+            "implementations": {
+                "Numeric": "ops.CompareValuesAreSmallerBitset"
+            }
+        },
+        {
+            "name": "RANGE",
+            "args": 2,
+            "implementations": {
+                "SignedInts": "ops.CompareValuesAreInRangeSignedIntsBitset",
+                "UnsignedInts": "ops.CompareValuesAreInRangeUnsignedIntsBitsetFast",
+                "Floats": "ops.CompareValuesAreInRangeFloatsBitsetUnrolled"
+            }
+        }
+    ],
+    "typeMap": {
+        "schema.Uint64FieldType": "uint64",
+        "schema.Int64FieldType": "int64",
+        "schema.Uint32FieldType": "uint32",
+        "schema.Int32FieldType": "int32",
+        "schema.Uint16FieldType": "uint16",
+        "schema.Int16FieldType": "int16",
+        "schema.Uint8FieldType": "uint8",
+        "schema.Int8FieldType": "int8",
+        "schema.Float32FieldType": "float32",
+        "schema.Float64FieldType": "float64"
+    },
+    "numericTypeAlias": {
+        "name": "Numeric",
+        "items": [
+            "schema.Int8FieldType",
+            "schema.Int16FieldType",
+            "schema.Int32FieldType",
+            "schema.Int64FieldType",
+            "schema.Uint8FieldType",
+            "schema.Uint16FieldType",
+            "schema.Uint32FieldType",
+            "schema.Uint64FieldType",
+            "schema.Float32FieldType",
+            "schema.Float64FieldType"
+        ]
+    },
+    "typeAliases": [
+        {
+            "name": "SignedInts",
+            "items": [
+                "schema.Int8FieldType",
+                "schema.Int16FieldType",
+                "schema.Int32FieldType",
+                "schema.Int64FieldType"
+            ]
+        },
+        {
+            "name": "UnsignedInts",
+            "items": [
+                "schema.Uint8FieldType",
+                "schema.Uint16FieldType",
+                "schema.Uint32FieldType",
+                "schema.Uint64FieldType"
+            ]
+        },
+        {
+            "name": "Floats",
+            "items": [
+                "schema.Float32FieldType",
+                "schema.Float64FieldType"
+            ]
+        }
+    ],
+    "gen": [
+        {
+            "name": "specific_type_specific_filter_processor",
+            "tpl": "SpecificFilter{{filter.Name|capitalize}}On{{typeAlias.Name}}BlocksProcessor"
+        },
+        {
+            "name": "filter_processor_on_blocks",
+            "tpl": "ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks"
+        },
+        {
+            "name": "chunk_blocks_specific_processor",
+            "tpl": "ChunkBlockProcessorSpecificFilterAndType"
+        }
+    ]
+}
