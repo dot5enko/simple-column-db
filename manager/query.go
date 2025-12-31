@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"sync"
 	"time"
@@ -54,6 +55,7 @@ type QueryResult struct {
 func (q *QueryResult) GetMetrics() executortypes.ChunkFilterProcessResult {
 
 	if !q.finalized {
+		log.Printf("waiting for query results")
 		q.Wait()
 	}
 
