@@ -32,7 +32,7 @@ func ProcessFiltersOnChunkOfUnsignedIntsBlocks[T ops.UnsignedInts](slabMergerCon
 				
 			
 
-			SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.GT:
 
@@ -49,7 +49,7 @@ func ProcessFiltersOnChunkOfUnsignedIntsBlocks[T ops.UnsignedInts](slabMergerCon
 				
 			
 
-			SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.LT:
 
@@ -66,7 +66,7 @@ func ProcessFiltersOnChunkOfUnsignedIntsBlocks[T ops.UnsignedInts](slabMergerCon
 				
 			
 
-			SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.RANGE:
 
@@ -88,7 +88,7 @@ func ProcessFiltersOnChunkOfUnsignedIntsBlocks[T ops.UnsignedInts](slabMergerCon
 			
 			
 
-			SpecificFilterRangeOnUnsignedIntsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
+			result = SpecificFilterRangeOnUnsignedIntsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
 
 		default:
 			return result, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOfUnsignedIntsBlocks[%s]", filter.Operand.String(),filterType.String())

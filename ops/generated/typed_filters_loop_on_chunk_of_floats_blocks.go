@@ -32,7 +32,7 @@ func ProcessFiltersOnChunkOfFloatsBlocks[T ops.Floats](slabMergerContext *execut
 				
 			
 
-			SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.GT:
 
@@ -49,7 +49,7 @@ func ProcessFiltersOnChunkOfFloatsBlocks[T ops.Floats](slabMergerContext *execut
 				
 			
 
-			SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.LT:
 
@@ -66,7 +66,7 @@ func ProcessFiltersOnChunkOfFloatsBlocks[T ops.Floats](slabMergerContext *execut
 				
 			
 
-			SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.RANGE:
 
@@ -88,7 +88,7 @@ func ProcessFiltersOnChunkOfFloatsBlocks[T ops.Floats](slabMergerContext *execut
 			
 			
 
-			SpecificFilterRangeOnFloatsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
+			result = SpecificFilterRangeOnFloatsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
 
 		default:
 			return result, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOfFloatsBlocks[%s]", filter.Operand.String(),filterType.String())

@@ -32,7 +32,7 @@ func ProcessFiltersOnChunkOfSignedIntsBlocks[T ops.SignedInts](slabMergerContext
 				
 			
 
-			SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterEqOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.GT:
 
@@ -49,7 +49,7 @@ func ProcessFiltersOnChunkOfSignedIntsBlocks[T ops.SignedInts](slabMergerContext
 				
 			
 
-			SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterGtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.LT:
 
@@ -66,7 +66,7 @@ func ProcessFiltersOnChunkOfSignedIntsBlocks[T ops.SignedInts](slabMergerContext
 				
 			
 
-			SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
+			result = SpecificFilterLtOnNumericTypesBlocksProcessor(fIdx,slabMergerContext,operand0)
 
         case query.RANGE:
 
@@ -88,7 +88,7 @@ func ProcessFiltersOnChunkOfSignedIntsBlocks[T ops.SignedInts](slabMergerContext
 			
 			
 
-			SpecificFilterRangeOnSignedIntsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
+			result = SpecificFilterRangeOnSignedIntsBlocksProcessor(fIdx,slabMergerContext,operand0,operand1)
 
 		default:
 			return result, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOfSignedIntsBlocks[%s]", filter.Operand.String(),filterType.String())

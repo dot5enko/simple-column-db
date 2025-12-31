@@ -19,6 +19,7 @@ func SpecificFilterRangeOnSignedIntsBlocksProcessor[T ops.SignedInts](fIdx int,s
 			result.FullSkips += 1
 			continue
 		}
+		
 
 		headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
 		headerMatchResult := headerMatchResultObj.MatchResult
@@ -34,14 +35,19 @@ func SpecificFilterRangeOnSignedIntsBlocksProcessor[T ops.SignedInts](fIdx int,s
 
 		result.ProcessedBlocks += 1
 
-		accessArray, arrayOffset := blockData.Val.DirectAccess()
-		arrInput := accessArray.([]T)[arrayOffset:]
+		runtimeBlockInfo := blockData.Val
+		directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+
+		arrayCasted := directBlockArray.([]T)
+		inputArray := arrayCasted[:arrayEndOffset]
+
 
 		var outputBitset bits.Bitfield
 
-		ops.CompareValuesAreInRangeSignedIntsBitset(arrInput,operand0,operand1, &outputBitset)
+		ops.CompareValuesAreInRangeSignedIntsBitset(inputArray,operand0,operand1, &outputBitset)
 
 		blockGroupMerger.WithBitset(&outputBitset, false, false)
+		
 	}
 
 	return

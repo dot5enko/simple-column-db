@@ -19,6 +19,7 @@ func SpecificFilter{{filter.Name|capitalize}}On{{typeAlias.Name}}BlocksProcessor
 			result.FullSkips += 1
 			continue
 		}
+		
 
 		headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
 		headerMatchResult := headerMatchResultObj.MatchResult
@@ -34,14 +35,19 @@ func SpecificFilter{{filter.Name|capitalize}}On{{typeAlias.Name}}BlocksProcessor
 
 		result.ProcessedBlocks += 1
 
-		accessArray, arrayOffset := blockData.Val.DirectAccess()
-		arrInput := accessArray.([]T)[arrayOffset:]
+		runtimeBlockInfo := blockData.Val
+		directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+
+		arrayCasted := directBlockArray.([]T)
+		inputArray := arrayCasted[:arrayEndOffset]
+
 
 		var outputBitset bits.Bitfield
 
-		{% set tempFilter = config.Filters[filtersIndexes[filter.Name]] %}{% if tempFilter.Implementations[typeAlias.Name] %}{{tempFilter.Implementations[typeAlias.Name]}}{% else %}{{tempFilter.Implementations['NumericTypes']}}{% endif %}(arrInput{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %}, &outputBitset)
+		{% set tempFilter = config.Filters[filtersIndexes[filter.Name]] %}{% if tempFilter.Implementations[typeAlias.Name] %}{{tempFilter.Implementations[typeAlias.Name]}}{% else %}{{tempFilter.Implementations['NumericTypes']}}{% endif %}(inputArray{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %}, &outputBitset)
 
 		blockGroupMerger.WithBitset(&outputBitset, false, false)
+		
 	}
 
 	return

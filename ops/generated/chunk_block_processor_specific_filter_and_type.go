@@ -72,11 +72,9 @@ func ChunkBlockProcessorSpecificFilterAndType(groupType schema.FieldType, slabMe
 
 	// handle results
 
-	_ = singleColumnProcessResult
+	result.SkippedBlocksDueToHeaderFiltering += int64(singleColumnProcessResult.SkippedBlocksDueToHeaderFiltering)
+	result.ProcessedBlocks += int64(singleColumnProcessResult.ProcessedBlocks)
+	result.FullSkips += int64(singleColumnProcessResult.FullSkips)
 
 	return
-
-	// result.SkippedBlocksDueToHeaderFiltering += int64(singleColumnProcessResult.skippedBlocksDueToHeaderFiltering)
-	// result.ProcessedBlocks += int64(singleColumnProcessResult.processedBlocks)
-	// result.FullSkips += int64(singleColumnProcessResult.fullSkips)
 }

@@ -19,6 +19,7 @@ func SpecificFilterRangeOnUnsignedIntsBlocksProcessor[T ops.UnsignedInts](fIdx i
 			result.FullSkips += 1
 			continue
 		}
+		
 
 		headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
 		headerMatchResult := headerMatchResultObj.MatchResult
@@ -34,14 +35,19 @@ func SpecificFilterRangeOnUnsignedIntsBlocksProcessor[T ops.UnsignedInts](fIdx i
 
 		result.ProcessedBlocks += 1
 
-		accessArray, arrayOffset := blockData.Val.DirectAccess()
-		arrInput := accessArray.([]T)[arrayOffset:]
+		runtimeBlockInfo := blockData.Val
+		directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+
+		arrayCasted := directBlockArray.([]T)
+		inputArray := arrayCasted[:arrayEndOffset]
+
 
 		var outputBitset bits.Bitfield
 
-		ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(arrInput,operand0,operand1, &outputBitset)
+		ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(inputArray,operand0,operand1, &outputBitset)
 
 		blockGroupMerger.WithBitset(&outputBitset, false, false)
+		
 	}
 
 	return

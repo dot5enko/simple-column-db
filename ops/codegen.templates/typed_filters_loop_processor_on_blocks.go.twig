@@ -38,7 +38,7 @@ func ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks[T ops.{{typeAlias.Name}}](s
 				{% set curTypeAlias = "NumericTypes" %}
 			{% endif %}
 
-			SpecificFilter{{filter.Name|capitalize}}On{{curTypeAlias}}BlocksProcessor(fIdx,slabMergerContext{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %})
+			result = SpecificFilter{{filter.Name|capitalize}}On{{curTypeAlias}}BlocksProcessor(fIdx,slabMergerContext{% for i in gen_range(filter.Args) %},operand{{i}}{% endfor %})
 {% endfor %}
 		default:
 			return result, fmt.Errorf("unsupported operand type=%s while ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks[%s]", filter.Operand.String(),filterType.String())

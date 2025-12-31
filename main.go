@@ -482,7 +482,7 @@ func main() {
 			if testN < 100 {
 
 				slog.Info("result",
-					"ok_blocks", cummResult.ProcessedBlocks,
+					"processed", cummResult.ProcessedBlocks,
 					"skips_all", cummResult.FullSkips,
 					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
 					"matched", cummResult.TotalItems,

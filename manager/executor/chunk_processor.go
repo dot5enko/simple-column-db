@@ -94,14 +94,18 @@ func ExecutePlanForChunk(
 		}
 
 		groupType := filtersGroup.ColumnSchemaInfo.Type
+		singleColumnProcessResult, chunkProcessErr := generated.ChunkBlockProcessorSpecificFilterAndType(groupType, &slabMergerContext)
 
-		generated.ChunkBlockProcessorSpecificFilterAndType(groupType, &slabMergerContext)
-
-		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext)
+		// singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext)
 		if chunkProcessErr != nil {
 			return executortypes.ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
-			slog.Info("single column processing done", "skipped", singleColumnProcessResult.SkippedBlocksDueToHeaderFiltering, "processed", singleColumnProcessResult.ProcessedBlocks, "total_processed", result.ProcessedBlocks, "block_offset", blockChunk.GlobalBlockOffset)
+
+			result.ProcessedBlocks += int64(singleColumnProcessResult.ProcessedBlocks)
+			result.SkippedBlocksDueToHeaderFiltering += int64(singleColumnProcessResult.SkippedBlocksDueToHeaderFiltering)
+			result.FullSkips += int64(singleColumnProcessResult.FullSkips)
+
+			// slog.Info("chunk done", "idx", blockChunk.GlobalBlockOffset, "col", filtersGroup.ColumnSchemaInfo.Name, "skipped", singleColumnProcessResult.SkippedBlocksDueToHeaderFiltering, "processed", singleColumnProcessResult.ProcessedBlocks)
 		}
 	}
 

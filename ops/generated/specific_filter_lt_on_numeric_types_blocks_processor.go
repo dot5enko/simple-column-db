@@ -19,6 +19,7 @@ func SpecificFilterLtOnNumericTypesBlocksProcessor[T ops.NumericTypes](fIdx int,
 			result.FullSkips += 1
 			continue
 		}
+		
 
 		headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
 		headerMatchResult := headerMatchResultObj.MatchResult
@@ -34,14 +35,19 @@ func SpecificFilterLtOnNumericTypesBlocksProcessor[T ops.NumericTypes](fIdx int,
 
 		result.ProcessedBlocks += 1
 
-		accessArray, arrayOffset := blockData.Val.DirectAccess()
-		arrInput := accessArray.([]T)[arrayOffset:]
+		runtimeBlockInfo := blockData.Val
+		directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+
+		arrayCasted := directBlockArray.([]T)
+		inputArray := arrayCasted[:arrayEndOffset]
+
 
 		var outputBitset bits.Bitfield
 
-		ops.CompareValuesAreSmallerBitset(arrInput,operand0, &outputBitset)
+		ops.CompareValuesAreSmallerBitset(inputArray,operand0, &outputBitset)
 
 		blockGroupMerger.WithBitset(&outputBitset, false, false)
+		
 	}
 
 	return

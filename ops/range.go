@@ -671,6 +671,7 @@ func CompareValuesAreInRangeUnsignedIntsBitsetFast[T UnsignedInts](
 
 	// tail
 	for ; i < n; i++ {
+
 		if (arr[i] - from) < rng {
 			out.Set(i)
 		}

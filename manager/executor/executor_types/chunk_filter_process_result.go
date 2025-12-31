@@ -25,4 +25,6 @@ type SingleColumnProcessingResult struct {
 	SkippedBlocksDueToHeaderFiltering int
 	ProcessedBlocks                   int
 	FullSkips                         int
+
+	MatchedItems int
 }

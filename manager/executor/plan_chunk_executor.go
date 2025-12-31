@@ -164,6 +164,8 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 		// slog.Info("processing block OK", "block_relative_idx", blockRelativeIdx, "block_data_is_nil", blockData.Val == nil)
 		blockDataType := blockData.BlockHeader.DataType
 
+		var filteredSize int
+
 		for fIdx, filter := range mCtx.FilterColumn {
 
 			headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
@@ -182,7 +184,6 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 
 			{
 				var processFilterErr error
-				var filteredSize int
 
 				// slog.Info("processing filter", "filter_type", blockDataType.String())
 
@@ -200,8 +201,6 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}
 
-				_ = filteredSize
-
 				if processFilterErr != nil {
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 				}
@@ -209,6 +208,8 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 				// slog.Info(" -- [filtered]", "filteredSize", filteredSize, "header_match_cached", headerMatchResult.String(), "arg", filter, "filter_bounds", headerMatchResultObj.Bounds)
 			}
 		}
+
+		result.MatchedItems += filteredSize
 	}
 
 	return
