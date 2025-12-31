@@ -11,46 +11,56 @@ import (
 
 func ChunkBlockProcessorSpecificFilterAndType(groupType schema.FieldType, slabMergerContext *executortypes.BlockMergerContext) (result executortypes.ChunkFilterProcessResult, err error) {
 
-	var singleColumnProcessResult executortypes.SingleColumnProcessingResult
+    var singleColumnProcessResult executortypes.SingleColumnProcessingResult
 	var chunkProcessErr error
 
 	switch groupType {
 
+
+
 	// type alis SignedInts
-
-	case schema.Int8FieldType:
+	
+		case schema.Int8FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfSignedIntsBlocks[int8](slabMergerContext)
-
-	case schema.Int16FieldType:
+	
+		case schema.Int16FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfSignedIntsBlocks[int16](slabMergerContext)
-
-	case schema.Int32FieldType:
+	
+		case schema.Int32FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfSignedIntsBlocks[int32](slabMergerContext)
-
-	case schema.Int64FieldType:
+	
+		case schema.Int64FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfSignedIntsBlocks[int64](slabMergerContext)
+	
 
-		// type alis UnsignedInts
 
-	case schema.Uint8FieldType:
+
+	// type alis UnsignedInts
+	
+		case schema.Uint8FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfUnsignedIntsBlocks[uint8](slabMergerContext)
-
-	case schema.Uint16FieldType:
+	
+		case schema.Uint16FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfUnsignedIntsBlocks[uint16](slabMergerContext)
-
-	case schema.Uint32FieldType:
+	
+		case schema.Uint32FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfUnsignedIntsBlocks[uint32](slabMergerContext)
-
-	case schema.Uint64FieldType:
+	
+		case schema.Uint64FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfUnsignedIntsBlocks[uint64](slabMergerContext)
+	
 
-		// type alis Floats
 
-	case schema.Float32FieldType:
+
+	// type alis Floats
+	
+		case schema.Float32FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfFloatsBlocks[float32](slabMergerContext)
-
-	case schema.Float64FieldType:
+	
+		case schema.Float64FieldType:
 		singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfFloatsBlocks[float64](slabMergerContext)
+	
+
 
 	default:
 		return executortypes.ChunkFilterProcessResult{}, fmt.Errorf("unsupported field type while prcessing filters on chunk of blocks : %s", groupType.String())
