@@ -4,21 +4,21 @@
             "name": "EQ",
             "args": 1,
             "implementations": {
-                "Numeric": "ops.CompareNumericValuesAreEqualBitset"
+                "NumericTypes": "ops.CompareNumericValuesAreEqualBitset"
             }
         },
         {
             "name": "GT",
             "args": 1,
             "implementations": {
-                "Numeric": "ops.CompareValuesAreBiggerBitset"
+                "NumericTypes": "ops.CompareValuesAreBiggerBitset"
             }
         },
         {
             "name": "LT",
             "args": 1,
             "implementations": {
-                "Numeric": "ops.CompareValuesAreSmallerBitset"
+                "NumericTypes": "ops.CompareValuesAreSmallerBitset"
             }
         },
         {
@@ -44,7 +44,7 @@
         "schema.Float64FieldType": "float64"
     },
     "numericTypeAlias": {
-        "name": "Numeric",
+        "name": "NumericTypes",
         "items": [
             "schema.Int8FieldType",
             "schema.Int16FieldType",
@@ -91,8 +91,8 @@
             "tpl": "SpecificFilter{{filter.Name|capitalize}}On{{typeAlias.Name}}BlocksProcessor"
         },
         {
-            "name": "filter_processor_on_blocks",
-            "tpl": "ProcessFiltersOnChunkOf{{typeAlias.Name}}Blocks"
+            "name": "typed_filters_loop_processor_on_blocks",
+            "tpl": "TypedFiltersLoopOnChunkOf{{typeAlias.Name}}Blocks"
         },
         {
             "name": "chunk_blocks_specific_processor",

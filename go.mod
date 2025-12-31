@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fatih/color v1.18.0
+	github.com/flosch/pongo2/v6 v6.0.0
 	github.com/google/uuid v1.6.0
 	github.com/pierrec/lz4/v4 v4.1.22
 )

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -119,13 +120,13 @@ func ExecutePlanForChunk(
 
 		switch groupType { // switch on field type
 		case schema.Uint16FieldType:
-			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint16](&slabMergerContext, &result)
+			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint16](&slabMergerContext)
 		case schema.Uint32FieldType:
-			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint32](&slabMergerContext, &result)
+			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint32](&slabMergerContext)
 		case schema.Uint64FieldType:
-			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint64](&slabMergerContext, &result)
+			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint64](&slabMergerContext)
 		case schema.Uint8FieldType:
-			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint8](&slabMergerContext, &result)
+			singleColumnProcessResult, chunkProcessErr = ProcessFiltersOnChunkOfBlocksUnsigned[uint8](&slabMergerContext)
 		default:
 			return ChunkFilterProcessResult{}, fmt.Errorf("unsupported field type while prcessing filters on chunk of blocks : %s", groupType.String())
 		}
@@ -167,12 +168,25 @@ func ExecutePlanForChunk(
 	return result, nil
 }
 
+func ProcessRangeFilterOnUnsignedBlocks[T ops.UnsignedInts](blocks []executortypes.BlockRuntimeInfo, operandA, operandB T, slabMergerContext *BlockMergerContext) {
+
+	for idx := range blocks {
+		blockData := &blocks[idx]
+		accessArray, arrayOffset := blockData.Val.DirectAccess()
+		arrInput := accessArray.([]T)[arrayOffset:]
+
+		var outputBitset bits.Bitfield
+
+		ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(arrInput, operandA, operandB, &outputBitset)
+
+		blockGroupMerger := &slabMergerContext.AbsBlockMaps[idx]
+		blockGroupMerger.WithBitset(&outputBitset, false, false)
+	}
+}
+
 func ProcessFiltersOnChunkOfBlocksUnsigned[T ops.UnsignedInts](slabMergerContext *BlockMergerContext) (result SingleColumnProcessingResult, topErr error) {
 
-	return
-
-	/*for fIdx, _filter := range slabMergerContext.FilterColumn {
-
+	for _, _filter := range slabMergerContext.FilterColumn {
 		filterType := _filter.Filter.Operand
 		filter := &_filter.Filter
 
@@ -188,29 +202,14 @@ func ProcessFiltersOnChunkOfBlocksUnsigned[T ops.UnsignedInts](slabMergerContext
 
 			}
 
-			itemsFiltered = ops.CompareValuesAreInRangeUnsignedIntsBitsetFast(inputArray, operandA, operandB, &outputBitset)
-			// log.Printf(" end of input array offset : %v", arrayEndOffset)
-		case query.EQ:
-			operand := filter.Arguments[0].(T)
-
-			itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
-
-		case query.GT:
-			operand := filter.Arguments[0].(T)
-
-			itemsFiltered = ops.CompareValuesAreBiggerBitset(inputArray, operand, &outputBitset)
-		case query.LT:
-			operand := filter.Arguments[0].(T)
-
-			itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
+			ProcessRangeFilterOnUnsignedBlocks[T](slabMergerContext.Blocks, operandA, operandB, slabMergerContext)
 
 		default:
-			return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
+			return SingleColumnProcessingResult{}, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
 		}
 
 	}
 	return result, nil
-	*/
 
 }
 
