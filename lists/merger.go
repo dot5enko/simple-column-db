@@ -123,7 +123,7 @@ func (i *IndiceUnmerged) withFull() {
 		return
 	}
 
-	i.ResultBitset = bits.MergeAND(i.ResultBitset, BitsetFull)
+	// i.ResultBitset = bits.MergeAND(i.ResultBitset, BitsetFull)
 
 }
 
