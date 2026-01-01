@@ -130,6 +130,7 @@ func main() {
 		for name, params := range resultsMap {
 
 			params["config"] = parsed
+			params["loop_unwrap_number"] = 2
 			params["gen_range"] = func(hi int) []int {
 				lo := 0
 				s := make([]int, hi-lo)
