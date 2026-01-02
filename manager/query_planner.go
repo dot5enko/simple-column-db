@@ -58,8 +58,6 @@ func (qp *QueryPlanner) Plan(
 		slabsFiltered := []uuid.UUID{}
 		// skippedBlocksDueToHeaderFiltering := 0
 
-		queryObject := qp.pool.Get()
-
 		// full scan of all slabs and their blocks
 		slabsByColumns := map[string][]uuid.UUID{}
 
