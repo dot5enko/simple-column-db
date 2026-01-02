@@ -14,6 +14,8 @@ type ManagerConfig struct {
 	CacheMaxBytes uint64
 
 	ExecutorsMaxConcurentThreads int
+
+	QueryCacheSize int
 }
 
 type Manager struct {
@@ -34,8 +36,13 @@ func (m *Manager) SetQueryOptions(qopts query.QueryOptions) {
 
 func New(config ManagerConfig) *Manager {
 
+	// default values
+	if config.QueryCacheSize == 0 {
+		config.QueryCacheSize = 256
+	}
+
 	man := &Manager{
-		Planner:     NewQueryPlanner(),
+		Planner:     NewQueryPlanner(config.QueryCacheSize),
 		Meta:        meta.NewMetaManager(config.PathToStorage),
 		chunksQueue: make(chan *executor.ChunkProcessingTask, 512),
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
@@ -15,10 +16,13 @@ import (
 )
 
 type QueryPlanner struct {
+	pool *cache.TypedRingBuffer[query.Query]
 }
 
-func NewQueryPlanner() *QueryPlanner {
-	return &QueryPlanner{}
+func NewQueryPlanner(predefinedCacheSize int) *QueryPlanner {
+	return &QueryPlanner{
+		pool: cache.NewTypedRingBuffer[query.Query](predefinedCacheSize),
+	}
 }
 
 func (qp *QueryPlanner) Plan(
@@ -28,6 +32,7 @@ func (qp *QueryPlanner) Plan(
 	slabManager *meta.SlabManager,
 	options *query.QueryOptions,
 ) (query.QueryPlan, error) {
+
 	schemaObject := metaManager.GetSchema(schemaName)
 	if schemaObject == nil {
 		return query.QueryPlan{}, query.ErrSchemaNotFound
@@ -52,6 +57,8 @@ func (qp *QueryPlanner) Plan(
 		// slabs
 		slabsFiltered := []uuid.UUID{}
 		// skippedBlocksDueToHeaderFiltering := 0
+
+		queryObject := qp.pool.Get()
 
 		// full scan of all slabs and their blocks
 		slabsByColumns := map[string][]uuid.UUID{}
@@ -135,10 +142,10 @@ func (qp *QueryPlanner) Plan(
 
 		// total size of blocks in all segments == ExecutorChunkSizeBlocks
 
-		perColumnChunks := map[int]*query.ColumnChunks{}
+		perColumnChunks := make(map[int]*query.ColumnChunks, len(schemaObject.Columns))
 
 		newSingleChunk := func() *query.SingleChunk {
-			return &query.SingleChunk{Segments: []query.Segment{}}
+			return &query.SingleChunk{Segments: make([]query.Segment, 0, query.ExecutorChunkSizeBlocks)}
 		}
 
 		maxChunks := 0
@@ -244,7 +251,7 @@ func (qp *QueryPlanner) Plan(
 
 			curChunkSlabs, ok := perColumnChunks[columnIdx]
 			if !ok {
-				curChunkSlabs = &query.ColumnChunks{List: []query.SingleChunk{}}
+				curChunkSlabs = &query.ColumnChunks{List: make([]query.SingleChunk, 0, query.ExecutorChunkSizeBlocks)}
 				perColumnChunks[columnIdx] = curChunkSlabs
 			}
 
@@ -267,6 +274,7 @@ func (qp *QueryPlanner) Plan(
 					leftoverChunk := query.ExecutorChunkSizeBlocks - curChunkSlabsItem.BlocksFilled
 					if leftoverChunk == 0 {
 						curChunkSlabs.List = append(curChunkSlabs.List, *curChunkSlabsItem)
+
 						curChunkSlabsItem = newSingleChunk()
 						continue
 					}
@@ -318,6 +326,9 @@ func (qp *QueryPlanner) Plan(
 
 					// include selector unique fields
 					curChunkObject.ChunkSegmentsByFieldIndexMap = make([][]query.Segment, fieldsCount)
+
+					allocatedchunks += fieldsCount
+
 					curChunkObject.GlobalBlockOffset = uint64(chunkIdx) * query.ExecutorChunkSizeBlocks
 				}
 
@@ -335,3 +346,7 @@ func (qp *QueryPlanner) Plan(
 	}
 
 }
+
+var allocatedchunks = 0
+
+func AllocatedChunks() int { return allocatedchunks }

@@ -3,12 +3,16 @@ package cache
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 type TypedRingBuffer[T any] struct {
 	stats Stats
 
 	head atomic.Pointer[node[T]]
+
+	generator func(*T) *T
 }
 
 type node[T any] struct {
@@ -32,6 +36,9 @@ func (rb *TypedRingBuffer[T]) pushNode(n *node[T]) {
 }
 
 func (rb *TypedRingBuffer[T]) popNode() *node[T] {
+
+	counter := 0
+
 	for {
 		cur := rb.head.Load()
 
@@ -39,9 +46,23 @@ func (rb *TypedRingBuffer[T]) popNode() *node[T] {
 			panic("empty TypedRingBuffer value on the head")
 		}
 
+		counter += 1
+
 		if rb.head.CompareAndSwap(cur, cur.prev) {
 			return cur
 		}
+
+		if counter > 128 {
+			color.Red("too many cycles of waiting")
+
+			if rb.generator != nil {
+				newNode := &node[T]{val: rb.generator(nil)}
+				rb.pushNode(newNode)
+				return newNode
+			}
+
+		}
+
 	}
 }
 
@@ -60,6 +81,10 @@ func NewTypedRingBuffer[T any](n int) *TypedRingBuffer[T] {
 	}
 
 	return rb
+}
+
+func (p *TypedRingBuffer[T]) WithInitializer(cb func(item *T) *T) {
+	p.generator = cb
 }
 
 func (p *TypedRingBuffer[T]) Get() *T {

@@ -539,6 +539,8 @@ func main() {
 
 	m.Slabs.PrintBufferEffectivityReport()
 
+	slog.Info("allocated_chunks", "n", manager.AllocatedChunks())
+
 	cancelWorkers()
 
 }
