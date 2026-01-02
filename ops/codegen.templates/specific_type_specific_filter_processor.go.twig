@@ -25,30 +25,30 @@ for ; idx+{{loop_unwrap_number}}-1 < n; idx += {{loop_unwrap_number}} {
 
         if blockGroupMerger.FullSkip() {
             result.FullSkips += 1
+            continue;
+        } 
+
+        headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
+        headerMatchResult := headerMatchResultObj.MatchResult
+
+        if headerMatchResult == schema.FullIntersection {
+            result.SkippedBlocksDueToHeaderFiltering += 1
+            blockGroupMerger.WithBitset(nil, false, true)
         } else {
+            result.ProcessedBlocks += 1
 
-            headerMatchResultObj := blockData.HeaderFilterMatchResult[fIdx]
-            headerMatchResult := headerMatchResultObj.MatchResult
+            runtimeBlockInfo := blockData.Val
+            directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
-            if headerMatchResult == schema.FullIntersection {
-                result.SkippedBlocksDueToHeaderFiltering += 1
-                blockGroupMerger.WithBitset(nil, false, true)
-            } else {
-                result.ProcessedBlocks += 1
+            arrayCasted := directBlockArray.([]T)
+            inputArray := arrayCasted[:arrayEndOffset]
 
-                runtimeBlockInfo := blockData.Val
-                directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+            var outputBitset bits.Bitfield
 
-                arrayCasted := directBlockArray.([]T)
-                inputArray := arrayCasted[:arrayEndOffset]
+            {% set tempFilter = config.Filters[filtersIndexes[filter.Name]] %}
+            {% if tempFilter.Implementations[typeAlias.Name] %}{{tempFilter.Implementations[typeAlias.Name]}}{% else %}{{tempFilter.Implementations['NumericTypes']}}{% endif %}(inputArray{% for i in gen_range(filter.Args) %}, operand{{i}}{% endfor %}, &outputBitset)
 
-                var outputBitset bits.Bitfield
-
-                {% set tempFilter = config.Filters[filtersIndexes[filter.Name]] %}
-                {% if tempFilter.Implementations[typeAlias.Name] %}{{tempFilter.Implementations[typeAlias.Name]}}{% else %}{{tempFilter.Implementations['NumericTypes']}}{% endif %}(inputArray{% for i in gen_range(filter.Args) %}, operand{{i}}{% endfor %}, &outputBitset)
-
-                blockGroupMerger.WithBitset(&outputBitset, false, false)
-            }
+            blockGroupMerger.WithBitset(&outputBitset, false, false)
         }
     }
 {% endfor %}

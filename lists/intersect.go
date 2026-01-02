@@ -2,6 +2,7 @@ package lists
 
 import (
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/ops"
 )
 
 func Intersect[T uint64 | uint16](a, b, out []T, cache map[T]uint8) int {
@@ -88,6 +89,129 @@ func IntersectIndicesFastTwoListBitset(a, b, out []uint16) int {
 	}
 
 	return resultBitset.ToIndices(out)
+}
+
+func b2uT[T ops.NumericTypes](val T) T {
+
+	if val == 2 {
+		return 1
+	}
+	return 0
+}
+
+func MergeArrAnd[T ops.NumericTypes](a []T, b []T, out []T) T {
+
+	// unroll by 8
+	n := len(a)
+	i := 0
+
+	var count T = 0
+
+	for ; i+7 < n; i += 8 {
+
+		idx := i
+
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+		{
+			bval := a[idx] + b[idx]
+			ival := b2uT[T](bval)
+			out[idx] = ival
+
+			count += ival
+
+			idx += 1
+
+		}
+	}
+
+	// tail
+	for ; i < n; i++ {
+		{
+			bval := a[i] + b[i]
+			ival := b2uT[T](bval)
+			out[i] = ival
+
+			count += ival
+		}
+	}
+
+	return count
+}
+
+func IntersectIndicesFastTwoListArray(a, b, out []uint16) uint16 {
+	return MergeArrAnd(a, b, out)
 }
 
 func IntersectIndicesFastTwoListBitsetOptimized(a, b, out []uint16, aStart, bStart, aEnd, bEnd uint16) int {

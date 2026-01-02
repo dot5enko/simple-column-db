@@ -19,6 +19,18 @@ func randomFillIndices(n int, fillPercent int) []uint16 {
 	return out
 }
 
+func randomFillIndicesFull(n int, fillPercent int) []uint16 {
+	out := make([]uint16, n)
+	for i := 0; i < n; i++ {
+		if rand.Intn(100) < fillPercent {
+			out[i] = 1
+		} else {
+			out[i] = 0
+		}
+	}
+	return out
+}
+
 func randomFillIndicesWithBounds(n int, fillPercent int) (output []uint16, start, end uint16) {
 	out := make([]uint16, 0, n*fillPercent/100)
 	for i := 0; i < n; i++ {
@@ -138,6 +150,30 @@ func BenchmarkIntersectFastesOptimizedRandFull(t *testing.B) {
 		lists.IntersectIndicesFastTwoListBitset(input, input2, out)
 	}
 
+}
+
+func BenchmarkIntersectFastestV2OptimizedRandHalfSparse(t *testing.B) {
+
+	input := randomFillIndicesFull(blocksize, 85)
+	input2 := randomFillIndicesFull(blocksize, 15)
+
+	out := make([]uint16, blocksize)
+
+	for t.Loop() {
+		lists.IntersectIndicesFastTwoListArray(input, input2, out)
+	}
+}
+
+func BenchmarkIntersectFastestV2OptimizedRandFull(t *testing.B) {
+
+	input := randomFillIndicesFull(blocksize, 85)
+	input2 := randomFillIndicesFull(blocksize, 80)
+
+	out := make([]uint16, blocksize)
+
+	for t.Loop() {
+		lists.IntersectIndicesFastTwoListArray(input, input2, out)
+	}
 }
 
 func BenchmarkIntersectFastestOptimizedRandHalfSparse(t *testing.B) {
