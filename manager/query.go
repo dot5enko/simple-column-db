@@ -45,14 +45,14 @@ type QueryResult struct {
 	Data map[string][]any
 
 	finalized bool
-	metrics   executortypes.ChunkFilterProcessResult
+	metrics   *executortypes.ChunkFilterProcessResult
 
 	task *executor.TaskStatus
 
 	Error error
 }
 
-func (q *QueryResult) GetMetrics() executortypes.ChunkFilterProcessResult {
+func (q *QueryResult) GetMetrics() *executortypes.ChunkFilterProcessResult {
 
 	if !q.finalized {
 		log.Printf("waiting for query results")
@@ -70,8 +70,7 @@ func (q *QueryResult) Wait() {
 	taskStatus.Waiter.Wait()
 	waitTookMs := time.Since(timeBefore)
 
-	cummResult := taskStatus.ChunkResult
-
+	cummResult := &taskStatus.ChunkResult
 	cummResult.PureLock = waitTookMs.Nanoseconds()
 
 	q.finalized = true
@@ -130,6 +129,7 @@ func (sm *Manager) Query(
 	}
 
 	result.task = taskStatus
+	executor.QueueSizeNow.Add(1)
 
 	return result, nil
 }

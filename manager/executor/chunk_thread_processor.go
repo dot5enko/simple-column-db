@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/fatih/color"
 )
+
+var QueueSizeNow atomic.Int32
 
 func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
 
@@ -70,6 +73,9 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			if processed == int32(curStatus.ChunksTotal) {
 				globalChunkResult.TotalQueryDuration = time.Since(task.Status.StartTime)
 				curStatus.Waiter.Done()
+
+				nowSize := QueueSizeNow.Add(-1)
+				log.Printf("queue size now: %d\n", nowSize)
 			}
 
 		}

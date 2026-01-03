@@ -9,7 +9,6 @@ type Waiter struct {
 	erHappened atomic.Bool
 	err        error
 	tasks      atomic.Int32
-	wasted     atomic.Int32
 
 	sleepStep time.Duration
 }
@@ -32,8 +31,6 @@ func (w *Waiter) Errored(err error) {
 
 func (w *Waiter) SetSleepStep(step time.Duration) { w.sleepStep = step }
 
-func (w *Waiter) WastedCycles() int32 { return w.wasted.Load() }
-
 // wait
 // returns error if any of the tasks failed
 func (w *Waiter) Wait() error {
@@ -48,7 +45,6 @@ func (w *Waiter) Wait() error {
 			break
 		}
 
-		w.wasted.Add(1)
 		time.Sleep(w.sleepStep)
 	}
 
