@@ -10,10 +10,10 @@ import (
 
 func (sm *SlabManager) UpdateSlabHeaderOnDisk(s schema.Schema, slab *schema.DiskSlabHeader) error {
 
-	headerReadBuffer, headerBufferIdx := sm.headerReaderBufferRing.Get()
+	headerReadBuffer, headerBufferIdx := sm.buffers.headerReaderBufferRing.Get()
 
 	defer func() {
-		sm.headerReaderBufferRing.Return(headerBufferIdx)
+		sm.buffers.headerReaderBufferRing.Return(headerBufferIdx)
 	}()
 
 	serializedBytes, headerBytesErr := slab.WriteTo(headerReadBuffer)

@@ -3,7 +3,6 @@ package meta
 import (
 	"fmt"
 	"slices"
-	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/ops"
@@ -34,11 +33,11 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 
 	cached := m.getBlockFromCache(slab.Uid, block)
 
-	if cached != nil {
+	if cached.runtime != nil {
 		return cached.runtime, nil
 	} else {
-		// put into cache
 
+		// put into cache
 		var blockHeader schema.DiskHeader
 		blockIdx := -1
 		blockStartOffset := 0
@@ -86,7 +85,7 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				m.rt.cache[blockId] = BlockCacheItem{
 					header:  &blockHeader,
 					runtime: runtimeBlockData,
-					rtStats: &cache.CacheStats{CacheEntryId: slabData.RtStats.CacheEntryId, Created: time.Now(), Reads: 1},
+					rtStats: &cache.CacheStats{CacheEntryId: slabData.RtStats.CacheEntryId, Reads: 1},
 				}
 
 				return runtimeBlockData, nil

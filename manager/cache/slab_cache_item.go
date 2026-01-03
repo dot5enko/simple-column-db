@@ -1,8 +1,6 @@
 package cache
 
 import (
-	"time"
-
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
@@ -21,10 +19,10 @@ func (item *SlabCacheItem) Reset() {
 
 	if item.RtStats != nil {
 		item.RtStats.Reads = 0
-		item.RtStats.Created = time.Now()
+		// item.RtStats.Created = time.Now()
 	} else {
 		item.RtStats = &CacheStats{
-			Created: time.Now(),
+			// Created: time.Now(),
 		}
 	}
 }
@@ -40,10 +38,10 @@ func (item *SlabDataCacheItem) Reset() {
 
 	if item.RtStats != nil {
 		item.RtStats.Reads = 0
-		item.RtStats.Created = time.Now()
+		// item.RtStats.Created = time.Now()
 	} else {
 		item.RtStats = &CacheStats{
-			Created: time.Now(),
+			// Created: time.Now(),
 		}
 	}
 }

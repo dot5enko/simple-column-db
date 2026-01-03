@@ -11,8 +11,8 @@ import (
 
 func (m *SlabManager) NewSlabForColumn(schemaConfig schema.Schema, col schema.SchemaColumn, slabOffsetBlocks uint64) (*schema.DiskSlabHeader, error) {
 
-	wholeSlabCache, slabCacheIdx1 := m.fullSlabBufferRing.Get()
-	defer m.fullSlabBufferRing.Return(slabCacheIdx1)
+	wholeSlabCache, slabCacheIdx1 := m.buffers.fullSlabBufferRing.Get()
+	defer m.buffers.fullSlabBufferRing.Return(slabCacheIdx1)
 
 	slabHeader, slabError := schema.NewDiskSlab(schemaConfig, col.Name, slabOffsetBlocks)
 	if slabError != nil {

@@ -2,7 +2,6 @@ package executor
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -19,6 +18,8 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	threadCache := &executortypes.ChunkExecutorThreadCache{}
 
 	for task := range tasksQueue {
+
+		// color.Red(" chunk processed [%d] x %d blocks", task.ChunkIdx, query.ExecutorChunkSizeBlocks)
 
 		curStatus := task.Status
 		start := time.Now()
@@ -41,11 +42,10 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 		} else {
 
 			processed := curStatus.ChunksProcessed.Add(1)
-
 			processingTook := time.Since(start).Seconds() * 1000.0
 
 			if false {
-				slog.Info("chunk processing done ", "chunk_id", task.ChunkIdx, "took_ms", fmt.Sprintf("%.2f", processingTook))
+				slog.Info("chunk processing done ", "chunk_id", task.ChunkIdx, "took_ms", processingTook, "io_time", taskRes.IoTime)
 			}
 
 			globalChunkResult := &curStatus.ChunkResult
@@ -74,8 +74,8 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 				globalChunkResult.TotalQueryDuration = time.Since(task.Status.StartTime)
 				curStatus.Waiter.Done()
 
-				nowSize := QueueSizeNow.Add(-1)
-				log.Printf("queue size now: %d\n", nowSize)
+				// nowSize := QueueSizeNow.Add(-1)
+				// log.Printf("queue size now: %d\n", nowSize)
 			}
 
 		}

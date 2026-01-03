@@ -136,6 +136,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 				sm,
 			)
 			if preparationErr != nil {
+
 				return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
 			}
 		}

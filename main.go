@@ -89,6 +89,8 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
+	runtime.MemProfileRate = 1
+
 	pprofEnabled := flag.Bool("trace", false, "enable pprof server")
 	cpuProf := flag.Bool("cpuprof", false, "cpu pprof")
 	blockProf := flag.Bool("blockprof", false, "collect blocking pprof")
@@ -119,17 +121,30 @@ func main() {
 		}()
 	}
 
+	var mstats2 runtime.MemStats
+
+	defer func() {
+		runtime.ReadMemStats(&mstats2)
+
+		for idx := range mstats2.BySize {
+			it := mstats2.BySize[idx]
+			mallocs := it.Mallocs
+			// - it0.Mallocs
+			frees := it.Frees
+			// - it0.Frees
+
+			if mallocs > 0 {
+				slog.Info(" === mem stats main", "alloc_bytes", it.Size, "size", mallocs, "frees", frees)
+			}
+		}
+
+	}()
+
 	if *heapProf {
 
-		profileFile, _ := os.Create(profName("heap"))
-		runtime.MemProfileRate = 1
+		// defer func() {
 
-		defer func() {
-
-			pprof.WriteHeapProfile(profileFile)
-
-			profileFile.Close()
-		}()
+		// }()
 	}
 
 	if *cpuProf {

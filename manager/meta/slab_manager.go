@@ -46,6 +46,13 @@ type SlabManagerSession struct {
 	idx        uint64
 }
 
+type smBuffers struct {
+	headerReaderBufferRing *cache.FixedSizeBufferPool
+	fullSlabBufferRing     *cache.FixedSizeBufferPool
+	slabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
+	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabDataCacheItem]
+}
+
 type SlabManager struct {
 	storagePath string
 
@@ -53,26 +60,19 @@ type SlabManager struct {
 	rt *SlabManagerRuntimeCache
 
 	// buffers
-	headerReaderBufferRing *cache.FixedSizeBufferPool
-	fullSlabBufferRing     *cache.FixedSizeBufferPool
-	slabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
-	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabDataCacheItem]
+	buffers *smBuffers
 
-	meta *MetaManager
-
+	meta    *MetaManager
 	session *SlabManagerSession
 }
 
 // copy with session
 func (sm *SlabManager) NewSession(cache *executortypes.ChunkExecutorThreadCache) *SlabManager {
 	newSm := &SlabManager{
-		storagePath:            sm.storagePath,
-		rt:                     sm.rt,
-		headerReaderBufferRing: sm.headerReaderBufferRing,
-		fullSlabBufferRing:     sm.fullSlabBufferRing,
-		slabHeaderCache:        sm.slabHeaderCache,
-		slabRuntimeCache:       sm.slabRuntimeCache,
-		meta:                   sm.meta,
+		storagePath: sm.storagePath,
+		rt:          sm.rt,
+		buffers:     sm.buffers,
+		meta:        sm.meta,
 		session: &SlabManagerSession{
 			perf_stats: &perf.PerformanceMetrics{
 				IoTime: time.Duration(0),
@@ -111,10 +111,12 @@ func (m *SlabManager) PrintBufferEffectivityReport() {
 
 	log.Printf("%s%s%s", headerPart, "buffer effectiveness", headerPart)
 
-	printSingleBufferReport("headerReaderBufferRing", m.headerReaderBufferRing.GetStats())
-	printSingleBufferReport("fullSlabBufferRing", m.fullSlabBufferRing.GetStats())
-	printSingleBufferReport("slabHeaderCache", m.slabHeaderCache.GetStats())
-	printSingleBufferReport("slabRuntimeCache", m.slabRuntimeCache.GetStats())
+	buffers := m.buffers
+
+	printSingleBufferReport("headerReaderBufferRing", buffers.headerReaderBufferRing.GetStats())
+	printSingleBufferReport("fullSlabBufferRing", buffers.fullSlabBufferRing.GetStats())
+	printSingleBufferReport("slabHeaderCache", buffers.slabHeaderCache.GetStats())
+	printSingleBufferReport("slabRuntimeCache", buffers.slabRuntimeCache.GetStats())
 
 	log.Println(headerPart)
 
@@ -133,15 +135,19 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 		meta: meta,
 	}
 
-	// 1slab = ±10MB ram
-	sm.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
-	sm.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
+	buffers := &smBuffers{}
 
-	sm.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32)
+	// 1slab = ±10MB ram
+	buffers.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
+	buffers.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
+
+	buffers.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32)
 
 	// slab reusing header
 	// todo profile and optimize
-	sm.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128)
+	buffers.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128)
+
+	sm.buffers = buffers
 
 	return sm
 }
@@ -188,7 +194,7 @@ func GetUniqueBlockId(slab, block uuid.UUID) [32]byte {
 	return uid
 }
 
-func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
+func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) BlockCacheItem {
 
 	m.rt.locker.RLock()
 	defer m.rt.locker.RUnlock()
@@ -198,10 +204,10 @@ func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 	if item, ok := m.rt.cache[uid]; ok {
 
 		atomic.AddInt64(&item.rtStats.Reads, 1)
-		return &item
+		return item
 	}
 
-	return nil
+	return BlockCacheItem{}
 }
 
 // load block from slab

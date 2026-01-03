@@ -3,7 +3,6 @@ package meta
 import (
 	"bytes"
 	"fmt"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
@@ -24,14 +23,14 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 
 		v, err, _ := m.rt.loadGroup.Do(slabUid.String(), func() (any, error) {
 
-			slabReadCache, slabCacheIdx := m.fullSlabBufferRing.Get()
-			headerReadBuffer, headerBufferIdx := m.headerReaderBufferRing.Get()
+			slabReadCache, slabCacheIdx := m.buffers.fullSlabBufferRing.Get()
+			headerReadBuffer, headerBufferIdx := m.buffers.headerReaderBufferRing.Get()
 
 			// no need to block this resources for whole duration of func
 			// todo optimize
 			defer func() {
-				m.fullSlabBufferRing.Return(slabCacheIdx)
-				m.headerReaderBufferRing.Return(headerBufferIdx)
+				m.buffers.fullSlabBufferRing.Return(slabCacheIdx)
+				m.buffers.headerReaderBufferRing.Return(headerBufferIdx)
 			}()
 
 			// slog.Info("loading slab to cache from disk", "slab_uid", slabUid.String())
@@ -53,7 +52,7 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 					// ioTime := time.Since(readStart).Seconds()
 
 					var headerCacheEntryId uint16
-					result = m.slabHeaderCache.Get()
+					result = m.buffers.slabHeaderCache.Get()
 
 					headerBytes := bytes.NewReader(headerReadBuffer)
 					headerParseErr := result.FromBytes(headerBytes)
@@ -104,7 +103,9 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 					m.rt.slabHeaderCacheItem[slabUid] = &cache.SlabCacheItem{
 						CacheEntryId: headerCacheEntryId,
 						Header:       result,
-						RtStats:      &cache.CacheStats{Created: time.Now()},
+						RtStats:      &cache.CacheStats{
+							// Created: time.Now()
+						},
 					}
 
 					return result, nil
@@ -155,7 +156,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		fileReader.SetPerfStats(m.GetSession())
 
 		defer fileReader.Close()
-		item := m.slabRuntimeCache.Get()
+		item := m.buffers.slabRuntimeCache.Get()
 
 		// todo improve this part
 		// should be done on .Get inside RingBuffer

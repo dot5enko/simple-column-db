@@ -60,11 +60,11 @@ func (sm *SlabManager) UpdateBlockHeaderAndDataOnDisk(
 	}
 
 	// compression buffer
-	slabReadCache, slabCacheIdx := sm.fullSlabBufferRing.Get()
-	defer sm.fullSlabBufferRing.Return(slabCacheIdx)
+	slabReadCache, slabCacheIdx := sm.buffers.fullSlabBufferRing.Get()
+	defer sm.buffers.fullSlabBufferRing.Return(slabCacheIdx)
 
-	slabReadCache1, slabCacheIdx1 := sm.fullSlabBufferRing.Get()
-	defer sm.fullSlabBufferRing.Return(slabCacheIdx1)
+	slabReadCache1, slabCacheIdx1 := sm.buffers.fullSlabBufferRing.Get()
+	defer sm.buffers.fullSlabBufferRing.Return(slabCacheIdx1)
 
 	{
 		singleBlockUncompressedSize := slab.Type.BlockSize()
