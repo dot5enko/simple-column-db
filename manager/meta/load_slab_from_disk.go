@@ -189,7 +189,8 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 			return nil, openErr
 		}
 
-		fileReader.SetPerfStats(m.GetSession())
+		statSession := m.GetSession()
+		fileReader.SetPerfStats(statSession)
 
 		defer fileReader.Close()
 		item := m.buffers.slabRuntimeCache.Get()
@@ -232,7 +233,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 
 					decodedIs := decodings.Add(1)
 
-					color.Blue(" slab (%.2fMB) decompress took %.2fms %d", mbSize, decTook*1000, decodedIs)
+					color.Blue(" slab (%.2fMB) decompress took %.2fms %d. IO : %.2f", mbSize, decTook*1000, decodedIs, statSession.IoTime.Seconds()*1000)
 
 					// _ = mbSize
 					// _ = decTook
