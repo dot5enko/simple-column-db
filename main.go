@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"math/rand"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -24,6 +25,8 @@ import (
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+
+	_ "net/http/pprof"
 )
 
 func testCycles(n int, label string, testSize int, cb func()) {
@@ -89,8 +92,9 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
-	runtime.MemProfileRate = 1
+	runtime.MemProfileRate = 0
 
+	waitBeforeStart := flag.Int("wait_before_start", 0, "wait ms before app start ( useful with pprof )")
 	pprofEnabled := flag.Bool("trace", false, "enable pprof server")
 	cpuProf := flag.Bool("cpuprof", false, "cpu pprof")
 	blockProf := flag.Bool("blockprof", false, "collect blocking pprof")
@@ -121,30 +125,28 @@ func main() {
 		}()
 	}
 
-	var mstats2 runtime.MemStats
-
-	defer func() {
-		runtime.ReadMemStats(&mstats2)
-
-		for idx := range mstats2.BySize {
-			it := mstats2.BySize[idx]
-			mallocs := it.Mallocs
-			// - it0.Mallocs
-			frees := it.Frees
-			// - it0.Frees
-
-			if mallocs > 0 {
-				slog.Info(" === mem stats main", "alloc_bytes", it.Size, "size", mallocs, "frees", frees)
-			}
-		}
-
-	}()
+	go http.ListenAndServe("localhost:6060", nil)
 
 	if *heapProf {
 
-		// defer func() {
+		var mstats2 runtime.MemStats
 
-		// }()
+		defer func() {
+			runtime.ReadMemStats(&mstats2)
+
+			for idx := range mstats2.BySize {
+				it := mstats2.BySize[idx]
+				mallocs := it.Mallocs
+				// - it0.Mallocs
+				frees := it.Frees
+				// - it0.Frees
+
+				if mallocs > 0 {
+					slog.Info(" === mem stats main", "alloc_bytes", it.Size, "size", mallocs, "frees", frees)
+				}
+			}
+
+		}()
 	}
 
 	if *cpuProf {
@@ -207,8 +209,8 @@ func main() {
 
 	testN := *testIterations
 
-	if *pprofEnabled {
-		time.Sleep(time.Second * 5)
+	if *waitBeforeStart > 0 {
+		time.Sleep(time.Millisecond * time.Duration(*waitBeforeStart))
 	}
 
 	workersCtx, cancelWorkers := context.WithCancel(context.Background())
@@ -544,6 +546,10 @@ func main() {
 	multithreadWg := sync.WaitGroup{}
 
 	multithreadWg.Add(2)
+
+	if *waitBeforeStart > 0 {
+		multithreadWg.Add(1)
+	}
 
 	go testLoopWithOffset("first", 0, &multithreadWg)
 	go testLoopWithOffset("second", 3, &multithreadWg)

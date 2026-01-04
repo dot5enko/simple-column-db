@@ -2,7 +2,9 @@ package executor
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
+	"runtime"
 	"time"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
@@ -35,70 +37,99 @@ func preloadSlabHeaders(slabs *meta.SlabManager, plan *query.QueryPlan, blockChu
 	return nil
 }
 
+func allocsDetection() func() {
+	var mstats runtime.MemStats
+	runtime.ReadMemStats(&mstats)
+	it0 := mstats
+
+	return func() {
+
+		var mstats2 runtime.MemStats
+
+		runtime.ReadMemStats(&mstats2)
+
+		it := mstats2
+
+		mallocs := it.Mallocs - it0.Mallocs
+		// frees := it.Frees - it0.Frees
+
+		bytesSize := 0
+
+		if mallocs > 0 {
+
+			log.Printf(" ===== %d Mallocs", mallocs)
+
+			for i := range it.BySize { // AllocObjects is the number of allocated objects.
+				has := it.BySize[i].Mallocs - it0.BySize[i].Mallocs
+				if has > 0 {
+					bytesSize = int(it.BySize[i].Size)
+					slog.Info(" \t+++ mem stats", "alloc_size", bytesSize, "count", has)
+				}
+			}
+
+		}
+	}
+}
+
 func ExecutePlanForChunk(
 	cache *executortypes.ChunkExecutorThreadCache,
 	sm *meta.SlabManager,
 	plan *query.QueryPlan,
 	blockChunk *query.BlockChunk,
-) (executortypes.ChunkFilterProcessResult, error) {
-
-	// runtime.LockOSThread()
-	// defer runtime.UnlockOSThread()
+	slabMergerContext *executortypes.BlockMergerContext,
+	result *executortypes.ChunkFilterProcessResult,
+) error {
 
 	cache.Reset()
 
-	result := executortypes.ChunkFilterProcessResult{}
+	// defer allocsDetection()()
 
 	// could be parallelized
 	// but synchronization is needed which could be less effective
 	// than chunk process parallelization
 
 	// per field/slab processing
+	slabMergerContext.Schema = plan.Schema
+	slabMergerContext.AbsOffsetStart = blockChunk.GlobalBlockOffset
+
 	for _, filtersGroup := range plan.FilterGroupedByFields {
 
-		conds := len(filtersGroup.Conditions)
-		filterColumnRTCache := cache.FilterCache[:conds]
+		filtersSize := len(filtersGroup.Conditions)
+
+		// check if conds
+		if filtersSize > executortypes.MaxFiltersPerField {
+			return fmt.Errorf("too many filters (%d), max %d", filtersSize, executortypes.MaxFiltersPerField)
+		}
+
+		filterColumnRTCache := cache.FilterCache[:filtersSize]
 
 		// cleanup filter cache
-		for filterCacheIdx := range conds {
+		for filterCacheIdx := range filtersSize {
 			r := &filterColumnRTCache[filterCacheIdx]
 			r.FilterLastBlockHeaderResult = schema.UnknownIntersection
 			r.FilterBounds.Deinit()
 		}
 
 		blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[filtersGroup.ColumnIdx]
-		filtersSize := len(filtersGroup.Conditions)
 
-		slabMergerContext := executortypes.BlockMergerContext{
-			Schema:         plan.Schema,
-			AbsOffsetStart: blockChunk.GlobalBlockOffset,
-
-			// filters applied to single column
-			FilterColumn: filtersGroup.Conditions,
-
-			// todo use circular buffer per thread?
-			FilterColumnRuntimeCache: filterColumnRTCache,
-
-			FilterSize: filtersSize,
-
-			Blocks:       cache.Blocks[:],
-			AbsBlockMaps: cache.AbsBlockMaps[:],
-
-			CurrentBlockProcessingIdx: 0,
-		}
+		// filters applied to single column
+		slabMergerContext.FilterColumn = filtersGroup.Conditions
+		slabMergerContext.FilterColumnRuntimeCache = filterColumnRTCache
+		slabMergerContext.FilterSize = filtersSize
+		slabMergerContext.CurrentBlockProcessingIdx = 0
 
 		// preprocess segments into blocks for column/slab
-		blocksPreprocessErr := preprocessSegmentsIntoBlocksAndHeaderFilter(sm, &slabMergerContext, blockSegments)
+		blocksPreprocessErr := preprocessSegmentsIntoBlocksAndHeaderFilter(sm, slabMergerContext, blockSegments)
 		if blocksPreprocessErr != nil {
-			return executortypes.ChunkFilterProcessResult{}, fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
+			return fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
 
 		groupType := filtersGroup.ColumnSchemaInfo.Type
-		singleColumnProcessResult, chunkProcessErr := generated.ChunkBlockProcessorSpecificFilterAndType(groupType, &slabMergerContext)
+		singleColumnProcessResult, chunkProcessErr := generated.ChunkBlockProcessorSpecificFilterAndType(groupType, slabMergerContext)
 
 		// singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(&slabMergerContext)
 		if chunkProcessErr != nil {
-			return executortypes.ChunkFilterProcessResult{}, fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
+			return fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
 
 			result.ProcessedBlocks += int64(singleColumnProcessResult.ProcessedBlocks)
@@ -129,5 +160,5 @@ func ExecutePlanForChunk(
 	result.TotalItems = int64(totalItems)
 	result.WastedMerges = int64(wastedMerges)
 
-	return result, nil
+	return nil
 }

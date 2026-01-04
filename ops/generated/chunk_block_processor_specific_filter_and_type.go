@@ -11,24 +11,6 @@ import (
 
 func ChunkBlockProcessorSpecificFilterAndType(groupType schema.FieldType, slabMergerContext *executortypes.BlockMergerContext) (result executortypes.ChunkFilterProcessResult, err error) {
 
-	// var mstats runtime.MemStats
-	// var mstats2 runtime.MemStats
-
-	// runtime.ReadMemStats(&mstats)
-	// it0 := mstats.BySize[3]
-
-	// defer func() {
-	// 	runtime.ReadMemStats(&mstats2)
-
-	// 	it := mstats2.BySize[3]
-	// 	mallocs := it.Mallocs - it0.Mallocs
-	// 	frees := it.Frees - it0.Frees
-
-	// 	if mallocs > 0 {
-	// 		slog.Info(" +++ mem stats", "alloc_bytes", it.Size, "size", mallocs, "frees", frees)
-	// 	}
-	// }()
-
 	var singleColumnProcessResult executortypes.SingleColumnProcessingResult
 	var chunkProcessErr error
 

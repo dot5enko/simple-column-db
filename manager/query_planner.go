@@ -12,7 +12,6 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/google/uuid"
 )
 
 type QueryPlanner struct {
@@ -34,6 +33,7 @@ func (qp *QueryPlanner) Plan(
 ) (query.QueryPlan, error) {
 
 	schemaObject := metaManager.GetSchema(schemaName)
+
 	if schemaObject == nil {
 		return query.QueryPlan{}, query.ErrSchemaNotFound
 	} else {
@@ -51,48 +51,6 @@ func (qp *QueryPlanner) Plan(
 
 			if !found {
 				return query.QueryPlan{}, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
-			}
-		}
-
-		// slabs
-		slabsFiltered := []uuid.UUID{}
-		// skippedBlocksDueToHeaderFiltering := 0
-
-		// full scan of all slabs and their blocks
-		slabsByColumns := map[string][]uuid.UUID{}
-
-		type ColumnPrecachedInfo struct {
-			BlocksPerSlab int16
-		}
-		columnPrecalculatedInfo := map[string]ColumnPrecachedInfo{}
-
-		// collect slabs
-		maxBlocks := 0
-		for _, it := range schemaObject.Columns {
-
-			fieldBlocksPerSlab := it.Type.BlocksPerSlab()
-			columnPrecalculatedInfo[it.Name] = ColumnPrecachedInfo{
-				BlocksPerSlab: fieldBlocksPerSlab,
-			}
-
-			if len(it.Slabs) > 0 {
-
-				// global
-				slabsFiltered = append(slabsFiltered, it.Slabs...)
-
-				old, isOk := slabsByColumns[it.Name]
-				if !isOk {
-					old = []uuid.UUID{}
-					slabsByColumns[it.Name] = old
-				}
-
-				slabsByColumns[it.Name] = append(old, it.Slabs...)
-
-				slabsSize := len(slabsByColumns[it.Name])
-				blocksAtMax := slabsSize * int(fieldBlocksPerSlab)
-				if blocksAtMax > maxBlocks {
-					maxBlocks = blocksAtMax
-				}
 			}
 		}
 
@@ -154,12 +112,17 @@ func (qp *QueryPlanner) Plan(
 			None    int8
 		}
 
-		absBlocksFullSkipArray := make([]SkipArrayCacheEntry, maxBlocks)
+		rtCache, err := metaManager.GetCacheForSchema(schemaObject)
+		if err != nil {
+			return query.QueryPlan{}, fmt.Errorf("error getting rt cache for schema: %s", err.Error())
+		}
+
+		absBlocksFullSkipArray := make([]SkipArrayCacheEntry, rtCache.MaxBlocks)
 
 		// filter slab headers
 		blockPrunningStart := time.Now()
 		for _, filtersGroup := range filterByColumnsArray {
-			slabs := slabsByColumns[filtersGroup.FieldName]
+			slabs := rtCache.SlabsByColumns[filtersGroup.FieldName]
 
 			for _, slabUid := range slabs {
 				for _, filter := range filtersGroup.Conditions {

@@ -15,7 +15,15 @@ var QueueSizeNow atomic.Int32
 
 func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
 
+	// per worker local cache
 	threadCache := &executortypes.ChunkExecutorThreadCache{}
+
+	threadSlabManagerSession := slabManager.NewSession(threadCache)
+
+	slabMergerContext := &executortypes.BlockMergerContext{
+		Blocks:       threadCache.Blocks[:],
+		AbsBlockMaps: threadCache.AbsBlockMaps[:],
+	}
 
 	for task := range tasksQueue {
 
@@ -31,11 +39,14 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			} else {
 				color.Red("skipped because of error: %s", curStatus.ErrObject.Error())
 			}
-			continue
+			return
 		}
 
-		sManager := slabManager.NewSession(threadCache)
-		taskRes, err := ExecutePlanForChunk(threadCache, sManager, task.Plan, task.Bchunk)
+		threadSlabManagerSession.GetSession().IoTime = 0
+
+		taskRes := &executortypes.ChunkFilterProcessResult{}
+
+		err := ExecutePlanForChunk(threadCache, threadSlabManagerSession, task.Plan, task.Bchunk, slabMergerContext, taskRes)
 		if err != nil {
 			curStatus.Err.Store(true)
 			curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
@@ -50,7 +61,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 			globalChunkResult := &curStatus.ChunkResult
 
-			session := sManager.GetSession()
+			session := threadSlabManagerSession.GetSession()
 
 			atomic.AddInt64(&globalChunkResult.TotalItems, taskRes.TotalItems)
 			atomic.AddInt64(&globalChunkResult.WastedMerges, taskRes.WastedMerges)
@@ -79,5 +90,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			}
 
 		}
+
 	}
+
 }

@@ -107,7 +107,11 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	segments []query.Segment,
 ) error {
 
-	for _, segment := range segments {
+	segmentsLen := len(segments)
+
+	for idx := range segmentsLen {
+
+		segment := &segments[idx]
 
 		slabBlockOffsetStart := segment.StartBlock
 
