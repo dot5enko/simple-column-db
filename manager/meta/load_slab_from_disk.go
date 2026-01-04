@@ -3,11 +3,14 @@ package meta
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/schema"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
@@ -124,6 +127,39 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 
 }
 
+func (m *SlabManager) invalidateCache(slabUid uuid.UUID, item2 *cache.SlabDataCacheItem) {
+
+	rt := m.rt
+	buffers := m.buffers
+
+	rt.slabDataCacheLocker.Lock()
+	defer rt.slabDataCacheLocker.Unlock()
+
+	rt.locker.Lock()
+	defer rt.locker.Unlock()
+
+	keysToRemove := [][32]byte{}
+
+	for key, _ := range rt.cache {
+		slabId, slabIdErr := uuid.FromBytes(key[:16])
+		if slabIdErr == nil && slabId == slabUid {
+			keysToRemove = append(keysToRemove, key)
+		}
+	}
+
+	for _, it := range keysToRemove {
+
+		delete(rt.cache, it)
+	}
+
+	delete(rt.slabDataCache, slabUid)
+	buffers.slabRuntimeCache.Return(item2)
+}
+
+var decodings atomic.Int32
+
+var SimulateCacheInvalidation = false
+
 func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid.UUID) (*cache.SlabDataCacheItem, error) {
 
 	var result *schema.DiskSlabHeader
@@ -170,21 +206,108 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 			return nil, readCompressedDataErr
 		} else {
 
+			fieldName := schemaObject.Columns[result.SchemaFieldId-1].Name
+
+			var decompressFunc func(src []byte, output []byte) (int, error) = compression.DecompressSnappy
+			var compressFunc func(input, output []byte) (int, error) = compression.CompressSnappy
+
 			if result.CompressionType != 0 {
 
-				panic("compression not implemented while LoadSlabDataContents")
-
+				// panic("compression not implemented while LoadSlabDataContents")
 				switch result.CompressionType {
 				case 1:
-					_, decompressErr := compression.DecompressLz4(item.Data[:result.CompressedSlabContentSize], item.Data[:])
+
+					item2 := m.buffers.slabRuntimeCache.Get()
+					item2.Reset()
+
+					dStart := time.Now()
+					_, decompressErr := decompressFunc(item.Data[:result.CompressedSlabContentSize], item2.Data[:])
 					if decompressErr != nil {
-
-						spew.Dump("input buffers to decompress ", item.Data[:256])
-
+						spew.Dump("input buffers to decompress ", item.Data[:256], decompressErr.Error())
 						return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
 					}
+
+					decTook := time.Since(dStart).Seconds()
+					mbSize := float64(result.CompressedSlabContentSize) / 1024.0 / 1024.0
+
+					decodedIs := decodings.Add(1)
+
+					color.Blue(" slab (%.2fMB) decompress took %.2fms %d", mbSize, decTook*1000, decodedIs)
+
+					// _ = mbSize
+					// _ = decTook
+
+					m.rt.slabDataCacheLocker.Lock()
+					defer m.rt.slabDataCacheLocker.Unlock()
+
+					m.rt.slabDataCache[uid] = item2
+
+					m.buffers.slabRuntimeCache.Return(item)
+
+					if SimulateCacheInvalidation {
+						time.AfterFunc(time.Millisecond*60, func() {
+							m.invalidateCache(uid, item2)
+						})
+					}
+
+					return item2, nil
+
 				default:
 					return nil, fmt.Errorf("unsupported compression type: %d", result.CompressionType)
+				}
+
+			} else if false {
+				// compress test
+
+				bufferSizeExpected := int(float64(result.CompressedSlabContentSize) * 1.5)
+				outputBuffer := make([]byte, bufferSizeExpected)
+
+				compressedSize, compressErr := compressFunc(item.Data[:result.CompressedSlabContentSize], outputBuffer)
+
+				if compressErr != nil {
+					color.Red("compress error: %s", compressErr.Error())
+				} else {
+
+					curSize := float64(compressedSize) / float64(result.CompressedSlabContentSize)
+
+					if curSize > 0.5 {
+						color.Red(" - ~~~ compressed neglectable [%s] FROM %d -> %d [%.2f%%]", fieldName, result.CompressedSlabContentSize, compressedSize, curSize*100.0)
+					} else {
+						color.Green(" - ~~~ compressed [%s] FROM %d -> %d [%.2f%%]", fieldName, result.CompressedSlabContentSize, compressedSize, curSize*100.0)
+
+						if true {
+							fileReader1, updateSlabContentFileOpenErr := m.GetSlabFile(*schemaObject, uid, true)
+							if updateSlabContentFileOpenErr != nil {
+								color.Yellow("unable to open file for slab compression: %s", updateSlabContentFileOpenErr.Error())
+							}
+							defer fileReader1.Close()
+
+							result.CompressedSlabContentSize = uint64(compressedSize)
+							result.CompressionType = 1
+
+							headerUpdateErr := m.UpdateSlabHeaderOnDisk(*schemaObject, result)
+
+							if headerUpdateErr != nil {
+								color.Yellow(" - xxx unable to update compressed header: %s", headerUpdateErr.Error())
+								return nil, headerUpdateErr
+							} else {
+								color.Cyan(" - ~~~ updated slab header. now the size is %d", result.CompressedSlabContentSize)
+							}
+
+							blocksInSlab := result.Type.BlocksPerSlab()
+							headersHeaderOffset := schema.TotalHeaderSize * uint64(blocksInSlab)
+							slabContentOffset := schema.SlabHeaderFixedSize + headersHeaderOffset
+
+							slabCompressionErr := fileReader1.WriteAt(outputBuffer, int(slabContentOffset), int(result.CompressedSlabContentSize))
+							if slabCompressionErr != nil {
+								color.Yellow(" - xxx unable to write compressed data: %s", slabCompressionErr.Error())
+								return nil, slabCompressionErr
+							} else {
+								color.Cyan(" - ~~~ updated slab header. now the size is %d", result.CompressedSlabContentSize)
+							}
+						}
+
+					}
 				}
 			}
 
@@ -192,6 +315,12 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 			defer m.rt.slabDataCacheLocker.Unlock()
 
 			m.rt.slabDataCache[uid] = item
+
+			if SimulateCacheInvalidation {
+				time.AfterFunc(time.Millisecond*60, func() {
+					m.invalidateCache(uid, item)
+				})
+			}
 
 			return item, nil
 		}

@@ -13,6 +13,11 @@ type TypedRingBuffer[T any] struct {
 	head atomic.Pointer[node[T]]
 
 	generator func(*T) *T
+
+	size           atomic.Int32
+	totalAllocated atomic.Int32
+
+	name string
 }
 
 type node[T any] struct {
@@ -27,6 +32,9 @@ func (rb *TypedRingBuffer[T]) pushNode(n *node[T]) {
 		cur := rb.head.Load()
 		n.prev = cur
 		if rb.head.CompareAndSwap(cur, n) {
+
+			rb.size.Add(1)
+
 			if cur != nil {
 				cur.next = n
 			}
@@ -43,24 +51,29 @@ func (rb *TypedRingBuffer[T]) popNode() *node[T] {
 		cur := rb.head.Load()
 
 		if cur == nil {
-			panic("empty TypedRingBuffer value on the head")
-		}
+			counter += 1
 
-		counter += 1
+			if counter > 128 {
 
-		if rb.head.CompareAndSwap(cur, cur.prev) {
-			return cur
-		}
+				if rb.generator != nil {
+					newNode := &node[T]{val: rb.generator(nil)}
+					rb.pushNode(newNode)
 
-		if counter > 128 {
-			color.Red("too many cycles of waiting")
+					allocatedTotal := rb.totalAllocated.Add(1)
+					color.Magenta("ring buffer empty %s. +node. <size=%d> <total_allocated=%d>", rb.name, rb.size.Load(), allocatedTotal)
+					return newNode
 
-			if rb.generator != nil {
-				newNode := &node[T]{val: rb.generator(nil)}
-				rb.pushNode(newNode)
-				return newNode
+				} else {
+					panic("no generator function provided, can't generate new element")
+				}
+
 			}
 
+		} else {
+			if rb.head.CompareAndSwap(cur, cur.prev) {
+				rb.size.Add(-1)
+				return cur
+			}
 		}
 
 	}
@@ -83,9 +96,12 @@ func NewTypedRingBuffer[T any](n int) *TypedRingBuffer[T] {
 	return rb
 }
 
-func (p *TypedRingBuffer[T]) WithInitializer(cb func(item *T) *T) {
+func (p *TypedRingBuffer[T]) WithInitializer(cb func(item *T) *T) *TypedRingBuffer[T] {
 	p.generator = cb
+	return p
 }
+
+func (p *TypedRingBuffer[T]) WithName(n string) *TypedRingBuffer[T] { p.name = n; return p }
 
 func (p *TypedRingBuffer[T]) Get() *T {
 
@@ -97,12 +113,16 @@ func (p *TypedRingBuffer[T]) Get() *T {
 	p.stats.Reads.Add(1)
 	p.stats.WaitTime.Add(int64(waitTime))
 
+	// color.Blue(" -reading %s: <size=%d>", p.name, p.size.Load())
+
 	return nodeVal.val
 }
 
 func (p *TypedRingBuffer[T]) Return(val *T) {
 
 	p.stats.Returns.Add(1)
+
+	// color.Blue(" +returning %s: <size=%d>", p.name, p.size.Load())
 
 	p.pushNode(&node[T]{val: val})
 

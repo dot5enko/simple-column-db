@@ -141,11 +141,15 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	buffers.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
 	buffers.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
 
-	buffers.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32)
+	buffers.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32).
+		WithInitializer(func(item *cache.SlabDataCacheItem) *cache.SlabDataCacheItem {
+			return &cache.SlabDataCacheItem{RtStats: &cache.CacheStats{}}
+		}).
+		WithName("SlabRuntimeDataCache")
 
 	// slab reusing header
 	// todo profile and optimize
-	buffers.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128)
+	buffers.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128).WithName("SlabHeaderCache")
 
 	sm.buffers = buffers
 

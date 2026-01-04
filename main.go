@@ -21,6 +21,7 @@ import (
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/io"
 	"github.com/dot5enko/simple-column-db/manager"
+	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
@@ -206,6 +207,9 @@ func main() {
 	}
 
 	// ingest_data_into_simple_metric_value(m, testSchemaName, 10_000_000, 8)
+	// return
+
+	meta.SimulateCacheInvalidation = true
 
 	testN := *testIterations
 
