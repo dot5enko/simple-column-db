@@ -463,7 +463,7 @@ func main() {
 					Alias:     "avg_value",
 				},
 				{
-					Arguments: []any{"count"},
+					Arguments: []any{"count", "*"},
 					Alias:     "total_count",
 				},
 			},

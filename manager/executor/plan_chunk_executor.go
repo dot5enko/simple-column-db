@@ -64,9 +64,6 @@ func prepareBlockForMerger(
 
 	blockRT := &mergerContext.Blocks[curRelativeBlockId]
 	blockRT.BlockHeader = blockHeader
-	// blockRT.SlabHeader = slabInfo
-
-	// increase current block pointer
 
 	if !fullSkipBlock {
 		// todo fix
@@ -83,17 +80,12 @@ func prepareBlockForMerger(
 		blockRT.Val = blockDecodedInfo
 	} else {
 		absBlockRTInfo := &mergerContext.AbsBlockMaps[curRelativeBlockId]
-
-		// preallocated for each thread executor
-		// check if works correctly
 		absBlockRTInfo.Reset()
 		absBlockRTInfo.SetFullSkip()
 	}
 
 	for filterIdx := range mergerContext.FilterColumn {
 		refResult := &blockRT.HeaderFilterMatchResult[filterIdx]
-
-		//
 		refResult.MatchResult = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterLastBlockHeaderResult
 		refResult.Bounds = mergerContext.FilterColumnRuntimeCache[filterIdx].FilterBounds
 	}
@@ -129,6 +121,7 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 			idx := i + slabBlockOffsetStart
 
 			if idx > int(slabInfo.BlocksFinalized) {
+				// log.Printf("skipping block %d due to out-of-bounds [finalized @ %d]", idx, slabInfo.BlocksFinalized)
 				break
 			}
 
@@ -140,7 +133,6 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 				sm,
 			)
 			if preparationErr != nil {
-
 				return fmt.Errorf("unable to prepare block for merging : %s", preparationErr.Error())
 			}
 		}
@@ -160,9 +152,7 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 
 		blockGroupMerger := &mCtx.AbsBlockMaps[blockRelativeIdx]
 		if blockGroupMerger.FullSkip() {
-
 			result.FullSkips += 1
-
 			continue
 		}
 

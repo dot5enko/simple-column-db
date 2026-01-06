@@ -21,3 +21,11 @@ type FilterGroupedRT struct {
 
 	Conditions []FilterConditionRuntime
 }
+
+type SelectorGroupedRT struct {
+	FieldName        string
+	ColumnIdx        int
+	ColumnSchemaInfo *schema.SchemaColumn
+
+	Selectors []Selector
+}

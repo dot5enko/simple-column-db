@@ -31,11 +31,17 @@ type (
 	}
 
 	QueryPlan struct {
+		Id int64
+
 		Schema                schema.Schema
 		FilterGroupedByFields []FilterGroupedRT
 		BlockChunks           []BlockChunk
 
+		SelectOnlyColumns []bool
+
 		FilterSize int
+
+		SelectorsGroupedByFields []SelectorGroupedRT
 	}
 
 	// chunk

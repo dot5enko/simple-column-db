@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/dot5enko/simple-column-db/manager/cache"
@@ -24,6 +25,8 @@ func NewQueryPlanner(predefinedCacheSize int) *QueryPlanner {
 	}
 }
 
+var timeWasted atomic.Int32
+
 func (qp *QueryPlanner) Plan(
 	schemaName string,
 	queryData query.Query,
@@ -38,67 +41,161 @@ func (qp *QueryPlanner) Plan(
 		return query.QueryPlan{}, query.ErrSchemaNotFound
 	} else {
 
+		type PlanFieldInfo struct {
+			name       string
+			where      string
+			filter     bool
+			filterCond *query.FilterCondition
+		}
+
+		fieldsAffected := map[string]PlanFieldInfo{}
+		fieldsList := []PlanFieldInfo{}
+
+		selectOnlyFields := map[string]bool{}
+
+		// fields processing
+		{
+			for _, filter := range queryData.Filter {
+				fieldsAffected[filter.Field] = PlanFieldInfo{
+					name:       filter.Field,
+					where:      fmt.Sprintf("filter %#+v", filter.Operand),
+					filter:     true,
+					filterCond: &filter,
+				}
+			}
+
+			for _, selector := range queryData.Select {
+				fieldName := (selector.Arguments[len(selector.Arguments)-1]).(string)
+
+				if fieldName != "*" {
+					_, old := fieldsAffected[fieldName]
+					if !old {
+
+						selectOnlyFields[fieldName] = true
+
+						fieldsAffected[fieldName] = PlanFieldInfo{
+							name:  fieldName,
+							where: fmt.Sprintf("select %s", selector.Alias),
+						}
+					}
+				}
+			}
+
+			for _, fieldInfo := range fieldsAffected {
+				fieldsList = append(fieldsList, fieldInfo)
+			}
+		}
+		// end of fields processing
+
 		// check that all fields are valid
-		for _, filter := range queryData.Filter {
+		for _, fieldInfo := range fieldsList {
 
 			found := false
 			for _, it := range schemaObject.Columns {
-				if it.Name == filter.Field {
+				if it.Name == fieldInfo.name {
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				return query.QueryPlan{}, fmt.Errorf("column `%v` not found on schema `%v`", filter.Field, schemaName)
+				return query.QueryPlan{}, fmt.Errorf("column `%v` not found on schema `%v` (%s)", fieldInfo.name, schemaName, fieldInfo.where)
 			}
 		}
 
-		// group filters by columns
 		filtersByColumns := map[string][]query.FilterConditionRuntime{}
-		for _, filter := range queryData.Filter {
-			old, isOk := filtersByColumns[filter.Field]
-			if !isOk {
-				old = []query.FilterConditionRuntime{}
-			}
-
-			filtersByColumns[filter.Field] = append(old, query.FilterConditionRuntime{
-				Filter: filter,
-			})
-		}
-
 		filterByColumnsArray := []query.FilterGroupedRT{}
-		for fname, it := range filtersByColumns {
 
-			var columnInfo schema.SchemaColumn
-			columnIdx := 0
+		{
+			// group filters by columns
 
-			// all fields must exist, as they were checked above
-			for idx, it := range schemaObject.Columns {
-				if it.Name == fname {
-					columnInfo = it
-					columnIdx = idx
-					break
+			for _, filter := range queryData.Filter {
+				old, isOk := filtersByColumns[filter.Field]
+				if !isOk {
+					old = []query.FilterConditionRuntime{}
 				}
+
+				filtersByColumns[filter.Field] = append(old, query.FilterConditionRuntime{
+					Filter: filter,
+				})
 			}
 
-			filterByColumnsArray = append(filterByColumnsArray, query.FilterGroupedRT{
-				FieldName:        fname,
-				Conditions:       it,
-				ColumnSchemaInfo: &columnInfo,
-				ColumnIdx:        columnIdx,
+			for fname, it := range filtersByColumns {
+
+				var columnInfo schema.SchemaColumn
+				columnIdx := 0
+
+				// all fields must exist, as they were checked above
+				for idx, it := range schemaObject.Columns {
+					if it.Name == fname {
+						columnInfo = it
+						columnIdx = idx
+						break
+					}
+				}
+
+				filterByColumnsArray = append(filterByColumnsArray, query.FilterGroupedRT{
+					FieldName:        fname,
+					Conditions:       it,
+					ColumnSchemaInfo: &columnInfo,
+					ColumnIdx:        columnIdx,
+				})
+			}
+
+			// sort by name
+			// for consistency of results
+			slices.SortStableFunc(filterByColumnsArray, func(a, b query.FilterGroupedRT) int {
+				return strings.Compare(a.FieldName, b.FieldName)
 			})
 		}
 
-		// sort by name
-		// for consistency of results
-		slices.SortStableFunc(filterByColumnsArray, func(a, b query.FilterGroupedRT) int {
-			return strings.Compare(a.FieldName, b.FieldName)
-		})
+		//selectors by columns
+		selectorsByColumns := map[string][]query.Selector{}
+		selectorsByColumnsArray := []query.SelectorGroupedRT{}
+		{
+
+			for _, filter := range queryData.Select {
+
+				columnName := filter.Arguments[len(filter.Arguments)-1].(string)
+
+				old, isOk := selectorsByColumns[columnName]
+				if !isOk {
+					old = []query.Selector{}
+				}
+
+				selectorsByColumns[columnName] = append(old, filter)
+			}
+
+			for fname, selectorsByField := range selectorsByColumns {
+
+				var columnInfo schema.SchemaColumn
+				columnIdx := 0
+
+				// all fields must exist, as they were checked above
+				for idx, it := range schemaObject.Columns {
+					if it.Name == fname {
+						columnInfo = it
+						columnIdx = idx
+						break
+					}
+				}
+
+				selectorsByColumnsArray = append(selectorsByColumnsArray, query.SelectorGroupedRT{
+					FieldName:        fname,
+					ColumnIdx:        columnIdx,
+					ColumnSchemaInfo: &columnInfo,
+					Selectors:        selectorsByField,
+				})
+			}
+
+			// sort by name
+			// for consistency of results
+			slices.SortStableFunc(selectorsByColumnsArray, func(a, b query.SelectorGroupedRT) int {
+				return strings.Compare(a.FieldName, b.FieldName)
+			})
+		}
 
 		// total size of blocks in all segments == ExecutorChunkSizeBlocks
-
-		perColumnChunks := make(map[int]*query.ColumnChunks, len(schemaObject.Columns))
 
 		newSingleChunk := func() *query.SingleChunk {
 			return &query.SingleChunk{Segments: make([]query.Segment, 0, query.ExecutorChunkSizeBlocks)}
@@ -181,32 +278,49 @@ func (qp *QueryPlanner) Plan(
 
 		blockPrunningTook := time.Since(blockPrunningStart).Seconds() * 1000.0
 
-		blocksToSkip := 0
-		blocksOk := 0
-		blocksFull := 0
+		if false {
 
-		for _, skip := range absBlocksFullSkipArray {
-			if skip.None > 0 {
-				blocksToSkip += 1
-			} else {
+			blocksToSkip := 0
+			blocksOk := 0
+			blocksFull := 0
 
-				// slog.Info("normal block", "blocks_info", []int8{
-				// 	skip.None, skip.Full, skip.Partial,
-				// })
-
-				if skip.Full == 3 {
-					blocksFull += 1
+			for _, skip := range absBlocksFullSkipArray {
+				if skip.None > 0 {
+					blocksToSkip += 1
 				} else {
-					blocksOk += 1
+
+					// slog.Info("normal block", "blocks_info", []int8{
+					// 	skip.None, skip.Full, skip.Partial,
+					// })
+
+					if skip.Full == 3 {
+						blocksFull += 1
+					} else {
+						blocksOk += 1
+					}
 				}
 			}
-		}
-
-		if false {
 			slog.Info("blocks prunned", "took", fmt.Sprintf("%.4fms", blockPrunningTook), "prunned_blocks", blocksToSkip, "good_blocks", blocksOk, "full_blocks", blocksFull)
 		}
 
+		perColumnChunks := make(map[int]*query.ColumnChunks, len(schemaObject.Columns))
+
 		for columnIdx, columnDef := range schemaObject.Columns {
+
+			found := false
+
+			for _, selectingField := range fieldsList {
+				if selectingField.name == columnDef.Name {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+
+			// before := time.Now()
 
 			blocksPerSlab := int(columnDef.Type.BlocksPerSlab())
 
@@ -272,6 +386,16 @@ func (qp *QueryPlanner) Plan(
 			if len(curChunkSlabs.List) > maxChunks {
 				maxChunks = len(curChunkSlabs.List)
 			}
+
+			// if !found {
+			// 	tTook := time.Since(before)
+
+			// 	_ = tTook
+			// 	wastedTotal := timeWasted.Add(int32(tTook))
+			// 	if wastedTotal > 10000000 {
+			// 		color.Cyan("wasting cpu time: %.3fms ", time.Duration(wastedTotal).Seconds()*1000)
+			// 	}
+			// }
 		}
 
 		chunks := make([]query.BlockChunk, maxChunks)
@@ -287,9 +411,7 @@ func (qp *QueryPlanner) Plan(
 
 					// include selector unique fields
 					curChunkObject.ChunkSegmentsByFieldIndexMap = make([][]query.Segment, fieldsCount)
-
 					allocatedchunks += fieldsCount
-
 					curChunkObject.GlobalBlockOffset = uint64(chunkIdx) * query.ExecutorChunkSizeBlocks
 				}
 
@@ -297,16 +419,36 @@ func (qp *QueryPlanner) Plan(
 			}
 		}
 
+		selectOnlyFieldsArr := make([]bool, fieldsCount)
+
+		for fieldName := range selectOnlyFields {
+			idx := -1
+
+			for schemaIdx, schemaColumn := range schemaObject.Columns {
+				if fieldName == schemaColumn.Name {
+					idx = schemaIdx
+					break
+				}
+			}
+
+			selectOnlyFieldsArr[idx] = selectOnlyFields[schemaObject.Columns[idx].Name]
+		}
+
 		return query.QueryPlan{
-			Schema:                *schemaObject,
-			FilterGroupedByFields: filterByColumnsArray,
-			BlockChunks:           chunks,
-			FilterSize:            len(queryData.Filter),
+			Schema:                   *schemaObject,
+			SelectOnlyColumns:        selectOnlyFieldsArr,
+			FilterGroupedByFields:    filterByColumnsArray,
+			BlockChunks:              chunks,
+			FilterSize:               len(queryData.Filter),
+			SelectorsGroupedByFields: selectorsByColumnsArray,
+			Id:                       queryGlobalId.Add(1),
 		}, nil
 
 	}
 
 }
+
+var queryGlobalId atomic.Int64
 
 var allocatedchunks = 0
 
