@@ -159,144 +159,159 @@ func ExecutePlanForChunk(
 		}
 	}
 
-	// should be optimized by using one biggest for all
-	// and casting with unsafe pointer to needed type
-	// and buf should be a part of thread's cache
+	if false {
+		// should be optimized by using one biggest for all
+		// and casting with unsafe pointer to needed type
+		// and buf should be a part of thread's cache
 
-	var uint64Buffer [schema.BlockRowsSize]uint64
-	var float32Buffer [schema.BlockRowsSize]float32
+		var uint64Buffer [schema.BlockRowsSize]uint64
+		var float32Buffer [schema.BlockRowsSize]float32
 
-	// process selectors
-	for _, selectorGroup := range plan.SelectorsGroupedByFields {
-		chunkBlocks := blockChunk.ChunkSegmentsByFieldIndexMap[selectorGroup.ColumnIdx]
+		// process selectors
+		for _, selectorGroup := range plan.SelectorsGroupedByFields {
+			chunkBlocks := blockChunk.ChunkSegmentsByFieldIndexMap[selectorGroup.ColumnIdx]
 
-		relBlockId := 0
+			relBlockId := 0
 
-		for _, singleSelector := range selectorGroup.Selectors {
+			for _, singleSelector := range selectorGroup.Selectors {
 
-			funcName := singleSelector.Arguments[0]
-			selectorName := fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
+				funcName := singleSelector.Arguments[0]
+				selectorName := fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
 
-			if selectorGroup.FieldName == "*" {
-				color.Yellow("skipped * selector, not implemented yet")
-				continue
-			}
+				if selectorGroup.FieldName == "*" {
+					color.Yellow("skipped * selector, not implemented yet")
+					continue
+				}
 
-			type FuncChunkResultMeta struct {
-				initialized bool
-				Count       int
-				Sum         float64
-				Avg         float64
-				Max         float64
-				Min         float64
-			}
+				type FuncChunkResultMeta struct {
+					initialized bool
+					Count       int
+					Sum         float64
+					Avg         float64
+					Max         float64
+					Min         float64
+				}
 
-			var chunkResultEntries [query.ExecutorChunkSizeBlocks]FuncChunkResultMeta
+				var chunkResultEntries [query.ExecutorChunkSizeBlocks]FuncChunkResultMeta
 
-			for _, segment := range chunkBlocks {
+				for _, segment := range chunkBlocks {
 
-				for segmentOffset := range segment.Size {
+					for segmentOffset := range segment.Size {
 
-					mergerBitset := cache.AbsBlockMaps[relBlockId]
+						func() {
+							mergerBitset := cache.AbsBlockMaps[relBlockId]
 
-					// defer func() {
-					// 	if r := recover(); r != nil {
+							defer func() {
+								if r := recover(); r != nil {
 
-					// 		valRef := cache.Blocks[relBlockId].Val == nil
+									valRef := cache.Blocks[relBlockId].Val == nil
 
-					// 		color.Blue("recovered on <rel_block_id=%d> valRef = nil (%v). merger.Count = %d", relBlockId, valRef, mergerBitset.Count())
-					// 		fmt.Println(r)
-					// 	}
+									color.Yellow("selector group column: %s %s %T", selectorGroup.ColumnSchemaInfo.Name, selectorGroup.ColumnSchemaInfo.Type.String(), cache.Blocks[relBlockId].Val.DataTypedArray)
+									color.Red("recovered on <field=%s><rel_block_id=%d> valRef = nil (%v). merger.Count = %d", selectorName, relBlockId, valRef, mergerBitset.Count())
 
-					// }()
+									stackDebugRows := 3
 
-					if mergerBitset.FullSkip() || mergerBitset.Count() == -1 {
-						continue
-					}
+									for debugRowIdx := range stackDebugRows {
+										_, file, line, ok := runtime.Caller(debugRowIdx + 2)
+										if ok {
+											fmt.Printf("\t%s:%d\n", file, line)
+										}
+									}
 
-					blockOffset := segment.StartBlock + segmentOffset
+								}
+								relBlockId += 1
 
-					directArrayAccess, arraySize := cache.Blocks[relBlockId].Val.DirectAccess()
+							}()
 
-					var itemsCount int64
-
-					chunkResultMeta := &chunkResultEntries[relBlockId]
-
-					switch selectorGroup.ColumnSchemaInfo.Type {
-					case schema.Uint64FieldType:
-
-						arrInputWhole := directArrayAccess.([]uint64)
-						arrInput := arrInputWhole[:arraySize]
-
-						itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:]))
-					case schema.Float32FieldType:
-						arrInputWhole := directArrayAccess.([]float32)
-						arrInput := arrInputWhole[:arraySize]
-
-						itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:]))
-
-						switch funcName {
-						case "avg":
-
-							var sum float64
-							for _, v := range float32Buffer {
-								sum += float64(v)
+							if mergerBitset.FullSkip() || mergerBitset.Count() == -1 {
+								// continue
+								return
 							}
 
-							chunkResultMeta.initialized = true
-							chunkResultMeta.Sum = sum
-							chunkResultMeta.Count = int(itemsCount)
-							chunkResultMeta.Avg = sum / float64(itemsCount)
+							blockOffset := segment.StartBlock + segmentOffset
 
-						default:
-							panic(fmt.Sprintf("unknown function in selector : %s", funcName))
+							directArrayAccess, arraySize := cache.Blocks[relBlockId].Val.DirectAccess()
+
+							var itemsCount int64
+
+							chunkResultMeta := &chunkResultEntries[relBlockId]
+
+							switch selectorGroup.ColumnSchemaInfo.Type {
+							case schema.Uint64FieldType:
+
+								arrInputWhole := directArrayAccess.([]uint64)
+								arrInput := arrInputWhole[:arraySize]
+
+								itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:]))
+							case schema.Float32FieldType:
+								arrInputWhole := directArrayAccess.([]float32)
+								arrInput := arrInputWhole[:arraySize]
+
+								itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:]))
+
+								switch funcName {
+								case "avg":
+
+									var sum float64
+									for _, v := range float32Buffer {
+										sum += float64(v)
+									}
+
+									chunkResultMeta.initialized = true
+									chunkResultMeta.Sum = sum
+									chunkResultMeta.Count = int(itemsCount)
+									chunkResultMeta.Avg = sum / float64(itemsCount)
+
+								default:
+									panic(fmt.Sprintf("unknown function in selector : %s", funcName))
+								}
+
+							default:
+								panic(fmt.Sprintf("unsupported type %v, while processing selector %#+v", selectorGroup.ColumnSchemaInfo.Type.String(), singleSelector.Arguments))
+							}
+
+							// color.Green("<query=%d/chunk%d> found %d item in block[%d/rel=%d] %s = %v", plan.Id, blockChunk.GlobalBlockOffset, itemsCount, blockOffset, relBlockId, selectorName, chunkFuncResult)
+
+							if itemsCount != int64(mergerBitset.Count()) {
+								color.Yellow(fmt.Sprintf("bitsets count mismatch, expected %d got %d", mergerBitset.Count(), itemsCount))
+							}
+							_ = blockOffset
+
+							// relBlockId += 1
+						}()
+					}
+				}
+
+				// calc final result for this selector
+				{
+
+					finalResultMeta := FuncChunkResultMeta{}
+
+					switch funcName {
+
+					case "avg":
+
+						for _, meta := range chunkResultEntries {
+							if !meta.initialized {
+								break
+							}
+							finalResultMeta.initialized = true
+							finalResultMeta.Sum += meta.Sum
+							finalResultMeta.Count += meta.Count
+
 						}
+
+						finalResultMeta.Avg = finalResultMeta.Sum / float64(finalResultMeta.Count)
 
 					default:
-						panic(fmt.Sprintf("unsupported type %v, while processing selector %#+v", selectorGroup.ColumnSchemaInfo.Type.String(), singleSelector.Arguments))
+						panic(fmt.Sprintf("unknown function in selector : %s, while aggregating results", funcName))
 					}
 
-					// color.Green("<query=%d/chunk%d> found %d item in block[%d/rel=%d] %s = %v", plan.Id, blockChunk.GlobalBlockOffset, itemsCount, blockOffset, relBlockId, selectorName, chunkFuncResult)
-
-					if itemsCount != int64(mergerBitset.Count()) {
-						color.Yellow(fmt.Sprintf("bitsets count mismatch, expected %d got %d", mergerBitset.Count(), itemsCount))
-					}
-					_ = blockOffset
-
-					relBlockId += 1
+					color.Green("<query=%d/chunk%d>  selector %s = %.2f", plan.Id, blockChunk.GlobalBlockOffset, selectorName, finalResultMeta.Avg)
 
 				}
-			}
-
-			// calc final result for this selector
-			{
-
-				finalResultMeta := FuncChunkResultMeta{}
-
-				switch funcName {
-
-				case "avg":
-
-					for _, meta := range chunkResultEntries {
-						if !meta.initialized {
-							break
-						}
-						finalResultMeta.initialized = true
-						finalResultMeta.Sum += meta.Sum
-						finalResultMeta.Count += meta.Count
-
-					}
-
-					finalResultMeta.Avg = finalResultMeta.Sum / float64(finalResultMeta.Count)
-
-				default:
-					panic(fmt.Sprintf("unknown function in selector : %s, while aggregating results", funcName))
-				}
-
-				color.Green("<query=%d/chunk%d>  selector %s = %.2f", plan.Id, blockChunk.GlobalBlockOffset, selectorName, finalResultMeta.Avg)
 
 			}
-
 		}
 	}
 

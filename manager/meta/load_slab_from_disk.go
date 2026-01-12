@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dot5enko/simple-column-db/compression"
@@ -159,6 +160,7 @@ func (m *SlabManager) invalidateCache(slabUid uuid.UUID, item2 *cache.SlabDataCa
 var decodings atomic.Int32
 
 var SimulateCacheInvalidation = false
+var CacheInvalidationTimeout = time.Millisecond * 50
 
 func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid.UUID) (*cache.SlabDataCacheItem, error) {
 
@@ -222,7 +224,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 					item2.Reset()
 
 					dStart := time.Now()
-					_, decompressErr := decompressFunc(item.Data[:result.CompressedSlabContentSize], item2.Data[:])
+					decompressedSize, decompressErr := decompressFunc(item.Data[:result.CompressedSlabContentSize], item2.Data[:])
 					if decompressErr != nil {
 						spew.Dump("input buffers to decompress ", item.Data[:256], decompressErr.Error())
 						return nil, fmt.Errorf("unable to decompress slab data [input length %d, outputd buffer: %d]: %s", result.CompressedSlabContentSize, len(item.Data[:]), decompressErr.Error())
@@ -235,6 +237,47 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 
 					color.Blue(" slab (%.2fMB) decompress took %.2fms %d. IO : %.2f", mbSize, decTook*1000, decodedIs, statSession.IoTime.Seconds()*1000)
 
+					if false {
+
+						skipSize := 64
+
+						if result.Type == schema.Uint64FieldType {
+							decompressedBytes := item2.Data[:decompressedSize]
+
+							count := decompressedSize / 8
+							uDecompressed := unsafe.Slice((*uint64)(unsafe.Pointer(&decompressedBytes[0])), count)
+							diffCompressTime := time.Now()
+
+							compressedData, compressedMeta, compressErr := compression.CompressDiffWithSkips(uDecompressed, skipSize)
+							if compressErr != nil {
+								color.Red("error while recompressing after decompress: %s", compressErr.Error())
+							} else {
+								tookDiffCompress := time.Since(diffCompressTime).Seconds()
+								_ = tookDiffCompress
+								// color.Cyan(" >>> compressed DIFF %.3fms %d -> %d", tookDiffCompress*1000, decompressedSize, len(compressedData))
+								// spew.Dump("diff compressed ", compressedData[:64])
+							}
+
+							decompressOut := make([]uint64, compressedMeta.Count)
+							decompressStart := time.Now()
+							_, decompressDiffErr := compression.DecompressDiffWithSkips(compressedData, compressedMeta, decompressOut)
+							if decompressDiffErr != nil {
+								color.Red("unable to diff-decode back from just encoded : %s", decompressDiffErr.Error())
+							}
+							decompressEnd := time.Since(decompressStart)
+							_ = decompressEnd
+
+							color.Yellow(" -- diff decompression : %.3fms", decompressEnd.Seconds()*1000)
+
+							for i := 0; i < count; i++ {
+								if uDecompressed[i] != decompressOut[i] {
+									panic(fmt.Sprintf("DIFFERENT VALUES AT[%d] : <input=%d> != <decompressed=%d>", i, uDecompressed[i], decompressOut[i]))
+								}
+							}
+
+						}
+					}
+
 					// _ = mbSize
 					// _ = decTook
 
@@ -246,7 +289,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 					m.buffers.slabRuntimeCache.Return(item)
 
 					if SimulateCacheInvalidation {
-						time.AfterFunc(time.Millisecond*60, func() {
+						time.AfterFunc(CacheInvalidationTimeout, func() {
 							m.invalidateCache(uid, item2)
 						})
 					}
@@ -318,7 +361,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 			m.rt.slabDataCache[uid] = item
 
 			if SimulateCacheInvalidation {
-				time.AfterFunc(time.Millisecond*60, func() {
+				time.AfterFunc(CacheInvalidationTimeout, func() {
 					m.invalidateCache(uid, item)
 				})
 			}

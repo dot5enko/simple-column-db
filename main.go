@@ -93,7 +93,10 @@ func read_array_data[T any](fileName string, size int, typ schema.FieldType) (da
 
 func main() {
 
+	// debug.SetGCPercent(-1)
 	runtime.MemProfileRate = 0
+	meta.SimulateCacheInvalidation = true
+	meta.CacheInvalidationTimeout = 60 * time.Millisecond
 
 	waitBeforeStart := flag.Int("wait_before_start", 0, "wait ms before app start ( useful with pprof )")
 	pprofEnabled := flag.Bool("trace", false, "enable pprof server")
@@ -208,8 +211,6 @@ func main() {
 
 	// ingest_data_into_simple_metric_value(m, testSchemaName, 10_000_000, 8)
 	// return
-
-	meta.SimulateCacheInvalidation = true
 
 	testN := *testIterations
 
