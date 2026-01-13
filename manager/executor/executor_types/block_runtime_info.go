@@ -25,6 +25,7 @@ type historyEntry struct {
 
 type BlockRuntimeInfo struct {
 	BlockHeader *schema.DiskHeader
+	SlabHeader  *schema.DiskSlabHeader
 
 	HeaderFilterMatchResult [MaxFiltersPerField]BlockRuntimeFilterCache
 
@@ -38,6 +39,8 @@ func (b *BlockRuntimeInfo) GetDebugHistory() []historyEntry {
 }
 
 func (b *BlockRuntimeInfo) SetRuntimeValue(rtv *schema.RuntimeBlockData, threadIdx int) {
+
+	return
 
 	tnow := time.Now()
 	actionIdx := b.changesCount.Add(1)

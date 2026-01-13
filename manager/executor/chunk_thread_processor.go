@@ -71,6 +71,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			atomic.AddInt64(&globalChunkResult.ProcessedBlocks, taskRes.ProcessedBlocks)
 			atomic.AddInt64(&globalChunkResult.FullSkips, taskRes.FullSkips)
 			atomic.AddInt64(&globalChunkResult.IoTime, session.IoTime.Nanoseconds())
+			atomic.AddInt64(&globalChunkResult.TookSelectors, taskRes.TookSelectors)
 
 			// copy bitset to global result bitset
 			// perform selectors according to query

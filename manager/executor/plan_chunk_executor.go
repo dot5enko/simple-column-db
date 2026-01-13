@@ -64,25 +64,27 @@ func prepareBlockForMerger(
 	fullSkipBlock := skipFilters == mergerContext.FilterSize
 
 	blockRT := &mergerContext.Blocks[curRelativeBlockId]
-	blockRT.BlockHeader = blockHeader
 
-	if !fullSkipBlock {
+	blockRT.BlockHeader = blockHeader
+	blockRT.SlabHeader = slabInfo
+
+	if fullSkipBlock {
 		// todo fix
 		// mergerContext.IoTime += time.Since(load)
 
 		// block should be loadedd once we really need data, not here
-		if false {
-			blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
+		// if false {
+		// 	blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
 
-			// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
+		// 	// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
 
-			if blockErr != nil {
-				return fmt.Errorf("unable to decode block : %s", blockErr.Error())
-			}
+		// 	if blockErr != nil {
+		// 		return fmt.Errorf("unable to decode block : %s", blockErr.Error())
+		// 	}
 
-			blockRT.SetRuntimeValue(blockDecodedInfo, slabsManager.GetSessionThreadIdx())
-		}
-	} else {
+		// 	blockRT.SetRuntimeValue(blockDecodedInfo, slabsManager.GetSessionThreadIdx())
+		// }
+
 		absBlockRTInfo := &mergerContext.AbsBlockMaps[curRelativeBlockId]
 		absBlockRTInfo.Reset()
 		absBlockRTInfo.SetFullSkip()
@@ -145,7 +147,13 @@ func preprocessSegmentsIntoBlocksAndHeaderFilter(
 	return nil
 }
 
-func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (result executortypes.SingleColumnProcessingResult, topErr error) {
+func processFiltersOnPreparedBlocks(
+	mCtx *executortypes.BlockMergerContext,
+	sm *meta.SlabManager,
+) (
+	result executortypes.SingleColumnProcessingResult,
+	topErr error,
+) {
 
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
@@ -158,6 +166,17 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 		if blockGroupMerger.FullSkip() {
 			result.FullSkips += 1
 			continue
+		}
+
+		// load block into memory
+		blockRtInfo, blockLoadErr := sm.LoadBlockToRuntimeBlockData(
+			mCtx.Schema,
+			blockData.SlabHeader,
+			blockData.BlockHeader.Uid,
+		)
+
+		if blockLoadErr != nil {
+			return executortypes.SingleColumnProcessingResult{}, blockLoadErr
 		}
 
 		// slog.Info("processing block OK", "block_relative_idx", blockRelativeIdx, "block_data_is_nil", blockData.Val == nil)
@@ -189,13 +208,13 @@ func processFiltersOnPreparedBlocks(mCtx *executortypes.BlockMergerContext) (res
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockData, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockRtInfo, blockGroupMerger)
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockData, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockRtInfo, blockGroupMerger)
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockData, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockRtInfo, blockGroupMerger)
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockData, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockRtInfo, blockGroupMerger)
 				default:
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}

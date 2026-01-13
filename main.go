@@ -512,6 +512,7 @@ func main() {
 					"wait", time.Duration(cummResult.PureLock),
 					"n_chunks", cummResult.TotalChunks,
 					"io", time.Duration(cummResult.IoTime),
+					"selectors", time.Duration(cummResult.TookSelectors),
 				)
 
 			}

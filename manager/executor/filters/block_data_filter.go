@@ -5,7 +5,6 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/lists"
-	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
@@ -13,11 +12,14 @@ import (
 
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	filter query.FilterCondition,
-	blockData *executortypes.BlockRuntimeInfo,
+	runtimeBlockInfo *schema.RuntimeBlockData,
 	merger *lists.IndiceUnmerged,
+
 ) (int, error) {
 
-	runtimeBlockInfo := blockData.Val
+	var itemsFiltered int
+	var outputBitset bits.Bitfield
+
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
 	arrayCasted := directBlockArray.([]T)
@@ -54,7 +56,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
 
 	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), blockData.BlockHeader.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), runtimeBlockInfo.Header.DataType.String())
 	}
 
 	merger.WithBitset(&outputBitset, false, false)
@@ -63,73 +65,73 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 
 }
 
-func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
-	slab *schema.DiskSlabHeader,
-	filter query.FilterCondition,
-	blockData *executortypes.BlockRuntimeInfo,
-	merger *lists.IndiceUnmerged,
-	indicesCache []uint16,
-) (int, error) {
+// func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
+// 	slab *schema.DiskSlabHeader,
+// 	filter query.FilterCondition,
+// 	blockData *executortypes.BlockRuntimeInfo,
+// 	merger *lists.IndiceUnmerged,
+// 	indicesCache []uint16,
+// ) (int, error) {
 
-	var itemsFiltered int
+// 	var itemsFiltered int
 
-	var outputBitset bits.Bitfield
+// 	var outputBitset bits.Bitfield
 
-	runtimeBlockInfo := blockData.Val
-	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
+// 	runtimeBlockInfo := blockData.Val
+// 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
-	arrayCasted := directBlockArray.([]T)
-	inputArray := arrayCasted[:arrayEndOffset]
+// 	arrayCasted := directBlockArray.([]T)
+// 	inputArray := arrayCasted[:arrayEndOffset]
 
-	switch filter.Operand {
-	case query.RANGE:
-		operandA := filter.Arguments[0].(T)
-		operandB := filter.Arguments[1].(T)
+// 	switch filter.Operand {
+// 	case query.RANGE:
+// 		operandA := filter.Arguments[0].(T)
+// 		operandB := filter.Arguments[1].(T)
 
-		if operandA > operandB {
-			temp := operandB
-			operandB = operandA
-			operandA = temp
+// 		if operandA > operandB {
+// 			temp := operandB
+// 			operandB = operandA
+// 			operandA = temp
 
-		}
+// 		}
 
-		itemsFiltered = ops.CompareValuesAreInRangeSignedIntsBitset(inputArray, operandA, operandB, &outputBitset)
+// 		itemsFiltered = ops.CompareValuesAreInRangeSignedIntsBitset(inputArray, operandA, operandB, &outputBitset)
 
-	case query.EQ:
-		operand := filter.Arguments[0].(T)
+// 	case query.EQ:
+// 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
+// 		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
 
-	case query.GT:
-		operand := filter.Arguments[0].(T)
+// 	case query.GT:
+// 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
-	case query.LT:
-		operand := filter.Arguments[0].(T)
+// 		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
+// 	case query.LT:
+// 		operand := filter.Arguments[0].(T)
 
-		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
+// 		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
 
-	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
-	}
+// 	default:
+// 		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
+// 	}
 
-	merger.WithBitset(&outputBitset, false, false)
+// 	merger.WithBitset(&outputBitset, false, false)
 
-	return itemsFiltered, nil
+// 	return itemsFiltered, nil
 
-}
+// }
 
 func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	// slab *schema.DiskSlabHeader,
 	filter query.FilterCondition,
-	blockData *executortypes.BlockRuntimeInfo,
+	// blockData *executortypes.BlockRuntimeInfo,
+	runtimeBlockInfo *schema.RuntimeBlockData,
 	merger *lists.IndiceUnmerged,
 ) (int, error) {
 
 	var itemsFiltered int
 	var outBitset bits.Bitfield
 
-	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
 	arrayCasted := directBlockArray.([]T)
@@ -166,7 +168,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outBitset)
 
 	default:
-		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
+		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, runtimeBlockInfo.Header.DataType.String())
 	}
 
 	merger.WithBitset(&outBitset, false, false)

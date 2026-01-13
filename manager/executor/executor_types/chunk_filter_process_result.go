@@ -14,6 +14,8 @@ type ChunkFilterProcessResult struct {
 	PlanTook int64
 	PureLock int64
 
+	TookSelectors int64
+
 	IoTime int64
 
 	// set on query planner

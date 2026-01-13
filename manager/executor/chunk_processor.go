@@ -12,7 +12,6 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
-	"github.com/dot5enko/simple-column-db/ops/generated"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
 )
@@ -87,10 +86,6 @@ func ExecutePlanForChunk(
 
 	// defer allocsDetection()()
 
-	// could be parallelized
-	// but synchronization is needed which could be less effective
-	// than chunk process parallelization
-
 	// per field/slab processing
 	slabMergerContext.Schema = plan.Schema
 	slabMergerContext.AbsOffsetStart = blockChunk.GlobalBlockOffset
@@ -99,7 +94,8 @@ func ExecutePlanForChunk(
 
 		filtersSize := len(filtersGroup.Conditions)
 
-		// check if conds
+		// check if limitations are met before this line,
+		// in a validation step before loading any data
 		if filtersSize > executortypes.MaxFiltersPerField {
 			return fmt.Errorf("too many filters (%d), max %d", filtersSize, executortypes.MaxFiltersPerField)
 		}
@@ -127,10 +123,10 @@ func ExecutePlanForChunk(
 			return fmt.Errorf("unable to preprocess blocks from segments: %s", blocksPreprocessErr.Error())
 		}
 
-		groupType := filtersGroup.ColumnSchemaInfo.Type
-		singleColumnProcessResult, chunkProcessErr := generated.ChunkBlockProcessorSpecificFilterAndType(groupType, slabMergerContext)
+		// groupType := filtersGroup.ColumnSchemaInfo.Type
+		// singleColumnProcessResult, chunkProcessErr := generated.ChunkBlockProcessorSpecificFilterAndType(groupType, slabMergerContext)
 
-		// singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(slabMergerContext)
+		singleColumnProcessResult, chunkProcessErr := processFiltersOnPreparedBlocks(slabMergerContext, sm)
 		if chunkProcessErr != nil {
 			return fmt.Errorf("chunk processing failed : %s", chunkProcessErr.Error())
 		} else {
@@ -160,7 +156,10 @@ func ExecutePlanForChunk(
 		}
 	}
 
-	if true {
+	{
+
+		t0 := time.Now()
+
 		// should be optimized by using one biggest for all
 		// and casting with unsafe pointer to needed type
 		// and buf should be a part of thread's cache
@@ -217,9 +216,11 @@ func ExecutePlanForChunk(
 								return selectorsApplyErr
 							}
 
-							for _, it := range selectorsResult.Results {
-								log.Printf(" --- filters[%e] items count : %d, sum : %d", curRelativeBlockId, it.Count, it.Sum)
-							}
+							_ = selectorsResult
+
+							// for _, it := range selectorsResult.Results {
+							// 	log.Printf(" --- filters[%d] items count : %d, sum : %.2f", curRelativeBlockId, it.Count, it.Sum)
+							// }
 							////
 
 						}
@@ -230,6 +231,9 @@ func ExecutePlanForChunk(
 
 			///
 		}
+
+		tookSelectors := time.Since(t0)
+		result.TookSelectors = tookSelectors.Nanoseconds()
 
 		// calc final result for this selector
 		// {
@@ -302,7 +306,7 @@ func ProcessMultipleSelectorsOnSingleBlock(
 		selectorName := fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
 
 		if selectorGroup.FieldName == "*" {
-			color.Yellow("skipped * selector, not implemented yet")
+			// color.Yellow("skipped * selector, not implemented yet")
 			continue
 		}
 
@@ -317,32 +321,32 @@ func ProcessMultipleSelectorsOnSingleBlock(
 				defer func() {
 					if r := recover(); r != nil {
 
-						blockRef := &cache.Blocks[curRelativeBlockId]
+						// blockRef := &cache.Blocks[curRelativeBlockId]
 						cacheRef := rtBlockData
 						valRef := cacheRef == nil
 
 						fmt.Printf("block_idx : %d\n", idx)
 						color.Yellow("selector group column: field_name=%s type_expected=%s actually_got=%T", selectorGroup.ColumnSchemaInfo.Name, selectorGroup.ColumnSchemaInfo.Type.String(), cacheRef.DataTypedArray)
-						color.Red("recovered on <field=%10s><rel_block_id=%4d>, slab = %s, valRef = nil (%v). merger.Count = %4d", selectorName, idx, blockRef.Val.Slab, valRef, mergerBitset.Count())
+						color.Red("recovered on <field=%10s><rel_block_id=%4d>, slab = %s, valRef = nil (%v). merger.Count = %4d", selectorName, idx, nil, valRef, mergerBitset.Count())
 
-						debugHistory := blockRef.GetDebugHistory()
+						// debugHistory := blockRef.GetDebugHistory()
 
-						prevTime := debugHistory[0].Time
+						// prevTime := debugHistory[0].Time
 
-						for i := 0; i < len(debugHistory); i++ {
+						// for i := 0; i < len(debugHistory); i++ {
 
-							entry := debugHistory[i]
+						// 	entry := debugHistory[i]
 
-							diff := entry.Time.Sub(prevTime)
-							prevTime = entry.Time
+						// 	diff := entry.Time.Sub(prevTime)
+						// 	prevTime = entry.Time
 
-							dType := entry.DataType.String()
-							if entry.Action == 0 {
-								dType = "-"
-							}
+						// 	dType := entry.DataType.String()
+						// 	if entry.Action == 0 {
+						// 		dType = "-"
+						// 	}
 
-							fmt.Printf(" action=%d data_type: %15s (thread=%d) block_idx : %3d, slab : %16s from prev : %5.2f. \n", entry.Action, dType, entry.Thread, entry.BlockIdx, entry.Slab, diff.Seconds()*1000000)
-						}
+						// 	fmt.Printf(" action=%d data_type: %15s (thread=%d) block_idx : %3d, slab : %16s from prev : %5.2f. \n", entry.Action, dType, entry.Thread, entry.BlockIdx, entry.Slab, diff.Seconds()*1000000)
+						// }
 
 						// show events history
 						stackDebugRows := 3
