@@ -168,7 +168,6 @@ func ExecutePlanForChunk(
 		for _, selectorGroup := range plan.SelectorsGroupedByFields {
 
 			blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[selectorGroup.ColumnIdx]
-
 			collectResultsBlockIdx := 0
 
 			///

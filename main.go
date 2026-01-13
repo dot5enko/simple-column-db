@@ -443,6 +443,8 @@ func main() {
 		locks         []time.Duration
 		totalDuration []time.Duration
 		planTook      []time.Duration
+
+		selectors []time.Duration
 	}
 
 	initGroupResults := func() *GroupResults {
@@ -451,6 +453,7 @@ func main() {
 		item.locks = make([]time.Duration, testN)
 		item.totalDuration = make([]time.Duration, testN)
 		item.planTook = make([]time.Duration, testN)
+		item.selectors = make([]time.Duration, testN)
 
 		return &item
 	}
@@ -500,6 +503,7 @@ func main() {
 
 			groupMetrics.totalDuration[testIdx] = time.Duration(cummResult.TotalQueryDuration)
 			groupMetrics.planTook[testIdx] = time.Duration(cummResult.PlanTook)
+			groupMetrics.selectors[testIdx] = time.Duration(cummResult.TookSelectors)
 
 			if testN < 100 {
 
@@ -535,17 +539,20 @@ func main() {
 					totalValue += v
 				}
 
-				slog.Info(fmt.Sprintf("property [%s] stats", propName),
-					"total", totalValue,
-					fmt.Sprintf("%s_p%d", propName, 50), getP(arr, 50),
-					fmt.Sprintf("%s_p%d", propName, 95), getP(arr, 95),
-					fmt.Sprintf("%s_p%d", propName, 99), getP(arr, 99.9),
+				log.Printf("property [%s] stats total_value=%15s %15s %15s %15s",
+					propName,
+					totalValue,
+					getP(arr, 50).String(),
+					getP(arr, 95).String(),
+					getP(arr, 99.9).String(),
 				)
 
 			}
 
-			calcPS("dura "+name, groupMetrics.totalDuration)
-			calcPS("plan "+name, groupMetrics.planTook)
+			calcPS("duration ("+name+")", groupMetrics.totalDuration)
+			calcPS("planning ("+name+")", groupMetrics.planTook)
+			calcPS("selectors ("+name+")", groupMetrics.selectors)
+
 		}
 	}
 
@@ -564,7 +571,7 @@ func main() {
 
 	multithreadWg.Wait()
 
-	m.Slabs.PrintBufferEffectivityReport()
+	// m.Slabs.PrintBufferEffectivityReport()
 
 	slog.Info("allocated_chunks", "n", manager.AllocatedChunks())
 
