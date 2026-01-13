@@ -55,7 +55,6 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 		} else {
 
 			blockSize := blockHeader.DataType.BlockSize()
-			blockStartOffset = blockIdx * blockSize
 
 			slabData := m.getSlabDataFromCache(slab.Uid)
 			if slabData == nil {
@@ -69,8 +68,15 @@ func (m *SlabManager) LoadBlockToRuntimeBlockData(
 				}
 			}
 
+			blockStartOffset = blockIdx * blockSize
 			blockRawData := slabData.Data[blockStartOffset:]
+
+			// this function returns a reference to memory, not copy of it
 			runtimeBlockData, runtimeDecodeErr := DecodeRawBlockData(blockRawData, &blockHeader)
+
+			// runtime debug info
+			runtimeBlockData.Slab = slab.Uid
+			runtimeBlockData.BlockIndice = uint64(blockIdx)
 
 			if runtimeDecodeErr != nil {
 				return nil, fmt.Errorf("unable to decoded raw block data for slab %s. block %s: %s", slab.Uid.String(), block.String(), runtimeDecodeErr.Error())

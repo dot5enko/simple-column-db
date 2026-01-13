@@ -23,6 +23,7 @@ func prepareBlockForMerger(
 	curRelativeBlockId := mergerContext.CurrentBlockProcessingIdx
 	mergerContext.CurrentBlockProcessingIdx++
 
+	// apply filter on headers
 	for idx := range mergerContext.FilterColumn {
 
 		filter := mergerContext.FilterColumn[idx]
@@ -69,15 +70,18 @@ func prepareBlockForMerger(
 		// todo fix
 		// mergerContext.IoTime += time.Since(load)
 
-		blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
+		// block should be loadedd once we really need data, not here
+		if false {
+			blockDecodedInfo, blockErr := slabsManager.LoadBlockToRuntimeBlockData(mergerContext.Schema, slabInfo, blockHeader.Uid)
 
-		// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
+			// log.Printf("--- loaded block %s: @ %p", blockHeader.Uid.String(), blockDecodedInfo.DataTypedArray)
 
-		if blockErr != nil {
-			return fmt.Errorf("unable to decode block : %s", blockErr.Error())
+			if blockErr != nil {
+				return fmt.Errorf("unable to decode block : %s", blockErr.Error())
+			}
+
+			blockRT.SetRuntimeValue(blockDecodedInfo, slabsManager.GetSessionThreadIdx())
 		}
-
-		blockRT.Val = blockDecodedInfo
 	} else {
 		absBlockRTInfo := &mergerContext.AbsBlockMaps[curRelativeBlockId]
 		absBlockRTInfo.Reset()

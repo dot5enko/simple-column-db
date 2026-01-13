@@ -16,7 +16,9 @@ var QueueSizeNow atomic.Int32
 func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tasksQueue <-chan *ChunkProcessingTask) {
 
 	// per worker local cache
-	threadCache := &executortypes.ChunkExecutorThreadCache{}
+	threadCache := &executortypes.ChunkExecutorThreadCache{
+		ThreadIdx: threadId,
+	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)
 

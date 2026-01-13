@@ -149,7 +149,6 @@ func (m *SlabManager) invalidateCache(slabUid uuid.UUID, item2 *cache.SlabDataCa
 	}
 
 	for _, it := range keysToRemove {
-
 		delete(rt.cache, it)
 	}
 

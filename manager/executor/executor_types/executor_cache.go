@@ -13,6 +13,8 @@ type ChunkExecutorThreadCache struct {
 	Blocks       [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
 
 	FilterCache [MaxFiltersPerField]query.RuntimeFilterCache
+
+	ThreadIdx int
 }
 
 func (c *ChunkExecutorThreadCache) Reset() {
@@ -23,6 +25,6 @@ func (c *ChunkExecutorThreadCache) Reset() {
 		bRef := &c.Blocks[i]
 
 		bRef.BlockHeader = nil
-		bRef.Val = nil
+		bRef.SetRuntimeValue(nil, c.ThreadIdx)
 	}
 }

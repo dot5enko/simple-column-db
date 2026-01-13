@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 type RuntimeBlockData struct {
@@ -12,6 +14,9 @@ type RuntimeBlockData struct {
 	lock sync.RWMutex
 
 	DataTypedArray any
+
+	Slab        uuid.UUID
+	BlockIndice uint64
 
 	// why dup ?
 	Cap   int

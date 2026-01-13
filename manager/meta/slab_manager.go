@@ -19,7 +19,9 @@ import (
 )
 
 type BlockCacheItem struct {
-	header  *schema.DiskHeader
+	header *schema.DiskHeader
+
+	// holds a reference to cached memory, not a copy of it
 	runtime *schema.RuntimeBlockData
 
 	rtStats *cache.CacheStats
@@ -91,6 +93,10 @@ func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
 		return nil
 	}
 	return sm.session.perf_stats
+}
+
+func (sm *SlabManager) GetSessionThreadIdx() int {
+	return sm.session.cache.ThreadIdx
 }
 
 // buffers report

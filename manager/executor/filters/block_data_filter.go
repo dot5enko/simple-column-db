@@ -17,10 +17,6 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	merger *lists.IndiceUnmerged,
 ) (int, error) {
 
-	var outputBitset bits.Bitfield
-
-	var itemsFiltered int
-
 	runtimeBlockInfo := blockData.Val
 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
 
