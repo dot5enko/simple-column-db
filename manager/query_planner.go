@@ -168,6 +168,11 @@ func (qp *QueryPlanner) Plan(
 
 			for fname, selectorsByField := range selectorsByColumns {
 
+				if fname == "*" {
+					slog.Debug("selector on * skipped, not implemented")
+					continue
+				}
+
 				var columnInfo schema.SchemaColumn
 				columnIdx := 0
 

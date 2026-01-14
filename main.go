@@ -467,6 +467,10 @@ func main() {
 					Alias:     "avg_value",
 				},
 				{
+					Arguments: []any{"avg", "monitor_id"},
+					Alias:     "avg_monitor",
+				},
+				{
 					Arguments: []any{"count", "*"},
 					Alias:     "total_count",
 				},

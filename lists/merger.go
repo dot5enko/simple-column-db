@@ -17,12 +17,14 @@ type IndiceUnmerged struct {
 	ResultBitset bits.Bitfield
 
 	fullSkip bool
+	allOnes  bool
 }
 
 func (i *IndiceUnmerged) Reset() {
 
 	i.merges = 0
 	i.fullSkip = false
+	i.allOnes = false
 
 	if i.initialized {
 		for j := range i.ResultBitset {
@@ -38,10 +40,13 @@ func (i *IndiceUnmerged) SetFullSkip() {
 }
 
 func (i *IndiceUnmerged) Count() int {
+
 	if !i.initialized {
 		return -1
 	} else {
-		return i.ResultBitset.Count()
+
+		res := i.ResultBitset.Count()
+		return res
 	}
 }
 
@@ -86,45 +91,21 @@ func (i *IndiceUnmerged) WithBitset(input *bits.Bitfield, isEmpty, isFull bool) 
 		return
 	}
 
+	i.allOnes = false
 	i.ResultBitset.And(input)
-}
-
-func (i *IndiceUnmerged) _With(input []uint16, isEmpty, isFull bool) {
-
-	i.merges += 1
-
-	if isFull {
-		i.withFull()
-		return
-	}
-
-	if isEmpty {
-		i.withEmpty()
-		return
-	}
-
-	if !i.initialized {
-		i.ResultBitset.FromSorted(input)
-		i.initialized = true
-		return
-	}
-
-	var bitset bits.Bitfield
-	bitset.FromSorted(input)
-
-	i.ResultBitset = bits.MergeAND(i.ResultBitset, bitset)
 }
 
 func (i *IndiceUnmerged) withFull() {
 
 	if !i.initialized {
 		i.ResultBitset = BitsetFull
+		i.allOnes = true
 		i.initialized = true
 		return
 	}
 
+	// do nothing as all the bits set in result would be the same afterwards
 	// i.ResultBitset = bits.MergeAND(i.ResultBitset, BitsetFull)
-
 }
 
 func (i *IndiceUnmerged) withEmpty() {
@@ -135,6 +116,7 @@ func (i *IndiceUnmerged) withEmpty() {
 		return
 	}
 
+	// simply clean all words
 	i.ResultBitset = bits.MergeAND(i.ResultBitset, BitsetEmpty)
 }
 

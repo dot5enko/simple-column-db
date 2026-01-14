@@ -4,12 +4,15 @@ import (
 	"math/bits"
 )
 
-type Bitfield [64 * 8]uint64
+const BitfieldWordsLength = 64 * 8
+
+type Bitfield [BitfieldWordsLength]uint64
 
 func (b *Bitfield) Count() int {
 
 	c := 0
-	for i := 0; i < len(b); i += 4 {
+
+	for i := 0; i < BitfieldWordsLength; i += 4 {
 		c += bits.OnesCount64(b[i+0])
 		c += bits.OnesCount64(b[i+1])
 		c += bits.OnesCount64(b[i+2])

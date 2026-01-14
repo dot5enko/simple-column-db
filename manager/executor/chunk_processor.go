@@ -166,71 +166,101 @@ func ExecutePlanForChunk(
 		// and casting with unsafe pointer to needed type
 		// and buf should be a part of thread's cache
 
-		// process selectors
-		for _, selectorGroup := range plan.SelectorsGroupedByFields {
+		chunkItemsFiltered := 0
 
-			blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[selectorGroup.ColumnIdx]
-			collectResultsBlockIdx := 0
+		for blockIdx := range query.ExecutorChunkSizeBlocks {
+			chunkItemsFiltered += cache.AbsBlockMaps[blockIdx].Count()
+		}
 
-			///
-			segmentsLen := len(blockSegments)
-			for idx := range segmentsLen {
+		totalBytesPerChunk := 0
 
-				segment := &blockSegments[idx]
+		for _, filtersGroup := range plan.FilterGroupedByFields {
 
-				slabBlockOffsetStart := segment.StartBlock
+			elementSize := filtersGroup.ColumnSchemaInfo.Type.Size()
+			memoryRequirements := elementSize * chunkItemsFiltered
+			totalBytesPerChunk += memoryRequirements
+		}
 
-				slabInfo, slabErr := sm.LoadSlabHeaderToCache(&slabMergerContext.Schema, segment.Slab)
-				if slabErr != nil {
-					return fmt.Errorf("unable to load slab : %s", slabErr.Error())
-				}
+		usageMb := float64(totalBytesPerChunk) / 1_000_000.0
 
-				blockHeaders := slabInfo.BlockHeaders
+		color.Green("<query=%d/chunk%d>  total_items=%d, memory_usage=%.3f", plan.Id, blockChunk.GlobalBlockOffset, chunkItemsFiltered, usageMb)
 
-				for i := 0; i < int(segment.Size); i++ {
-					idx := i + slabBlockOffsetStart
+		if false {
+			// process selectors
+			for _, selectorGroup := range plan.SelectorsGroupedByFields {
 
-					if idx > int(slabInfo.BlocksFinalized) {
-						break
+				blockSegments := blockChunk.ChunkSegmentsByFieldIndexMap[selectorGroup.ColumnIdx]
+				collectResultsBlockIdx := 0
+
+				///
+				segmentsLen := len(blockSegments)
+				for idx := range segmentsLen {
+
+					segment := &blockSegments[idx]
+
+					slabBlockOffsetStart := segment.StartBlock
+
+					slabInfo, slabErr := sm.LoadSlabHeaderToCache(&slabMergerContext.Schema, segment.Slab)
+					if slabErr != nil {
+						return fmt.Errorf("unable to load slab : %s", slabErr.Error())
 					}
 
-					blockHeader := &blockHeaders[idx]
+					blockHeaders := slabInfo.BlockHeaders
 
-					{
-						curRelativeBlockId := collectResultsBlockIdx
-						collectResultsBlockIdx += 1
+					for i := 0; i < int(segment.Size); i++ {
+						idx := i + slabBlockOffsetStart
 
-						// blockRT := &slabMergerContext.Blocks[curRelativeBlockId]
-
-						blockDecodedInfo, blockRuntimeDataErr := sm.LoadBlockToRuntimeBlockData(slabMergerContext.Schema, slabInfo, blockHeader.Uid)
-
-						if blockRuntimeDataErr != blockRuntimeDataErr {
-							return fmt.Errorf("unable to load block's data into rt cache: %s", blockRuntimeDataErr.Error())
+						if idx > int(slabInfo.BlocksFinalized) {
+							break
 						}
 
-						merger := cache.AbsBlockMaps[curRelativeBlockId]
-						if !merger.FullSkip() {
+						blockHeader := &blockHeaders[idx]
 
-							//// process selectors applicable to current block
-							selectorsResult, selectorsApplyErr := ProcessMultipleSelectorsOnSingleBlock(curRelativeBlockId, &selectorGroup, slabMergerContext, blockDecodedInfo, cache)
-							if selectorsApplyErr != nil {
-								return selectorsApplyErr
+						{
+							curRelativeBlockId := collectResultsBlockIdx
+							collectResultsBlockIdx += 1
+
+							// blockRT := &slabMergerContext.Blocks[curRelativeBlockId]
+
+							blockDecodedInfo, blockRuntimeDataErr := sm.LoadBlockToRuntimeBlockData(slabMergerContext.Schema, slabInfo, blockHeader.Uid)
+
+							if blockRuntimeDataErr != blockRuntimeDataErr {
+								return fmt.Errorf("unable to load block's data into rt cache: %s", blockRuntimeDataErr.Error())
 							}
 
-							_ = selectorsResult
+							merger := cache.AbsBlockMaps[curRelativeBlockId]
+							if !merger.FullSkip() {
 
-							// for _, it := range selectorsResult.Results {
-							// 	log.Printf(" --- filters[%d] items count : %d, sum : %.2f", curRelativeBlockId, it.Count, it.Sum)
-							// }
-							////
+								for _, singleSelector := range selectorGroup.Selectors {
+
+									//// process selectors applicable to current block
+									selectorsResult, selectorsApplyErr := ProcessSelectorOnBlock(
+										curRelativeBlockId,
+										&singleSelector,
+										blockHeader.DataType,
+										slabMergerContext,
+										blockDecodedInfo,
+										cache,
+									)
+									if selectorsApplyErr != nil {
+										return selectorsApplyErr
+									}
+
+									_ = selectorsResult
+								}
+								// for _, it := range selectorsResult.Results {
+								// 	log.Printf(" --- filters[%d] items count : %d, sum : %.2f", curRelativeBlockId, it.Count, it.Sum)
+								// }
+								////
+
+							}
 
 						}
-
 					}
 				}
-			}
 
-			///
+				///
+			}
 		}
 
 		tookSelectors := time.Since(t0)
@@ -283,185 +313,174 @@ type FuncChunkResultMeta struct {
 }
 
 type SelectorsResult struct {
-	Results []FuncChunkResultMeta
+	Result FuncChunkResultMeta
 }
 
 var floatComparisons atomic.Int64
 
-func ProcessMultipleSelectorsOnSingleBlock(
+func ProcessSelectorOnBlock(
 	curRelativeBlockId int,
-	selectorGroup *query.SelectorGroupedRT,
+	singleSelector *query.Selector,
+	selectorFieldType schema.FieldType,
 	slabMergerContext *executortypes.BlockMergerContext,
 	rtBlockData *schema.RuntimeBlockData,
 	cache *executortypes.ChunkExecutorThreadCache,
-) (SelectorsResult, error) {
+) (resultObject SelectorsResult, topErr error) {
 
-	resultObject := SelectorsResult{
-		Results: make([]FuncChunkResultMeta, len(selectorGroup.Selectors)),
-	}
+	funcName := singleSelector.Arguments[0]
 
-	if len(selectorGroup.Selectors) > 1 {
-		log.Printf("selectors on same field : %d ", len(selectorGroup.Selectors))
-	}
+	// if selectorGroup.FieldName == "*" {
+	// 	// color.Yellow("skipped * selector, not implemented yet")
+	// 	continue
+	// }
 
-	for selectorIdx, singleSelector := range selectorGroup.Selectors {
+	/////
 
-		funcName := singleSelector.Arguments[0]
-		selectorName := fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
+	{
+		// blockData := &slabMergerContext.Blocks[idx]
+		mergerBitset := &slabMergerContext.AbsBlockMaps[curRelativeBlockId]
 
-		// if selectorGroup.FieldName == "*" {
-		// 	// color.Yellow("skipped * selector, not implemented yet")
-		// 	continue
-		// }
+		// func(idx int) {
 
-		/////
+		if false {
+			defer func() {
+				selectorName := funcName //fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
 
-		{
-			// blockData := &slabMergerContext.Blocks[idx]
-			mergerBitset := &slabMergerContext.AbsBlockMaps[curRelativeBlockId]
+				if r := recover(); r != nil {
 
-			func(idx int) {
+					// blockRef := &cache.Blocks[curRelativeBlockId]
+					cacheRef := rtBlockData
+					valRef := cacheRef == nil
 
-				defer func() {
-					if r := recover(); r != nil {
+					fmt.Printf("block_idx : %d\n", curRelativeBlockId)
+					// color.Yellow("selector group column: field_name=%s type_expected=%s actually_got=%T", selectorGroup.ColumnSchemaInfo.Name, selectorGroup.ColumnSchemaInfo.Type.String(), cacheRef.DataTypedArray)
+					color.Red("recovered on <field=%10s><rel_block_id=%4d>, slab = %s, valRef = nil (%v). merger.Count = %4d", selectorName, curRelativeBlockId, nil, valRef, mergerBitset.Count())
 
-						// blockRef := &cache.Blocks[curRelativeBlockId]
-						cacheRef := rtBlockData
-						valRef := cacheRef == nil
+					// debugHistory := blockRef.GetDebugHistory()
 
-						fmt.Printf("block_idx : %d\n", idx)
-						color.Yellow("selector group column: field_name=%s type_expected=%s actually_got=%T", selectorGroup.ColumnSchemaInfo.Name, selectorGroup.ColumnSchemaInfo.Type.String(), cacheRef.DataTypedArray)
-						color.Red("recovered on <field=%10s><rel_block_id=%4d>, slab = %s, valRef = nil (%v). merger.Count = %4d", selectorName, idx, nil, valRef, mergerBitset.Count())
+					// prevTime := debugHistory[0].Time
 
-						// debugHistory := blockRef.GetDebugHistory()
+					// for i := 0; i < len(debugHistory); i++ {
 
-						// prevTime := debugHistory[0].Time
+					// 	entry := debugHistory[i]
 
-						// for i := 0; i < len(debugHistory); i++ {
+					// 	diff := entry.Time.Sub(prevTime)
+					// 	prevTime = entry.Time
 
-						// 	entry := debugHistory[i]
+					// 	dType := entry.DataType.String()
+					// 	if entry.Action == 0 {
+					// 		dType = "-"
+					// 	}
 
-						// 	diff := entry.Time.Sub(prevTime)
-						// 	prevTime = entry.Time
+					// 	fmt.Printf(" action=%d data_type: %15s (thread=%d) block_idx : %3d, slab : %16s from prev : %5.2f. \n", entry.Action, dType, entry.Thread, entry.BlockIdx, entry.Slab, diff.Seconds()*1000000)
+					// }
 
-						// 	dType := entry.DataType.String()
-						// 	if entry.Action == 0 {
-						// 		dType = "-"
-						// 	}
+					// show events history
+					stackDebugRows := 3
 
-						// 	fmt.Printf(" action=%d data_type: %15s (thread=%d) block_idx : %3d, slab : %16s from prev : %5.2f. \n", entry.Action, dType, entry.Thread, entry.BlockIdx, entry.Slab, diff.Seconds()*1000000)
-						// }
-
-						// show events history
-						stackDebugRows := 3
-
-						for debugRowIdx := range stackDebugRows {
-							_, file, line, ok := runtime.Caller(debugRowIdx + 2)
-							if ok {
-								fmt.Printf("\t%s:%d\n", file, line)
-							}
+					for debugRowIdx := range stackDebugRows {
+						_, file, line, ok := runtime.Caller(debugRowIdx + 2)
+						if ok {
+							fmt.Printf("\t%s:%d\n", file, line)
 						}
-
-						os.Exit(0)
-
 					}
-				}()
 
-				if mergerBitset.FullSkip() || mergerBitset.Count() == -1 {
-					// continue
-					return
+					os.Exit(0)
+
 				}
-
-				directArrayAccess, arraySize := rtBlockData.DirectAccess()
-
-				var itemsCount int64
-
-				chunkResultMeta := &resultObject.Results[selectorIdx]
-
-				switch selectorGroup.ColumnSchemaInfo.Type {
-				case schema.Int8FieldType:
-
-					switch funcName {
-					case "count":
-
-						itemsCount = int64(mergerBitset.Count())
-						chunkResultMeta.initialized = true
-						chunkResultMeta.Count = int(itemsCount)
-					default:
-						panic(fmt.Sprintf("function on int8 not implemented: %s", funcName))
-					}
-
-				case schema.Uint64FieldType:
-
-					arrInputWhole := directArrayAccess.([]uint64)
-					arrInput := arrInputWhole[:arraySize]
-
-					uint64Buffer := unsafe.Slice((*uint64)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
-
-					itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:]))
-
-					switch funcName {
-					case "avg":
-
-						var sum uint64
-						for _, v := range uint64Buffer[:itemsCount] {
-							sum += v
-						}
-
-						chunkResultMeta.initialized = true
-						chunkResultMeta.Sum = float64(sum)
-						chunkResultMeta.Count = int(itemsCount)
-						chunkResultMeta.Avg = chunkResultMeta.Sum / float64(itemsCount)
-
-					default:
-						panic(fmt.Sprintf("unknown function in selector u64 : %s", funcName))
-					}
-
-				case schema.Float32FieldType:
-					arrInputWhole := directArrayAccess.([]float32)
-					arrInput := arrInputWhole[:arraySize]
-
-					float32Buffer := unsafe.Slice((*float32)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
-
-					itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:]))
-
-					switch funcName {
-					case "avg":
-
-						var sum float64
-
-						// totalComparisons := floatComparisons.Add(itemsCount)
-						// log.Printf("f32 comparisons : %d", totalComparisons)
-
-						for i := int64(0); i < itemsCount; i++ {
-							sum += float64(float32Buffer[i])
-						}
-
-						chunkResultMeta.initialized = true
-						chunkResultMeta.Sum = float64(sum)
-						chunkResultMeta.Count = int(itemsCount)
-						chunkResultMeta.Avg = chunkResultMeta.Sum / float64(itemsCount)
-
-					default:
-						panic(fmt.Sprintf("unknown function in selector f64 : %s", funcName))
-					}
-
-				default:
-					color.Red("unsupported type %v, while processing selector %#+v", selectorGroup.ColumnSchemaInfo.Type.String(), singleSelector.Arguments)
-					panic("unsupported type ")
-				}
-
-				// color.Green("<query=%d/chunk%d> found %d item in block[%d/rel=%d] %s = %v", plan.Id, blockChunk.GlobalBlockOffset, itemsCount, blockOffset, relBlockId, selectorName, chunkFuncResult)
-
-				if itemsCount != int64(mergerBitset.Count()) {
-					color.Yellow(fmt.Sprintf("bitsets count mismatch, expected %d got %d", mergerBitset.Count(), itemsCount))
-				}
-			}(curRelativeBlockId)
-
+			}()
 		}
-		/////
+
+		if mergerBitset.FullSkip() || mergerBitset.Count() == -1 {
+			// continue
+			return
+		}
+
+		directArrayAccess, arraySize := rtBlockData.DirectAccess()
+
+		var itemsCount int64
+
+		chunkResultMeta := &resultObject.Result
+
+		switch rtBlockData.Header.DataType {
+		case schema.Int8FieldType:
+
+			switch funcName {
+			case "count":
+
+				itemsCount = int64(mergerBitset.Count())
+				chunkResultMeta.initialized = true
+				chunkResultMeta.Count = int(itemsCount)
+			default:
+				panic(fmt.Sprintf("function on int8 not implemented: %s", funcName))
+			}
+
+		case schema.Uint64FieldType:
+
+			arrInputWhole := directArrayAccess.([]uint64)
+			arrInput := arrInputWhole[:arraySize]
+
+			uint64Buffer := unsafe.Slice((*uint64)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
+
+			itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:]))
+
+			switch funcName {
+			case "avg":
+
+				var sum uint64
+				for _, v := range uint64Buffer[:itemsCount] {
+					sum += v
+				}
+
+				chunkResultMeta.initialized = true
+				chunkResultMeta.Sum = float64(sum)
+				chunkResultMeta.Count = int(itemsCount)
+				chunkResultMeta.Avg = chunkResultMeta.Sum / float64(itemsCount)
+
+			default:
+				panic(fmt.Sprintf("unknown function in selector u64 : %s", funcName))
+			}
+
+		case schema.Float32FieldType:
+			arrInputWhole := directArrayAccess.([]float32)
+			arrInput := arrInputWhole[:arraySize]
+
+			float32Buffer := unsafe.Slice((*float32)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
+
+			itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:]))
+
+			switch funcName {
+			case "avg":
+
+				var sum float64
+
+				for i := int64(0); i < itemsCount; i++ {
+					sum += float64(float32Buffer[i])
+				}
+
+				chunkResultMeta.initialized = true
+				chunkResultMeta.Sum = float64(sum)
+				chunkResultMeta.Count = int(itemsCount)
+				chunkResultMeta.Avg = chunkResultMeta.Sum / float64(itemsCount)
+
+			default:
+				panic(fmt.Sprintf("unknown function in selector f64 : %s", funcName))
+			}
+
+		default:
+			color.Red("unsupported type %v, while processing selector %#+v", rtBlockData.Header.DataType.String(), singleSelector.Arguments)
+			panic("unsupported type ")
+		}
+
+		// color.Green("<query=%d/chunk%d> found %d item in block[%d/rel=%d] %s = %v", plan.Id, blockChunk.GlobalBlockOffset, itemsCount, blockOffset, relBlockId, selectorName, chunkFuncResult)
+
+		if itemsCount != int64(mergerBitset.Count()) {
+			color.Yellow(fmt.Sprintf("bitsets count mismatch, expected %d got %d", mergerBitset.Count(), itemsCount))
+		}
+		// }(curRelativeBlockId)
 
 	}
+	/////
 
 	return resultObject, nil
 }
