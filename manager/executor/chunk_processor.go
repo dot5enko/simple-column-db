@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -284,6 +286,8 @@ type SelectorsResult struct {
 	Results []FuncChunkResultMeta
 }
 
+var floatComparisons atomic.Int64
+
 func ProcessMultipleSelectorsOnSingleBlock(
 	curRelativeBlockId int,
 	selectorGroup *query.SelectorGroupedRT,
@@ -292,11 +296,12 @@ func ProcessMultipleSelectorsOnSingleBlock(
 	cache *executortypes.ChunkExecutorThreadCache,
 ) (SelectorsResult, error) {
 
-	var uint64Buffer [schema.BlockRowsSize]uint64
-	var float32Buffer [schema.BlockRowsSize]float32
-
 	resultObject := SelectorsResult{
 		Results: make([]FuncChunkResultMeta, len(selectorGroup.Selectors)),
+	}
+
+	if len(selectorGroup.Selectors) > 1 {
+		log.Printf("selectors on same field : %d ", len(selectorGroup.Selectors))
 	}
 
 	for selectorIdx, singleSelector := range selectorGroup.Selectors {
@@ -304,10 +309,10 @@ func ProcessMultipleSelectorsOnSingleBlock(
 		funcName := singleSelector.Arguments[0]
 		selectorName := fmt.Sprintf("%s(%s)", funcName, selectorGroup.FieldName)
 
-		if selectorGroup.FieldName == "*" {
-			// color.Yellow("skipped * selector, not implemented yet")
-			continue
-		}
+		// if selectorGroup.FieldName == "*" {
+		// 	// color.Yellow("skipped * selector, not implemented yet")
+		// 	continue
+		// }
 
 		/////
 
@@ -374,10 +379,24 @@ func ProcessMultipleSelectorsOnSingleBlock(
 				chunkResultMeta := &resultObject.Results[selectorIdx]
 
 				switch selectorGroup.ColumnSchemaInfo.Type {
+				case schema.Int8FieldType:
+
+					switch funcName {
+					case "count":
+
+						itemsCount = int64(mergerBitset.Count())
+						chunkResultMeta.initialized = true
+						chunkResultMeta.Count = int(itemsCount)
+					default:
+						panic(fmt.Sprintf("function on int8 not implemented: %s", funcName))
+					}
+
 				case schema.Uint64FieldType:
 
 					arrInputWhole := directArrayAccess.([]uint64)
 					arrInput := arrInputWhole[:arraySize]
+
+					uint64Buffer := unsafe.Slice((*uint64)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
 
 					itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:]))
 
@@ -385,7 +404,7 @@ func ProcessMultipleSelectorsOnSingleBlock(
 					case "avg":
 
 						var sum uint64
-						for _, v := range uint64Buffer {
+						for _, v := range uint64Buffer[:itemsCount] {
 							sum += v
 						}
 
@@ -402,27 +421,34 @@ func ProcessMultipleSelectorsOnSingleBlock(
 					arrInputWhole := directArrayAccess.([]float32)
 					arrInput := arrInputWhole[:arraySize]
 
+					float32Buffer := unsafe.Slice((*float32)(unsafe.Pointer(&cache.SelectorBuffer[0])), arraySize)
+
 					itemsCount = int64(ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:]))
 
 					switch funcName {
 					case "avg":
 
 						var sum float64
-						for _, v := range float32Buffer {
-							sum += float64(v)
+
+						// totalComparisons := floatComparisons.Add(itemsCount)
+						// log.Printf("f32 comparisons : %d", totalComparisons)
+
+						for i := int64(0); i < itemsCount; i++ {
+							sum += float64(float32Buffer[i])
 						}
 
 						chunkResultMeta.initialized = true
-						chunkResultMeta.Sum = sum
+						chunkResultMeta.Sum = float64(sum)
 						chunkResultMeta.Count = int(itemsCount)
-						chunkResultMeta.Avg = sum / float64(itemsCount)
+						chunkResultMeta.Avg = chunkResultMeta.Sum / float64(itemsCount)
 
 					default:
 						panic(fmt.Sprintf("unknown function in selector f64 : %s", funcName))
 					}
 
 				default:
-					panic(fmt.Sprintf("unsupported type %v, while processing selector %#+v", selectorGroup.ColumnSchemaInfo.Type.String(), singleSelector.Arguments))
+					color.Red("unsupported type %v, while processing selector %#+v", selectorGroup.ColumnSchemaInfo.Type.String(), singleSelector.Arguments)
+					panic("unsupported type ")
 				}
 
 				// color.Green("<query=%d/chunk%d> found %d item in block[%d/rel=%d] %s = %v", plan.Id, blockChunk.GlobalBlockOffset, itemsCount, blockOffset, relBlockId, selectorName, chunkFuncResult)

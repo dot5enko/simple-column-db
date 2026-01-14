@@ -3,6 +3,7 @@ package executortypes
 import (
 	"github.com/dot5enko/simple-column-db/lists"
 	"github.com/dot5enko/simple-column-db/manager/query"
+	"github.com/dot5enko/simple-column-db/schema"
 )
 
 const MaxFiltersPerField = 16
@@ -13,6 +14,8 @@ type ChunkExecutorThreadCache struct {
 	Blocks       [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
 
 	FilterCache [MaxFiltersPerField]query.RuntimeFilterCache
+
+	SelectorBuffer [schema.BlockRowsSize]uint64
 
 	ThreadIdx int
 }
