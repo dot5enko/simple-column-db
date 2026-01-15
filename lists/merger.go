@@ -2,6 +2,7 @@ package lists
 
 import (
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 )
 
 var (
@@ -18,6 +19,21 @@ type IndiceUnmerged struct {
 
 	fullSkip bool
 	allOnes  bool
+
+	indicesCache [rtconfig.ROWS_PER_BLOCK]uint16
+	sizeCache    int
+	calculated   bool
+}
+
+func (i *IndiceUnmerged) GetIndicesCache(recalc bool) []uint16 {
+
+	if !i.calculated || recalc {
+		i.calculated = true
+		i.sizeCache = i.ResultBitset.ToIndices(i.indicesCache[:])
+	}
+
+	return i.indicesCache[:i.sizeCache]
+
 }
 
 func (i *IndiceUnmerged) Reset() {
@@ -37,6 +53,10 @@ func (i *IndiceUnmerged) Reset() {
 
 func (i *IndiceUnmerged) SetFullSkip() {
 	i.fullSkip = true
+}
+
+func (i *IndiceUnmerged) Initialized() bool {
+	return i.initialized
 }
 
 func (i *IndiceUnmerged) Count() int {

@@ -31,6 +31,21 @@ func CollectByBitset0[T any](
 	return o
 }
 
+func CollectByIndices[T any](
+	arr []T,
+	indices []uint16,
+	out []T,
+) int {
+	o := 0
+
+	for indice := range indices {
+		out[o] = arr[indice]
+		o++
+	}
+
+	return o
+}
+
 func CollectByBitset[T any](
 	arr []T,
 	bitset *bits.Bitfield,

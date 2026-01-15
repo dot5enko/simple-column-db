@@ -10,9 +10,11 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/dot5enko/simple-column-db/lists"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/dot5enko/simple-column-db/manager/query"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
@@ -168,6 +170,12 @@ func filterDataOnChunk(
 	return nil
 }
 
+func precalcIndices(unmergedItems *[query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged) {
+	for idx := range query.ExecutorChunkSizeBlocks {
+		unmergedItems[idx].GetIndicesCache(true)
+	}
+}
+
 func processSelectorsOnChunk(
 	cache *executortypes.ChunkExecutorThreadCache,
 	sm *meta.SlabManager,
@@ -194,6 +202,8 @@ func processSelectorsOnChunk(
 		memoryRequirements := elementSize * chunkItemsFiltered
 		totalBytesPerChunk += memoryRequirements
 	}
+
+	precalcIndices(&cache.AbsBlockMaps)
 
 	// collect filtered data
 	{
@@ -396,7 +406,7 @@ func ProcessSelectorOnBlock(
 			}()
 		}
 
-		if mergerBitset.FullSkip() || mergerBitset.Count() == -1 {
+		if mergerBitset.FullSkip() || !mergerBitset.Initialized() {
 			// continue
 			return
 		}
@@ -427,7 +437,14 @@ func ProcessSelectorOnBlock(
 
 			uint64Buffer := unsafe.Slice((*uint64)(unsafe.Pointer(&bufferForData[0])), arraySize)
 
-			itemsCount = ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, uint64Buffer[:])
+			indicesList := mergerBitset.GetIndicesCache(false)
+
+			if len(indicesList) == rtconfig.ROWS_PER_BLOCK {
+				copy(uint64Buffer, arrInput)
+				itemsCount = rtconfig.ROWS_PER_BLOCK
+			} else {
+				itemsCount = ops.CollectByIndices(arrInput, indicesList, uint64Buffer[:])
+			}
 
 			switch funcName {
 			case "avg":
@@ -451,8 +468,7 @@ func ProcessSelectorOnBlock(
 			arrInput := arrInputWhole[:arraySize]
 
 			float32Buffer := unsafe.Slice((*float32)(unsafe.Pointer(&bufferForData[0])), arraySize)
-
-			itemsCount = ops.CollectByBitset(arrInput, &mergerBitset.ResultBitset, float32Buffer[:])
+			itemsCount = ops.CollectByIndices(arrInput, mergerBitset.GetIndicesCache(false), float32Buffer[:])
 
 			switch funcName {
 			case "avg":
