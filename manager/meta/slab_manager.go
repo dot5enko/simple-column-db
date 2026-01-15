@@ -20,16 +20,14 @@ import (
 )
 
 type BlockCacheItem struct {
-	header *schema.DiskHeader
-
+	header schema.DiskHeader
 	// holds a reference to cached memory, not a copy of it
 	runtime *schema.RuntimeBlockData
-
-	rtStats *cache.CacheStats
+	rtStats cache.CacheStats
 }
 
 type SlabManagerRuntimeCache struct {
-	cache  map[[32]byte]BlockCacheItem
+	cache  map[[32]byte]*BlockCacheItem
 	locker sync.RWMutex
 
 	slabHeaderCacheItem   map[uuid.UUID]*cache.SlabCacheItem
@@ -143,7 +141,7 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	sm := &SlabManager{
 		storagePath: storagePath,
 		rt: &SlabManagerRuntimeCache{
-			cache:               map[[32]byte]BlockCacheItem{},
+			cache:               map[[32]byte]*BlockCacheItem{},
 			slabHeaderCacheItem: map[uuid.UUID]*cache.SlabCacheItem{},
 			slabDataCache:       map[uuid.UUID]*cache.SlabDataCacheItem{},
 		},
@@ -221,7 +219,7 @@ func GetUniqueBlockId(slab, block uuid.UUID) [32]byte {
 	return uid
 }
 
-func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) BlockCacheItem {
+func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) *BlockCacheItem {
 
 	m.rt.locker.RLock()
 	defer m.rt.locker.RUnlock()
@@ -234,7 +232,7 @@ func (m *SlabManager) getBlockFromCache(slab, block uuid.UUID) BlockCacheItem {
 		return item
 	}
 
-	return BlockCacheItem{}
+	return nil
 }
 
 // load block from slab
