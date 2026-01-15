@@ -96,7 +96,7 @@ func main() {
 	// debug.SetGCPercent(-1)
 	runtime.MemProfileRate = 0
 	meta.SimulateCacheInvalidation = true
-	meta.CacheInvalidationTimeout = 1000 * time.Millisecond
+	meta.CacheInvalidationTimeout = 60 * time.Millisecond
 
 	waitBeforeStart := flag.Int("wait_before_start", 0, "wait ms before app start ( useful with pprof )")
 	pprofEnabled := flag.Bool("trace", false, "enable pprof server")

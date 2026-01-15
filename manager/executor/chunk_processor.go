@@ -278,7 +278,7 @@ func processSelectorsOnChunk(
 							return fmt.Errorf("unable to load block's data into rt cache: %s", blockRuntimeDataErr.Error())
 						}
 
-						merger := cache.AbsBlockMaps[curRelativeBlockId]
+						merger := &cache.AbsBlockMaps[curRelativeBlockId]
 						if !merger.FullSkip() {
 
 							// multiple selectors not supported yet
