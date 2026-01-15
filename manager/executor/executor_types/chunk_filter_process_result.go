@@ -6,6 +6,12 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 )
 
+type SelectorBufferWrapper struct {
+	Buffer        []byte
+	Size          int
+	BufferHandler any
+}
+
 type ChunkFilterProcessResult struct {
 	SkippedBlocksDueToHeaderFiltering int64
 	ProcessedBlocks                   int64
@@ -26,7 +32,7 @@ type ChunkFilterProcessResult struct {
 	TotalChunks        int64
 	TotalQueryDuration time.Duration
 
-	SelectorBuffers [rtconfig.MAX_SELECTORS_PER_QUERY][]byte
+	SelectorBuffers [rtconfig.QUERY_MAX_SELECTORS]SelectorBufferWrapper
 }
 
 type SingleColumnProcessingResult struct {

@@ -178,10 +178,6 @@ func processSelectorsOnChunk(
 ) error {
 	t0 := time.Now()
 
-	// should be optimized by using one biggest for all
-	// and casting with unsafe pointer to needed type
-	// and buf should be a part of thread's cache
-
 	chunkItemsFiltered := 0
 
 	for blockIdx := range query.ExecutorChunkSizeBlocks {
@@ -201,7 +197,6 @@ func processSelectorsOnChunk(
 
 	// collect filtered data
 	{
-
 		// process selectors
 		for selectorGroupIdx, selectorGroup := range plan.SelectorsGroupedByFields {
 
@@ -210,7 +205,27 @@ func processSelectorsOnChunk(
 
 			// todo use ring buffer
 			// or bounded pool
-			wholeBufferForColumn := make([]byte, memoryRequirements)
+			curBufferH := &result.SelectorBuffers[selectorGroupIdx]
+
+			if memoryRequirements < 1*1024*1024 {
+
+				bufferHandler := sm.GetRuntimeCache().MegabyteCache.Get()
+				curBufferH.BufferHandler = bufferHandler
+				curBufferH.Buffer = bufferHandler.Data[:memoryRequirements]
+			} else {
+				if memoryRequirements < 3*1024*1024 {
+					bufferHandler := sm.GetRuntimeCache().ThreeMegabyteCache.Get()
+					curBufferH.BufferHandler = bufferHandler
+					curBufferH.Buffer = bufferHandler.Data[:memoryRequirements]
+
+				} else {
+					bufferHandler := sm.GetRuntimeCache().SlabRuntimeCache.Get()
+					curBufferH.BufferHandler = bufferHandler
+					curBufferH.Buffer = bufferHandler.Data[:memoryRequirements]
+				}
+			}
+
+			curBufferH.Size = memoryRequirements
 
 			currentBufferOffset := 0
 
@@ -267,7 +282,7 @@ func processSelectorsOnChunk(
 									blockHeader.DataType,
 									slabMergerContext,
 									blockDecodedInfo,
-									wholeBufferForColumn[currentBufferOffset:],
+									curBufferH.Buffer[currentBufferOffset:],
 								)
 
 								if selectorsApplyErr != nil {
@@ -281,8 +296,6 @@ func processSelectorsOnChunk(
 				}
 			}
 			/// segments lopp end
-
-			result.SelectorBuffers[selectorGroupIdx] = wholeBufferForColumn
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/dot5enko/simple-column-db/perf"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
@@ -51,8 +52,12 @@ type SlabManagerSession struct {
 type smBuffers struct {
 	headerReaderBufferRing *cache.FixedSizeBufferPool
 	fullSlabBufferRing     *cache.FixedSizeBufferPool
-	slabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
-	slabRuntimeCache       *cache.TypedRingBuffer[cache.SlabDataCacheItem]
+	SlabHeaderCache        *cache.TypedRingBuffer[schema.DiskSlabHeader]
+	SlabRuntimeCache       *cache.TypedRingBuffer[cache.SlabDataCacheItem]
+
+	// generic caches
+	MegabyteCache      *cache.TypedRingBuffer[cache.MbCacheItem]
+	ThreeMegabyteCache *cache.TypedRingBuffer[cache.ThreeMbCacheItem]
 }
 
 type SlabManager struct {
@@ -66,6 +71,10 @@ type SlabManager struct {
 
 	meta    *MetaManager
 	session *SlabManagerSession
+}
+
+func (sm *SlabManager) GetRuntimeCache() *smBuffers {
+	return sm.buffers
 }
 
 // copy with session
@@ -121,8 +130,8 @@ func (m *SlabManager) PrintBufferEffectivityReport() {
 
 	printSingleBufferReport("headerReaderBufferRing", buffers.headerReaderBufferRing.GetStats())
 	printSingleBufferReport("fullSlabBufferRing", buffers.fullSlabBufferRing.GetStats())
-	printSingleBufferReport("slabHeaderCache", buffers.slabHeaderCache.GetStats())
-	printSingleBufferReport("slabRuntimeCache", buffers.slabRuntimeCache.GetStats())
+	printSingleBufferReport("slabHeaderCache", buffers.SlabHeaderCache.GetStats())
+	printSingleBufferReport("slabRuntimeCache", buffers.SlabRuntimeCache.GetStats())
 
 	log.Println(headerPart)
 
@@ -144,10 +153,10 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 	buffers := &smBuffers{}
 
 	// 1slab = ±10MB ram
-	buffers.fullSlabBufferRing = cache.NewFixedSizeBufferPool(16, schema.SlabDiskContentsUncompressed)
-	buffers.headerReaderBufferRing = cache.NewFixedSizeBufferPool(32, schema.SlabHeaderFixedSize)
+	buffers.fullSlabBufferRing = cache.NewFixedSizeBufferPool(rtconfig.CACHE_STANDBY_SLABS, schema.SlabDiskContentsUncompressed)
+	buffers.headerReaderBufferRing = cache.NewFixedSizeBufferPool(rtconfig.CACHE_PRECACHED_SLAB_HEADERS, schema.SlabHeaderFixedSize)
 
-	buffers.slabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](32).
+	buffers.SlabRuntimeCache = cache.NewTypedRingBuffer[cache.SlabDataCacheItem](rtconfig.CACHE_PRECACHED_SLABS).
 		WithInitializer(func(item *cache.SlabDataCacheItem) *cache.SlabDataCacheItem {
 			return &cache.SlabDataCacheItem{RtStats: &cache.CacheStats{}}
 		}).
@@ -155,7 +164,15 @@ func NewSlabManager(storagePath string, meta *MetaManager) *SlabManager {
 
 	// slab reusing header
 	// todo profile and optimize
-	buffers.slabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128).WithName("SlabHeaderCache")
+	buffers.SlabHeaderCache = cache.NewTypedRingBuffer[schema.DiskSlabHeader](128).WithName("SlabHeaderCache")
+
+	// generic buffers
+	buffers.MegabyteCache = cache.NewTypedRingBuffer[cache.MbCacheItem](32).WithInitializer(func(item *cache.MbCacheItem) *cache.MbCacheItem {
+		return &cache.MbCacheItem{RtStats: &cache.CacheStats{}}
+	}).WithName("MbCache")
+	buffers.ThreeMegabyteCache = cache.NewTypedRingBuffer[cache.ThreeMbCacheItem](16).WithInitializer(func(item *cache.ThreeMbCacheItem) *cache.ThreeMbCacheItem {
+		return &cache.ThreeMbCacheItem{RtStats: &cache.CacheStats{}}
+	}).WithName("ThreeMbCache")
 
 	sm.buffers = buffers
 

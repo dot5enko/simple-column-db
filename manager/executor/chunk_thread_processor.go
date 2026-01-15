@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
 	"github.com/fatih/color"
@@ -97,12 +98,28 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 			if selectorsProcessingErr != nil {
 				curStatus.Err.Store(true)
-				curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
+				curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", selectorsProcessingErr.Error())
+			}
+
+			for _, item := range taskRes.SelectorBuffers[:len(task.Plan.SelectorsGroupedByFields)] {
+				switch cacheHandler := item.BufferHandler.(type) {
+
+				case *cache.MbCacheItem:
+					threadSlabManagerSession.GetRuntimeCache().MegabyteCache.Return(cacheHandler)
+				case *cache.ThreeMbCacheItem:
+					threadSlabManagerSession.GetRuntimeCache().ThreeMegabyteCache.Return(cacheHandler)
+				case *cache.SlabDataCacheItem:
+					threadSlabManagerSession.GetRuntimeCache().SlabRuntimeCache.Return(cacheHandler)
+				default:
+					slog.Error("unknown buffer handler type", "type", fmt.Sprintf("%T", cacheHandler))
+				}
 			}
 
 			if processed == int32(curStatus.ChunksTotal) {
 				globalChunkResult.TotalQueryDuration = time.Since(task.Status.StartTime)
 				curStatus.Waiter.Done()
+
+				// cleanup chunks buffers
 
 				// nowSize := QueueSizeNow.Add(-1)
 				// log.Printf("queue size now: %d\n", nowSize)qi

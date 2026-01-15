@@ -56,7 +56,7 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 					// ioTime := time.Since(readStart).Seconds()
 
 					var headerCacheEntryId uint16
-					result = m.buffers.slabHeaderCache.Get()
+					result = m.buffers.SlabHeaderCache.Get()
 
 					headerBytes := bytes.NewReader(headerReadBuffer)
 					headerParseErr := result.FromBytes(headerBytes)
@@ -153,7 +153,7 @@ func (m *SlabManager) invalidateCache(slabUid uuid.UUID, item2 *cache.SlabDataCa
 	}
 
 	delete(rt.slabDataCache, slabUid)
-	buffers.slabRuntimeCache.Return(item2)
+	buffers.SlabRuntimeCache.Return(item2)
 }
 
 var decodings atomic.Int32
@@ -194,7 +194,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 		fileReader.SetPerfStats(statSession)
 
 		defer fileReader.Close()
-		item := m.buffers.slabRuntimeCache.Get()
+		item := m.buffers.SlabRuntimeCache.Get()
 
 		// todo improve this part
 		// should be done on .Get inside RingBuffer
@@ -219,7 +219,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 				switch result.CompressionType {
 				case 1:
 
-					item2 := m.buffers.slabRuntimeCache.Get()
+					item2 := m.buffers.SlabRuntimeCache.Get()
 					item2.Reset()
 
 					dStart := time.Now()
@@ -285,7 +285,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 
 					m.rt.slabDataCache[uid] = item2
 
-					m.buffers.slabRuntimeCache.Return(item)
+					m.buffers.SlabRuntimeCache.Return(item)
 
 					if SimulateCacheInvalidation {
 						time.AfterFunc(CacheInvalidationTimeout, func() {

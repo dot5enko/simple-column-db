@@ -34,6 +34,16 @@ type SlabDataCacheItem struct {
 	RtStats *CacheStats
 }
 
+type MbCacheItem struct {
+	Data    [1 * 1024 * 1024]byte
+	RtStats *CacheStats
+}
+
+type ThreeMbCacheItem struct {
+	Data    [3 * 1024 * 1024]byte
+	RtStats *CacheStats
+}
+
 func (item *SlabDataCacheItem) Reset() {
 
 	if item.RtStats != nil {
