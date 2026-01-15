@@ -6,13 +6,14 @@ import (
 	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 )
 
 const CurrentSlabVersion = 1
 const SlabHeaderFixedSize = 2 + 8 + 16 + 2 + 2 + 2 + 1 + 1 + 1 + 8 + BoundsSize
-const SlabDiskContentsUncompressed = 10 * 1024 * 1024
+const SlabDiskContentsUncompressed = rtconfig.SLAB_DISK_SIZE_MB * 1024 * 1024
 
 type DiskSlabHeader struct {
 	Bounds BoundsFloat

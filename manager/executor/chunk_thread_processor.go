@@ -32,6 +32,13 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 		// color.Red(" chunk processed [%d] x %d blocks", task.ChunkIdx, query.ExecutorChunkSizeBlocks)
 
 		curStatus := task.Status
+
+		processed := curStatus.ChunksProcessed.Add(1)
+
+		if processed == 1 {
+			curStatus.QueueTime = time.Since(curStatus.StartTime)
+		}
+
 		start := time.Now()
 
 		if curStatus.Err.Load() {
@@ -48,13 +55,19 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 		taskRes := &executortypes.ChunkFilterProcessResult{}
 
-		err := ExecutePlanForChunk(threadCache, threadSlabManagerSession, task.Plan, task.Bchunk, slabMergerContext, taskRes)
+		err := filterDataOnChunk(
+			threadCache,
+			threadSlabManagerSession,
+			task.Plan,
+			task.Bchunk,
+			slabMergerContext,
+			taskRes,
+		)
 		if err != nil {
 			curStatus.Err.Store(true)
 			curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
 		} else {
 
-			processed := curStatus.ChunksProcessed.Add(1)
 			processingTook := time.Since(start).Seconds() * 1000.0
 
 			if false {
@@ -73,27 +86,29 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			atomic.AddInt64(&globalChunkResult.IoTime, session.IoTime.Nanoseconds())
 			atomic.AddInt64(&globalChunkResult.TookSelectors, taskRes.TookSelectors)
 
-			// copy bitset to global result bitset
-			// perform selectors according to query
+			selectorsProcessingErr := processSelectorsOnChunk(
+				threadCache,
+				threadSlabManagerSession,
+				task.Plan,
+				task.Bchunk,
+				slabMergerContext,
+				taskRes,
+			)
 
-			// for idx := range query.ExecutorChunkSizeBlocks {
-
-			// 	blockFilterMask := &threadCache.AbsBlockMaps[idx]
-
-			// 	if blockFilterMask.Merges() == task.Plan.FilterSize {
-			// 	}
-			// }
+			if selectorsProcessingErr != nil {
+				curStatus.Err.Store(true)
+				curStatus.ErrObject = fmt.Errorf("error while executing plan chunk: %s", err.Error())
+			}
 
 			if processed == int32(curStatus.ChunksTotal) {
 				globalChunkResult.TotalQueryDuration = time.Since(task.Status.StartTime)
 				curStatus.Waiter.Done()
 
 				// nowSize := QueueSizeNow.Add(-1)
-				// log.Printf("queue size now: %d\n", nowSize)
+				// log.Printf("queue size now: %d\n", nowSize)qi
 			}
-
 		}
-
 	}
-
 }
+
+// color.Green("<query=%d/chunk%d>  total_items=%d, memory_usage=%.3f", plan.Id, blockChunk.GlobalBlockOffset, chunkItemsFiltered, usageMb)

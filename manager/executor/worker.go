@@ -13,7 +13,11 @@ import (
 type TaskStatus struct {
 	StartTime time.Time
 
-	ChunksTotal     int
+	QueueTime  time.Duration
+	SubmitTime time.Duration
+
+	ChunksTotal int
+
 	ChunksProcessed atomic.Int32
 
 	Err       atomic.Bool

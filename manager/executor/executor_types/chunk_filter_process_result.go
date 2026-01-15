@@ -1,6 +1,10 @@
 package executortypes
 
-import "time"
+import (
+	"time"
+
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
+)
 
 type ChunkFilterProcessResult struct {
 	SkippedBlocksDueToHeaderFiltering int64
@@ -21,6 +25,8 @@ type ChunkFilterProcessResult struct {
 	// set on query planner
 	TotalChunks        int64
 	TotalQueryDuration time.Duration
+
+	SelectorBuffers [rtconfig.MAX_SELECTORS_PER_QUERY][]byte
 }
 
 type SingleColumnProcessingResult struct {

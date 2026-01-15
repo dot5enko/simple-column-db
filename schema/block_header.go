@@ -6,11 +6,11 @@ import (
 	"io"
 
 	"github.com/dot5enko/simple-column-db/bits"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/google/uuid"
 )
 
-const BlockRowsSize = 32 * 1024 // 32k rows per block
-
+const BlockRowsSize = rtconfig.ROWS_PER_BLOCK
 const TotalHeaderSize = 128
 
 const HeaderSizeUsed uint64 = 16 + 2 + 8 + 8 + 1 + 16 // guid + start offset + compressed size + datatype + [max value + min value] bounds : 16

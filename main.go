@@ -517,10 +517,11 @@ func main() {
 					"skip_blocks", cummResult.SkippedBlocksDueToHeaderFiltering,
 					"matched", cummResult.TotalItems,
 					"took", time.Duration(cummResult.TotalQueryDuration),
-					"wait", time.Duration(cummResult.PureLock),
+					// "wait", time.Duration(cummResult.PureLock),
 					"n_chunks", cummResult.TotalChunks,
 					"io", time.Duration(cummResult.IoTime),
 					"selectors", time.Duration(cummResult.TookSelectors),
+					"queue_time", result.GetQueueTime(),
 				)
 
 			}

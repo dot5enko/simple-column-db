@@ -2,9 +2,11 @@ package bits
 
 import (
 	"math/bits"
+
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 )
 
-const BitfieldWordsLength = 64 * 8
+const BitfieldWordsLength = rtconfig.ROWS_PER_BLOCK / 64
 
 type Bitfield [BitfieldWordsLength]uint64
 

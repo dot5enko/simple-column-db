@@ -168,6 +168,10 @@ func (qp *QueryPlanner) Plan(
 
 			for fname, selectorsByField := range selectorsByColumns {
 
+				if len(selectorsByField) > 1 {
+					return query.QueryPlan{}, fmt.Errorf("multiple selectors on same column not supported (yet?)")
+				}
+
 				if fname == "*" {
 					slog.Debug("selector on * skipped, not implemented")
 					continue

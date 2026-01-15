@@ -60,6 +60,8 @@ func (q *QueryResult) GetMetrics() *executortypes.ChunkFilterProcessResult {
 	return q.metrics
 }
 
+func (q *QueryResult) GetQueueTime() time.Duration { return q.task.QueueTime }
+
 func (q *QueryResult) Wait() {
 
 	taskStatus := q.task
@@ -125,6 +127,8 @@ func (sm *Manager) Query(
 			Status: taskStatus,
 		}
 	}
+
+	taskStatus.SubmitTime = time.Since(taskStatus.StartTime)
 
 	result.task = taskStatus
 	executor.QueueSizeNow.Add(1)

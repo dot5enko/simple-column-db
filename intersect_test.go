@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 )
 
-const blocksize = 32 * 1024 // ~32k rows per block
+const blocksize = rtconfig.ROWS_PER_BLOCK // ~32k rows per block
 
 func randomFillIndices(n int, fillPercent int) []uint16 {
 	out := make([]uint16, 0, n*fillPercent/100)

@@ -1,0 +1,11 @@
+package rtconfig
+
+const MAX_SELECTORS_PER_QUERY = 32
+const SLAB_DISK_SIZE_MB = 10
+const ROWS_PER_BLOCK = 32 * 1024
+const BLOCKS_PER_CHUNK = 40
+
+const ROWS_PER_CHUNK = ROWS_PER_BLOCK * BLOCKS_PER_CHUNK
+
+// query executor
+const QUERY_MAX_FILTERS_PER_FIELD = 16

@@ -3,11 +3,12 @@ package query
 import (
 	"fmt"
 
+	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/google/uuid"
 )
 
-const ExecutorChunkSizeBlocks = 40
+const ExecutorChunkSizeBlocks = rtconfig.BLOCKS_PER_CHUNK
 
 var (
 	ErrSchemaNotFound = fmt.Errorf("schema not found")
