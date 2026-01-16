@@ -22,12 +22,6 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	threadCache := &executortypes.ChunkExecutorThreadCache{
 		ThreadIdx:               threadId,
 		FilterApplyCacheMapping: make(map[executortypes.FilterApplyKeyType]uint16, 1000),
-		// BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](64).
-		// 	WithInitializer(func(item *bits.Bitfield) *bits.Bitfield {
-		// 		var newItem bits.Bitfield
-		// 		return &newItem
-		// 	}).
-		// 	WithName(fmt.Sprintf("bitset_local_thread_cache_%d", threadId)),
 	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)
@@ -61,7 +55,10 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			return
 		}
 
-		threadSlabManagerSession.GetSession().IoTime = 0
+		threadSlabManagerSession.GetRunSession().TimeNs = uint64(start.UnixNano())
+		sStats := threadSlabManagerSession.GetSessionStats()
+
+		sStats.IoTime = 0
 
 		taskRes := &executortypes.ChunkFilterProcessResult{}
 
@@ -86,14 +83,12 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 			globalChunkResult := &curStatus.ChunkResult
 
-			session := threadSlabManagerSession.GetSession()
-
 			atomic.AddInt64(&globalChunkResult.TotalItems, taskRes.TotalItems)
 			atomic.AddInt64(&globalChunkResult.WastedMerges, taskRes.WastedMerges)
 			atomic.AddInt64(&globalChunkResult.SkippedBlocksDueToHeaderFiltering, taskRes.SkippedBlocksDueToHeaderFiltering)
 			atomic.AddInt64(&globalChunkResult.ProcessedBlocks, taskRes.ProcessedBlocks)
 			atomic.AddInt64(&globalChunkResult.FullSkips, taskRes.FullSkips)
-			atomic.AddInt64(&globalChunkResult.IoTime, session.IoTime.Nanoseconds())
+			atomic.AddInt64(&globalChunkResult.IoTime, sStats.IoTime.Nanoseconds())
 			atomic.AddInt64(&globalChunkResult.TookSelectors, taskRes.TookSelectors)
 
 			selectorsProcessingErr := processSelectorsOnChunk(
@@ -146,7 +141,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
 			_ = filterId
 
-			it := &threadCache.BitsetsCache[itIdx]
+			it := &threadCache.BitsetsMetaCache[itIdx]
 			readStats = append(readStats, int(it.Reads))
 		}
 

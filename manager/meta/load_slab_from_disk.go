@@ -40,7 +40,7 @@ func (m *SlabManager) LoadSlabHeaderToCache(schemaObject *schema.Schema, slabUid
 			// slog.Info("loading slab to cache from disk", "slab_uid", slabUid.String())
 
 			fileReader, openErr := m.GetSlabFile(*schemaObject, slabUid, false)
-			fileReader.SetPerfStats(m.GetSession())
+			fileReader.SetPerfStats(m.GetSessionStats())
 
 			if openErr != nil {
 				return nil, openErr
@@ -190,7 +190,7 @@ func (m *SlabManager) LoadSlabDataContents(schemaObject *schema.Schema, uid uuid
 			return nil, openErr
 		}
 
-		statSession := m.GetSession()
+		statSession := m.GetSessionStats()
 		fileReader.SetPerfStats(statSession)
 
 		defer fileReader.Close()

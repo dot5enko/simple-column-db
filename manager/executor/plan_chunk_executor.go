@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/executor/filters"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -155,6 +156,11 @@ func processFiltersOnPreparedBlocks(
 	topErr error,
 ) {
 
+	session := sm.GetRunSession()
+
+	threadCache := session.GetThreadCache()
+	sessionTime := session.TimeNs
+
 	// get slab bounds
 	// curBlocksPerSlab := slabInfo.Type.BlocksPerSlab()
 
@@ -183,6 +189,7 @@ func processFiltersOnPreparedBlocks(
 		blockDataType := blockData.BlockHeader.DataType
 
 		var filteredSize int
+		var outBitset bits.Bitfield
 
 		for fIdx, filter := range mCtx.FilterColumn {
 
@@ -193,28 +200,34 @@ func processFiltersOnPreparedBlocks(
 
 			if isFull {
 				result.SkippedBlocksDueToHeaderFiltering += 1
-
 				blockGroupMerger.WithBitset(nil, false, true)
 				continue
 			}
 
 			result.ProcessedBlocks += 1
 
+			bid := schema.ConstructUniqueBlockIdForColumn(blockRtInfo.Slab, uint8(blockRtInfo.BlockIndice))
+
+			cached, requests := threadCache.GetCachedFilter(filter.UniqueId, bid, sessionTime)
+			if cached != nil {
+				blockGroupMerger.WithBitset(cached, false, false)
+				filteredSize += cached.Count()
+				continue
+			}
+
 			{
 				var processFilterErr error
-
-				// slog.Info("processing filter", "filter_type", blockDataType.String())
 
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
+					filteredSize, outBitset, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](&filter, blockRtInfo)
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
+					filteredSize, outBitset, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](&filter, blockRtInfo)
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
+					filteredSize, outBitset, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](&filter, blockRtInfo)
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
+					filteredSize, outBitset, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](&filter, blockRtInfo)
 				default:
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}
@@ -222,9 +235,17 @@ func processFiltersOnPreparedBlocks(
 				if processFilterErr != nil {
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("error filter processing : %s. sum of bitset = %d, bitcount = %d", processFilterErr.Error(), blockGroupMerger.ResultBitset.Sum(), blockGroupMerger.ResultBitset.Count())
 				}
-
-				// slog.Info(" -- [filtered]", "filteredSize", filteredSize, "header_match_cached", headerMatchResult.String(), "arg", filter, "filter_bounds", headerMatchResultObj.Bounds)
 			}
+
+			blockGroupMerger.WithBitset(&outBitset, false, false)
+
+			if requests > 10 {
+				// cacheEntry := cache.BitsetCache.Get()
+				// copy(cacheEntry[:], outputBitset[:])
+
+				threadCache.PutCached(filter.UniqueId, bid, outBitset, sessionTime)
+			}
+
 		}
 
 		result.MatchedItems += filteredSize

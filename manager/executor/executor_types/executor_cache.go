@@ -3,6 +3,7 @@ package executortypes
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/lists"
@@ -16,17 +17,20 @@ const MaxFiltersPerField = rtconfig.QUERY_MAX_FILTERS_PER_FIELD
 // todo realocate with arena to allow dynamic size of blocks and chunks?
 // local thread cache, no locks needed
 
-const MaxBitsetsCached = rtconfig.ROWS_PER_BLOCK / 8
+const MaxBitsetsCached = rtconfig.ROWS_PER_BLOCK / 16
 
 type ChunkExecutorThreadCache struct {
 	AbsBlockMaps [query.ExecutorChunkSizeBlocks]lists.IndiceUnmerged
 	Blocks       [query.ExecutorChunkSizeBlocks]BlockRuntimeInfo
 
-	FilterCache [MaxFiltersPerField]query.RuntimeFilterCache
+	FilterCache      [MaxFiltersPerField]query.RuntimeFilterCache
+	BitsetsMetaCache [MaxBitsetsCached]BlockScanFilterResultCache
+	BitsetsCache     [MaxBitsetsCached]bits.Bitfield
 
 	FilterApplyCacheMapping map[FilterApplyKeyType]uint16 // max filters * blocks cached = 32k entries
-	BitsetsCache            [MaxBitsetsCached]BlockScanFilterResultCache
-	CachedBitsets           uint16
+
+	CachedBitsets uint16
+	FreedBitsets  uint16
 
 	//
 	ThreadIdx int
@@ -35,12 +39,24 @@ type ChunkExecutorThreadCache struct {
 type FilterApplyKeyType [48 + 17]byte
 
 type BlockScanFilterResultCache struct {
-	Result      bits.Bitfield
 	Reads       uint16
 	initialized bool
+	lastUsageNs uint64
 }
 
-func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockUid schema.BlockUniqueId) (*bits.Bitfield, int) {
+func (r *ChunkExecutorThreadCache) compactCache() error {
+
+	tNow := time.Now().UnixNano()
+	_ = tNow
+
+	return nil
+}
+
+func (r *ChunkExecutorThreadCache) GetCachedFilter(
+	f schema.FilterIdType,
+	blockUid schema.BlockUniqueId,
+	tNs uint64,
+) (*bits.Bitfield, int) {
 
 	var fullId FilterApplyKeyType
 	copy(fullId[:], f[:])
@@ -61,19 +77,25 @@ func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockU
 
 		r.FilterApplyCacheMapping[fullId] = mappingIdx
 	}
-	val := &r.BitsetsCache[mappingIdx]
+	val := &r.BitsetsMetaCache[mappingIdx]
 	val.Reads += 1
+	val.lastUsageNs = tNs
 
 	if !val.initialized {
 		return nil, int(val.Reads)
 	}
 
-	return &val.Result, int(val.Reads)
+	return &r.BitsetsCache[mappingIdx], int(val.Reads)
 }
 
 var total atomic.Int32
 
-func (r *ChunkExecutorThreadCache) PutCached(f schema.FilterIdType, blockUid schema.BlockUniqueId, val bits.Bitfield) {
+func (r *ChunkExecutorThreadCache) PutCached(
+	f schema.FilterIdType,
+	blockUid schema.BlockUniqueId,
+	val bits.Bitfield,
+	nowNano uint64,
+) {
 
 	// totalvalues := total.Add(1)
 	// color.Red("total cached filters: %d", totalvalues)
@@ -88,10 +110,10 @@ func (r *ChunkExecutorThreadCache) PutCached(f schema.FilterIdType, blockUid sch
 		panic(fmt.Sprintf("trying to set cache for non existing mapping: %d => %s", mappingIdx, string(fullId[:20])))
 	}
 
-	rval := &r.BitsetsCache[mappingIdx]
+	rval := &r.BitsetsMetaCache[mappingIdx]
 	rval.initialized = true
 
-	rval.Result = val
+	r.BitsetsCache[mappingIdx] = val
 }
 
 func (c *ChunkExecutorThreadCache) Reset() {

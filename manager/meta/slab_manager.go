@@ -45,6 +45,12 @@ type SlabManagerSession struct {
 	perf_stats *perf.PerformanceMetrics
 	cache      *executortypes.ChunkExecutorThreadCache
 	idx        uint64
+
+	TimeNs uint64
+}
+
+func (ss *SlabManagerSession) GetThreadCache() *executortypes.ChunkExecutorThreadCache {
+	return ss.cache
 }
 
 type smBuffers struct {
@@ -94,7 +100,7 @@ func (sm *SlabManager) NewSession(cache *executortypes.ChunkExecutorThreadCache)
 	return newSm
 }
 
-func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
+func (sm *SlabManager) GetSessionStats() *perf.PerformanceMetrics {
 
 	if sm.session == nil {
 		return nil
@@ -102,12 +108,12 @@ func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
 	return sm.session.perf_stats
 }
 
-func (sm *SlabManager) GetCache() *executortypes.ChunkExecutorThreadCache {
-	return sm.session.cache
-}
-
 func (sm *SlabManager) GetSessionThreadIdx() int {
 	return sm.session.cache.ThreadIdx
+}
+
+func (sm *SlabManager) GetRunSession() *SlabManagerSession {
+	return sm.session
 }
 
 // buffers report
