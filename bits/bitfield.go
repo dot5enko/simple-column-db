@@ -6,6 +6,8 @@ import (
 	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 )
 
+type BlockIndiceType uint32
+
 const BitfieldWordsLength = rtconfig.ROWS_PER_BLOCK / 64
 
 type Bitfield [BitfieldWordsLength]uint64
@@ -66,7 +68,7 @@ func (b *Bitfield) And(other *Bitfield) {
 
 }
 
-func (b *Bitfield) FromSorted(bits []uint16) {
+func (b *Bitfield) FromSorted(bits []BlockIndiceType) {
 
 	// t0 := time.Now()
 	// defer func() {
@@ -96,7 +98,7 @@ func (b *Bitfield) FromSorted(bits []uint16) {
 	arr[currWord] |= mask
 }
 
-func (b *Bitfield) FromSortedWithBounds(bits []uint16, start, end uint16) {
+func (b *Bitfield) FromSortedWithBounds(bits []BlockIndiceType, start, end BlockIndiceType) {
 	arr := b[:] // removes bounds checks in indexing
 	if len(bits) == 0 {
 		return
@@ -123,13 +125,13 @@ func (b *Bitfield) Get(bit int) uint64 {
 	return (b[word] >> (bit & 63)) & 1
 }
 
-func (b *Bitfield) ToIndices(out []uint16) int {
+func (b *Bitfield) ToIndices(out []BlockIndiceType) int {
 	filled := 0
 	for wi, w := range b {
 		for w != 0 {
 			tz := bits.TrailingZeros64(w)
 			bit := uint64(wi*64 + tz)
-			out[filled] = uint16(bit)
+			out[filled] = BlockIndiceType(bit)
 			filled += 1
 			w &= w - 1 // clear lowest set bit
 		}

@@ -33,7 +33,7 @@ func CollectByBitset0[T any](
 
 func CollectByIndices[T any](
 	arr []T,
-	indices []uint16,
+	indices []bits.BlockIndiceType,
 	out []T,
 ) int {
 	o := 0

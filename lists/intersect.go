@@ -63,21 +63,21 @@ func IntersectIndicesFastTwoList(a, b, cache, cache2, out []uint16) int {
 	return filled
 }
 
-func convertArrayIndicesToBitset(arr []uint16) (bitset bits.Bitfield) {
+func convertArrayIndicesToBitset(arr []bits.BlockIndiceType) (bitset bits.Bitfield) {
 
 	bitset.FromSorted(arr)
 
 	return bitset
 }
 
-func convertArrayIndicesToBitsetWithBounds(arr []uint16, boundsStart, boundsEnd uint16) (bitset bits.Bitfield) {
+func convertArrayIndicesToBitsetWithBounds(arr []bits.BlockIndiceType, boundsStart, boundsEnd bits.BlockIndiceType) (bitset bits.Bitfield) {
 
 	bitset.FromSortedWithBounds(arr, boundsStart, boundsEnd)
 
 	return bitset
 }
 
-func IntersectIndicesFastTwoListBitset(a, b, out []uint16) int {
+func IntersectIndicesFastTwoListBitset(a, b, out []bits.BlockIndiceType) int {
 
 	aBitset := convertArrayIndicesToBitset(a)
 	bBitset := convertArrayIndicesToBitset(b)
@@ -214,7 +214,7 @@ func IntersectIndicesFastTwoListArray(a, b, out []uint16) uint16 {
 	return MergeArrAnd(a, b, out)
 }
 
-func IntersectIndicesFastTwoListBitsetOptimized(a, b, out []uint16, aStart, bStart, aEnd, bEnd uint16) int {
+func IntersectIndicesFastTwoListBitsetOptimized(a, b, out []bits.BlockIndiceType, aStart, bStart, aEnd, bEnd bits.BlockIndiceType) int {
 
 	aBitset := convertArrayIndicesToBitsetWithBounds(a, aStart, aEnd)
 	bBitset := convertArrayIndicesToBitsetWithBounds(b, bStart, bEnd)

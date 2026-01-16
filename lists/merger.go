@@ -20,12 +20,13 @@ type IndiceUnmerged struct {
 	fullSkip bool
 	allOnes  bool
 
-	indicesCache [rtconfig.ROWS_PER_BLOCK]uint16
-	sizeCache    int
-	calculated   bool
+	indicesCache [rtconfig.ROWS_PER_BLOCK]bits.BlockIndiceType
+
+	sizeCache  int
+	calculated bool
 }
 
-func (i *IndiceUnmerged) GetIndicesCache(recalc bool) []uint16 {
+func (i *IndiceUnmerged) GetIndicesCache(recalc bool) []bits.BlockIndiceType {
 
 	if !i.calculated || recalc {
 		i.calculated = true
