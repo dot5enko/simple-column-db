@@ -263,7 +263,7 @@ func processSelectorsOnChunk(
 
 											color.Red("buffer type used : %T. cap = %d", curBufferH.BufferHandler, cap(curBufferH.Buffer))
 											color.Red("-- buffer start before : %d, total_size = %d", beforeStart, memoryRequirements)
-
+											color.Red("elementSize * chunkItemsFiltered = %d * %d = %d (memoryReq = %d)", elementSize, chunkItemsFiltered, elementSize*chunkItemsFiltered, memoryRequirements)
 											stackDebugRows := 5
 
 											for debugRowIdx := range stackDebugRows {

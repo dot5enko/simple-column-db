@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -21,14 +20,14 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 	// per worker local cache
 	threadCache := &executortypes.ChunkExecutorThreadCache{
-		ThreadIdx:        threadId,
-		FilterApplyCache: make(map[executortypes.FilterApplyKeyType]*executortypes.BlockScanFilterResultCache, 1000),
-		BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](64).
-			WithInitializer(func(item *bits.Bitfield) *bits.Bitfield {
-				var newItem bits.Bitfield
-				return &newItem
-			}).
-			WithName(fmt.Sprintf("bitset_local_thread_cache_%d", threadId)),
+		ThreadIdx:               threadId,
+		FilterApplyCacheMapping: make(map[executortypes.FilterApplyKeyType]uint16, 1000),
+		// BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](64).
+		// 	WithInitializer(func(item *bits.Bitfield) *bits.Bitfield {
+		// 		var newItem bits.Bitfield
+		// 		return &newItem
+		// 	}).
+		// 	WithName(fmt.Sprintf("bitset_local_thread_cache_%d", threadId)),
 	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)
@@ -139,14 +138,15 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 	// check thread cache effectivity
 	if false {
-		slog.Info("thread cache info", "thread_id", threadId, "filters_cached", len(threadCache.FilterApplyCache))
+		slog.Info("thread cache info", "thread_id", threadId, "filters_cached", len(threadCache.FilterApplyCacheMapping))
 
 		readStats := []int{}
 
-		for filterId, it := range threadCache.FilterApplyCache {
+		for filterId, itIdx := range threadCache.FilterApplyCacheMapping {
 			// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
 			_ = filterId
 
+			it := &threadCache.BitsetsCache[itIdx]
 			readStats = append(readStats, int(it.Reads))
 		}
 

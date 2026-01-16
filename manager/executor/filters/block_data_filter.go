@@ -87,7 +87,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		// cacheEntry := cache.BitsetCache.Get()
 		// copy(cacheEntry[:], outputBitset[:])
 
-		cache.PutCached(filterRT.UniqueId, bid, &outputBitset)
+		cache.PutCached(filterRT.UniqueId, bid, outputBitset)
 	}
 
 	merger.WithBitset(&outputBitset, false, false)
@@ -159,7 +159,7 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 	}
 
 	if requests > 10 {
-		cache.PutCached(filterRT.UniqueId, bid, &outBitset)
+		cache.PutCached(filterRT.UniqueId, bid, outBitset)
 	}
 
 	merger.WithBitset(&outBitset, false, false)
