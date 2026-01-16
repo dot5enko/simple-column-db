@@ -34,6 +34,10 @@ func (m *Manager) SetQueryOptions(qopts query.QueryOptions) {
 	m.queryOptions = qopts
 }
 
+func (m *Manager) ShutdownWorkers() {
+	close(m.chunksQueue)
+}
+
 func New(config ManagerConfig) *Manager {
 
 	// default values

@@ -2,11 +2,12 @@ package executor
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
+	"slices"
 	"sync/atomic"
 	"time"
 
-	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
@@ -21,7 +22,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	// per worker local cache
 	threadCache := &executortypes.ChunkExecutorThreadCache{
 		ThreadIdx:        threadId,
-		FilterApplyCache: make(map[schema.FilterIdType]map[schema.BlockUniqueId]*bits.Bitfield),
+		FilterApplyCache: make(map[schema.FilterIdType]map[schema.BlockUniqueId]*executortypes.BlockScanFilterResultCache),
 	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)
@@ -129,6 +130,43 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			}
 		}
 	}
+
+	// check thread effectivity
+
+	slog.Info("thread cache info", "thread_id", threadId, "filters_cached", len(threadCache.FilterApplyCache))
+
+	readStats := []int{}
+
+	for filterId, it := range threadCache.FilterApplyCache {
+		// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
+		_ = filterId
+
+		for _, jval := range it {
+			readStats = append(readStats, jval.Reads)
+		}
+	}
+
+	slices.Sort(readStats)
+
+	// top k usages
+
+	topK := 5
+	itemsLength := len(readStats)
+
+	if itemsLength < topK {
+		topK = itemsLength
+	}
+
+
+	p50val := 
+
+	for i := 0; i < topK; i += 1 {
+
+		idx := itemsLength - topK + i
+		curValue := readStats[idx]
+		log.Printf(" -- max usage of block(%d out of %d): %d times", idx, itemsLength, curValue)
+	}
+
 }
 
 // color.Green("<query=%d/chunk%d>  total_items=%d, memory_usage=%.3f", plan.Id, blockChunk.GlobalBlockOffset, chunkItemsFiltered, usageMb)

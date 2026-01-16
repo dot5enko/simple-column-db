@@ -19,7 +19,7 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 	swg.Add(workerCount)
 
 	for i := 0; i < workerCount; i++ {
-		go func() {
+		go func(copiedI int) {
 
 			defer func() {
 				swg.Done()
@@ -33,8 +33,8 @@ func StartWorkerThreads(workerCount int, cb func(threadId int)) *sync.WaitGroup 
 				}
 			}()
 
-			cb(i)
-		}()
+			cb(copiedI)
+		}(i)
 	}
 
 	return &swg

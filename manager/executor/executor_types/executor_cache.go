@@ -22,10 +22,15 @@ type ChunkExecutorThreadCache struct {
 
 	SelectorBuffer [schema.BlockRowsSize]uint64
 
-	// fcacheL     sync.RWMutex
-	FilterApplyCache map[schema.FilterIdType]map[schema.BlockUniqueId]*bits.Bitfield
+	// local thread cache, no locks needed
+	FilterApplyCache map[schema.FilterIdType]map[schema.BlockUniqueId]*BlockScanFilterResultCache
 
 	ThreadIdx int
+}
+
+type BlockScanFilterResultCache struct {
+	Reads  int
+	Result *bits.Bitfield
 }
 
 func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockUid schema.BlockUniqueId) *bits.Bitfield {
@@ -33,7 +38,13 @@ func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockU
 	val := r.FilterApplyCache[f]
 
 	if val != nil {
-		return val[blockUid]
+
+		tmp := val[blockUid]
+
+		if tmp != nil {
+			tmp.Reads += 1
+			return tmp.Result
+		}
 	}
 
 	// r.fcacheL.RUnlock()
@@ -46,15 +57,18 @@ func (r *ChunkExecutorThreadCache) PutCached(f schema.FilterIdType, blockUid sch
 	// r.fcacheL.Lock()
 
 	totalvalues := total.Add(1)
-	color.Red("total cached filters: %s", totalvalues)
+	color.Red("total cached filters: %d", totalvalues)
 
 	cV := r.FilterApplyCache[f]
 
 	if cV == nil {
-		r.FilterApplyCache[f] = map[schema.BlockUniqueId]*bits.Bitfield{}
+		r.FilterApplyCache[f] = map[schema.BlockUniqueId]*BlockScanFilterResultCache{}
 	}
 
-	r.FilterApplyCache[f][blockUid] = val
+	r.FilterApplyCache[f][blockUid] = &BlockScanFilterResultCache{
+		Reads:  0,
+		Result: val,
+	}
 	// r.fcacheL.Unlock()
 }
 

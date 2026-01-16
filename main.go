@@ -220,7 +220,7 @@ func main() {
 
 	workersCtx, cancelWorkers := context.WithCancel(context.Background())
 
-	m.StartWorkers(*workerThreads, workersCtx)
+	workersWaitGroup := m.StartWorkers(*workerThreads, workersCtx)
 
 	fromNowFilter := func(offset time.Duration, fieldName string) query.FilterCondition {
 
@@ -575,6 +575,13 @@ func main() {
 	color.Yellow("waiting for the tests done...")
 
 	multithreadWg.Wait()
+
+	m.ShutdownWorkers()
+	log.Printf("waiting for worker threads to shut down")
+
+	workersWaitGroup.Wait()
+
+	slog.Info("workers shut down now")
 
 	// m.Slabs.PrintBufferEffectivityReport()
 
