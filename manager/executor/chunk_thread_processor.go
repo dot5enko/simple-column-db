@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
-	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
 )
 
@@ -22,7 +22,13 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	// per worker local cache
 	threadCache := &executortypes.ChunkExecutorThreadCache{
 		ThreadIdx:        threadId,
-		FilterApplyCache: make(map[schema.FilterIdType]map[schema.BlockUniqueId]*executortypes.BlockScanFilterResultCache),
+		FilterApplyCache: make(map[executortypes.FilterApplyKeyType]*executortypes.BlockScanFilterResultCache, 1000),
+		BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](512).
+			WithInitializer(func(item *bits.Bitfield) *bits.Bitfield {
+				var newItem bits.Bitfield
+				return &newItem
+			}).
+			WithName(fmt.Sprintf("bitset_local_thread_cache_%d", threadId)),
 	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)
@@ -131,40 +137,40 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 		}
 	}
 
-	// check thread effectivity
+	// check thread cache effectivity
+	if false {
+		slog.Info("thread cache info", "thread_id", threadId, "filters_cached", len(threadCache.FilterApplyCache))
 
-	slog.Info("thread cache info", "thread_id", threadId, "filters_cached", len(threadCache.FilterApplyCache))
+		readStats := []int{}
 
-	readStats := []int{}
+		for filterId, it := range threadCache.FilterApplyCache {
+			// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
+			_ = filterId
 
-	for filterId, it := range threadCache.FilterApplyCache {
-		// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
-		_ = filterId
-
-		for _, jval := range it {
-			readStats = append(readStats, jval.Reads)
+			readStats = append(readStats, it.Reads)
 		}
-	}
 
-	slices.Sort(readStats)
+		slices.Sort(readStats)
 
-	// top k usages
+		// top k usages
 
-	topK := 5
-	itemsLength := len(readStats)
+		topK := 5
+		itemsLength := len(readStats)
 
-	if itemsLength < topK {
-		topK = itemsLength
-	}
+		if itemsLength < topK {
+			topK = itemsLength
+		}
 
+		p30val := readStats[int(float64(itemsLength)*0.3)]
+		p50val := readStats[itemsLength/2]
+		p90val := readStats[int(float64(itemsLength)*0.9)]
 
-	p50val := 
+		for i := 0; i < topK; i += 1 {
 
-	for i := 0; i < topK; i += 1 {
-
-		idx := itemsLength - topK + i
-		curValue := readStats[idx]
-		log.Printf(" -- max usage of block(%d out of %d): %d times", idx, itemsLength, curValue)
+			idx := itemsLength - topK + i
+			curValue := readStats[idx]
+			log.Printf(" -- max usage of block(%d out of %d): %d times: p30=%d, p50=%d, p90=%d", idx, itemsLength, curValue, p30val, p50val, p90val)
+		}
 	}
 
 }

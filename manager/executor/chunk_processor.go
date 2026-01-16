@@ -285,21 +285,56 @@ func processSelectorsOnChunk(
 							// this loop always has one element
 							for _, singleSelector := range selectorGroup.Selectors {
 
-								//// process selectors applicable to current block
-								selectorsResult, selectorsApplyErr := ProcessSelectorOnBlock(
-									curRelativeBlockId,
-									&singleSelector,
-									blockHeader.DataType,
-									slabMergerContext,
-									blockDecodedInfo,
-									curBufferH.Buffer[currentBufferOffset:],
-								)
+								handleErr := func() error {
 
-								if selectorsApplyErr != nil {
-									return selectorsApplyErr
+									beforeStart := currentBufferOffset
+
+									defer func() {
+										rec := recover()
+
+										if rec != nil {
+											color.Red("panicked in ProcessSelectorOnBlock")
+											color.Red("%s", rec)
+
+											color.Red("buffer type used : %T. cap = %d", curBufferH.BufferHandler, cap(curBufferH.Buffer))
+											color.Red("-- buffer start before : %d, total_size = %d", beforeStart, memoryRequirements)
+
+											stackDebugRows := 5
+
+											for debugRowIdx := range stackDebugRows {
+												_, file, line, ok := runtime.Caller(debugRowIdx + 2)
+												if ok {
+													fmt.Printf("\t%s:%d\n", file, line)
+												}
+											}
+
+											os.Exit(0)
+										}
+									}()
+
+									//// process selectors applicable to current block
+									selectorsResult, selectorsApplyErr := ProcessSelectorOnBlock(
+										curRelativeBlockId,
+										&singleSelector,
+										blockHeader.DataType,
+										slabMergerContext,
+										blockDecodedInfo,
+										curBufferH.Buffer[currentBufferOffset:],
+									)
+
+									if selectorsApplyErr != nil {
+										return selectorsApplyErr
+									}
+
+									currentBufferOffset += selectorsResult.BytesSize
+
+									return nil
+								}()
+
+								if handleErr != nil {
+									return handleErr
 								}
 
-								currentBufferOffset += selectorsResult.BytesSize
 							}
 						}
 					}
@@ -434,6 +469,10 @@ func ProcessSelectorOnBlock(
 
 			arrInputWhole := directArrayAccess.([]uint64)
 			arrInput := arrInputWhole[:arraySize]
+
+			if len(bufferForData) == 0 {
+				color.Yellow("trying to address 0 element with 0 size, arraySize = %d", arraySize)
+			}
 
 			uint64Buffer := unsafe.Slice((*uint64)(unsafe.Pointer(&bufferForData[0])), arraySize)
 

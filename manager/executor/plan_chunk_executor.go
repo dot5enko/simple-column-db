@@ -212,9 +212,9 @@ func processFiltersOnPreparedBlocks(
 				case schema.Uint8FieldType:
 					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
 				case schema.Float32FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockRtInfo, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
 				case schema.Float64FieldType:
-					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](filter.Filter, blockRtInfo, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float64](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
 				default:
 					return executortypes.SingleColumnProcessingResult{}, fmt.Errorf("unsupported type %v", blockDataType.String())
 				}

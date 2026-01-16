@@ -27,6 +27,38 @@ type node[T any] struct {
 	val *T
 }
 
+func NewTypedRingBuffer[T any](n int) *TypedRingBuffer[T] {
+
+	rb := &TypedRingBuffer[T]{
+		stats: Stats{
+			Size: n,
+		},
+	}
+
+	rb.preallocateChunk(n)
+
+	return rb
+}
+
+func (p *TypedRingBuffer[T]) preallocateChunk(n int) *TypedRingBuffer[T] {
+
+	// buffers := make([]T, n)
+
+	// for i := 0; i < n; i++ {
+	// 	p.pushNode(&node[T]{val: &buffers[i]})
+	// }
+
+	values := make([]T, n)
+	nodes := make([]node[T], n)
+
+	for i := 0; i < n; i++ {
+		nodes[i].val = &values[i]
+		p.pushNode(&nodes[i])
+	}
+
+	return p
+}
+
 func (rb *TypedRingBuffer[T]) pushNode(n *node[T]) {
 	for {
 		cur := rb.head.Load()
@@ -77,23 +109,6 @@ func (rb *TypedRingBuffer[T]) popNode() *node[T] {
 		}
 
 	}
-}
-
-func NewTypedRingBuffer[T any](n int) *TypedRingBuffer[T] {
-
-	buffers := make([]T, n)
-
-	rb := &TypedRingBuffer[T]{
-		stats: Stats{
-			Size: n,
-		},
-	}
-
-	for i := 0; i < n; i++ {
-		rb.pushNode(&node[T]{val: &buffers[i]})
-	}
-
-	return rb
 }
 
 func (p *TypedRingBuffer[T]) WithInitializer(cb func(item *T) *T) *TypedRingBuffer[T] {

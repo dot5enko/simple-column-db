@@ -28,14 +28,13 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 	filterRT *query.FilterConditionRuntime,
 	runtimeBlockInfo *schema.RuntimeBlockData,
 	merger *lists.IndiceUnmerged,
-
 ) (int, error) {
 
 	filter := filterRT.Filter
 
 	bid := schema.ConstructUniqueBlockIdForColumn(runtimeBlockInfo.Slab, uint8(runtimeBlockInfo.BlockIndice))
 
-	cached := cache.GetCachedFilter(filterRT.UniqueId, bid)
+	cached, requests := cache.GetCachedFilter(filterRT.UniqueId, bid)
 	if cached != nil {
 		merger.WithBitset(cached, false, false)
 		return cached.Count(), nil
@@ -84,76 +83,38 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), runtimeBlockInfo.Header.DataType.String())
 	}
 
-	cache.PutCached(filterRT.UniqueId, bid, &outputBitset)
+	if requests > 10 {
+		// cacheEntry := cache.BitsetCache.Get()
+		// copy(cacheEntry[:], outputBitset[:])
+
+		cache.PutCached(filterRT.UniqueId, bid, &outputBitset)
+	}
+
 	merger.WithBitset(&outputBitset, false, false)
 
 	return itemsFiltered, nil
 
 }
 
-// func ProcessSignedFilterOnColumnWithType[T ops.SignedInts](
-// 	slab *schema.DiskSlabHeader,
-// 	filter query.FilterCondition,
-// 	blockData *executortypes.BlockRuntimeInfo,
-// 	merger *lists.IndiceUnmerged,
-// 	indicesCache []uint16,
-// ) (int, error) {
-
-// 	var itemsFiltered int
-
-// 	var outputBitset bits.Bitfield
-
-// 	runtimeBlockInfo := blockData.Val
-// 	directBlockArray, arrayEndOffset := runtimeBlockInfo.DirectAccess()
-
-// 	arrayCasted := directBlockArray.([]T)
-// 	inputArray := arrayCasted[:arrayEndOffset]
-
-// 	switch filter.Operand {
-// 	case query.RANGE:
-// 		operandA := filter.Arguments[0].(T)
-// 		operandB := filter.Arguments[1].(T)
-
-// 		if operandA > operandB {
-// 			temp := operandB
-// 			operandB = operandA
-// 			operandA = temp
-
-// 		}
-
-// 		itemsFiltered = ops.CompareValuesAreInRangeSignedIntsBitset(inputArray, operandA, operandB, &outputBitset)
-
-// 	case query.EQ:
-// 		operand := filter.Arguments[0].(T)
-
-// 		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
-
-// 	case query.GT:
-// 		operand := filter.Arguments[0].(T)
-
-// 		itemsFiltered = ops.CompareNumericValuesAreEqualBitset(inputArray, operand, &outputBitset)
-// 	case query.LT:
-// 		operand := filter.Arguments[0].(T)
-
-// 		itemsFiltered = ops.CompareValuesAreSmallerBitset(inputArray, operand, &outputBitset)
-
-// 	default:
-// 		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, blockData.BlockHeader.DataType.String())
-// 	}
-
-// 	merger.WithBitset(&outputBitset, false, false)
-
-// 	return itemsFiltered, nil
-
-// }
-
 func ProcessFloatFilterOnColumnWithType[T ops.Floats](
+	cache *executortypes.ChunkExecutorThreadCache,
 	// slab *schema.DiskSlabHeader,
-	filter query.FilterCondition,
+	filterRT *query.FilterConditionRuntime,
+
 	// blockData *executortypes.BlockRuntimeInfo,
 	runtimeBlockInfo *schema.RuntimeBlockData,
 	merger *lists.IndiceUnmerged,
 ) (int, error) {
+
+	filter := filterRT.Filter
+
+	bid := schema.ConstructUniqueBlockIdForColumn(runtimeBlockInfo.Slab, uint8(runtimeBlockInfo.BlockIndice))
+
+	cached, requests := cache.GetCachedFilter(filterRT.UniqueId, bid)
+	if cached != nil {
+		merger.WithBitset(cached, false, false)
+		return cached.Count(), nil
+	}
 
 	var itemsFiltered int
 	var outBitset bits.Bitfield
@@ -195,6 +156,10 @@ func ProcessFloatFilterOnColumnWithType[T ops.Floats](
 
 	default:
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%v while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand, runtimeBlockInfo.Header.DataType.String())
+	}
+
+	if requests > 10 {
+		cache.PutCached(filterRT.UniqueId, bid, &outBitset)
 	}
 
 	merger.WithBitset(&outBitset, false, false)

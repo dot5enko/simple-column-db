@@ -5,10 +5,10 @@ import (
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/lists"
+	"github.com/dot5enko/simple-column-db/manager/cache"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/manager/rtconfig"
 	"github.com/dot5enko/simple-column-db/schema"
-	"github.com/fatih/color"
 )
 
 const MaxFiltersPerField = rtconfig.QUERY_MAX_FILTERS_PER_FIELD
@@ -23,53 +23,53 @@ type ChunkExecutorThreadCache struct {
 	SelectorBuffer [schema.BlockRowsSize]uint64
 
 	// local thread cache, no locks needed
-	FilterApplyCache map[schema.FilterIdType]map[schema.BlockUniqueId]*BlockScanFilterResultCache
+	FilterApplyCache map[FilterApplyKeyType]*BlockScanFilterResultCache
+	BitsetCache      *cache.TypedRingBuffer[bits.Bitfield]
 
 	ThreadIdx int
 }
+
+type FilterApplyKeyType [48 + 17]byte
 
 type BlockScanFilterResultCache struct {
 	Reads  int
 	Result *bits.Bitfield
 }
 
-func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockUid schema.BlockUniqueId) *bits.Bitfield {
-	// r.fcacheL.RLock()
-	val := r.FilterApplyCache[f]
+func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockUid schema.BlockUniqueId) (*bits.Bitfield, int) {
 
-	if val != nil {
+	var fullId FilterApplyKeyType
+	copy(fullId[:], f[:])
+	copy(fullId[48:], blockUid[:])
 
-		tmp := val[blockUid]
+	val := r.FilterApplyCache[fullId]
 
-		if tmp != nil {
-			tmp.Reads += 1
-			return tmp.Result
+	if val == nil {
+		val = &BlockScanFilterResultCache{
+			Reads: 0,
 		}
+		r.FilterApplyCache[fullId] = val
 	}
 
-	// r.fcacheL.RUnlock()
-	return nil
+	val.Reads += 1
+
+	return val.Result, val.Reads
+
 }
 
 var total atomic.Int32
 
 func (r *ChunkExecutorThreadCache) PutCached(f schema.FilterIdType, blockUid schema.BlockUniqueId, val *bits.Bitfield) {
-	// r.fcacheL.Lock()
+	// totalvalues := total.Add(1)
+	// color.Red("total cached filters: %d", totalvalues)
 
-	totalvalues := total.Add(1)
-	color.Red("total cached filters: %d", totalvalues)
+	var fullId FilterApplyKeyType
+	copy(fullId[:], f[:])
+	copy(fullId[48:], blockUid[:])
 
-	cV := r.FilterApplyCache[f]
+	cV := r.FilterApplyCache[fullId]
 
-	if cV == nil {
-		r.FilterApplyCache[f] = map[schema.BlockUniqueId]*BlockScanFilterResultCache{}
-	}
-
-	r.FilterApplyCache[f][blockUid] = &BlockScanFilterResultCache{
-		Reads:  0,
-		Result: val,
-	}
-	// r.fcacheL.Unlock()
+	cV.Result = val
 }
 
 func (c *ChunkExecutorThreadCache) Reset() {
