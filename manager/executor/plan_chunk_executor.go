@@ -208,9 +208,9 @@ func processFiltersOnPreparedBlocks(
 				// process filter on a block
 				switch blockDataType {
 				case schema.Uint64FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](filter.Filter, blockRtInfo, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint64](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
 				case schema.Uint8FieldType:
-					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](filter.Filter, blockRtInfo, blockGroupMerger)
+					filteredSize, processFilterErr = filters.ProcessUnsignedFilterOnColumnWithType[uint8](sm.GetCache(), &filter, blockRtInfo, blockGroupMerger)
 				case schema.Float32FieldType:
 					filteredSize, processFilterErr = filters.ProcessFloatFilterOnColumnWithType[float32](filter.Filter, blockRtInfo, blockGroupMerger)
 				case schema.Float64FieldType:

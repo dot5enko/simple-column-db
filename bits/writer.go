@@ -96,6 +96,11 @@ func (this *BitWriter) Bytes() []byte {
 	return this.data[:this.pos]
 }
 
+func (this *BitWriter) PutUint32(v uint32) {
+	this.tryGrow(4)
+	this.order.PutUint32(this.data[this.pos:], v)
+	this.pos += 4
+}
 func (this *BitWriter) PutInt32(v int32) {
 	this.tryGrow(4)
 	this.order.PutUint32(this.data[this.pos:], uint32(v))

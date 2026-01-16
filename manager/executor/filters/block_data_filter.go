@@ -2,20 +2,44 @@ package filters
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/lists"
+	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/query"
 	"github.com/dot5enko/simple-column-db/ops"
 	"github.com/dot5enko/simple-column-db/schema"
 )
 
+var totalCompares atomic.Int32
+
+// comparesCount := totalCompares.Add(1)
+
+// // percent := float64(itemsFiltered) / float64(rtconfig.ROWS_PER_BLOCK)
+// // if percent > 0.5 {
+// // , itemsFiltered, percent*100.0
+// // , %d => %.2f
+// color.Green(" -- total eq compares on int %d", comparesCount)
+// // }
+
 func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
-	filter query.FilterCondition,
+	cache *executortypes.ChunkExecutorThreadCache,
+	filterRT *query.FilterConditionRuntime,
 	runtimeBlockInfo *schema.RuntimeBlockData,
 	merger *lists.IndiceUnmerged,
 
 ) (int, error) {
+
+	filter := filterRT.Filter
+
+	bid := schema.ConstructUniqueBlockIdForColumn(runtimeBlockInfo.Slab, uint8(runtimeBlockInfo.BlockIndice))
+
+	cached := cache.GetCachedFilter(filterRT.UniqueId, bid)
+	if cached != nil {
+		merger.WithBitset(cached, false, false)
+		return cached.Count(), nil
+	}
 
 	var itemsFiltered int
 	var outputBitset bits.Bitfield
@@ -50,6 +74,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		operand := filter.Arguments[0].(T)
 
 		itemsFiltered = ops.CompareValuesAreBiggerBitset(inputArray, operand, &outputBitset)
+
 	case query.LT:
 		operand := filter.Arguments[0].(T)
 
@@ -59,6 +84,7 @@ func ProcessUnsignedFilterOnColumnWithType[T ops.UnsignedInts](
 		return itemsFiltered, fmt.Errorf("unsupported operand type=%s while ProcessNumericFilterOnColumnWithType[%s]", filter.Operand.String(), runtimeBlockInfo.Header.DataType.String())
 	}
 
+	cache.PutCached(filterRT.UniqueId, bid, &outputBitset)
 	merger.WithBitset(&outputBitset, false, false)
 
 	return itemsFiltered, nil

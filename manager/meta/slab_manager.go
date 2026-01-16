@@ -102,6 +102,10 @@ func (sm *SlabManager) GetSession() *perf.PerformanceMetrics {
 	return sm.session.perf_stats
 }
 
+func (sm *SlabManager) GetCache() *executortypes.ChunkExecutorThreadCache {
+	return sm.session.cache
+}
+
 func (sm *SlabManager) GetSessionThreadIdx() int {
 	return sm.session.cache.ThreadIdx
 }

@@ -115,9 +115,12 @@ func (qp *QueryPlanner) Plan(
 					old = []query.FilterConditionRuntime{}
 				}
 
-				filtersByColumns[filter.Field] = append(old, query.FilterConditionRuntime{
+				fvRt := query.FilterConditionRuntime{
 					Filter: filter,
-				})
+				}
+				fvRt.GetUniqueId(schemaObject.Name)
+
+				filtersByColumns[filter.Field] = append(old, fvRt)
 			}
 
 			for fname, it := range filtersByColumns {

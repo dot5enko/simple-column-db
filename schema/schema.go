@@ -4,3 +4,5 @@ type Schema struct {
 	Name    string         `json:"name"`
 	Columns []SchemaColumn `json:"columns"`
 }
+
+type FilterIdType [48]byte

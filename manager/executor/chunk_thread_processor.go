@@ -6,9 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dot5enko/simple-column-db/bits"
 	"github.com/dot5enko/simple-column-db/manager/cache"
 	executortypes "github.com/dot5enko/simple-column-db/manager/executor/executor_types"
 	"github.com/dot5enko/simple-column-db/manager/meta"
+	"github.com/dot5enko/simple-column-db/schema"
 	"github.com/fatih/color"
 )
 
@@ -18,7 +20,8 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 
 	// per worker local cache
 	threadCache := &executortypes.ChunkExecutorThreadCache{
-		ThreadIdx: threadId,
+		ThreadIdx:        threadId,
+		FilterApplyCache: make(map[schema.FilterIdType]map[schema.BlockUniqueId]*bits.Bitfield),
 	}
 
 	threadSlabManagerSession := slabManager.NewSession(threadCache)

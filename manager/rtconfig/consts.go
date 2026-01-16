@@ -15,3 +15,11 @@ const QUERY_MAX_SELECTORS = 32
 const CACHE_STANDBY_SLABS = 16
 const CACHE_PRECACHED_SLABS = 32
 const CACHE_PRECACHED_SLAB_HEADERS = 32
+
+func init() {
+
+	if ROWS_PER_BLOCK%8 != 0 {
+		panic("rows per block must be power of two")
+	}
+
+}
