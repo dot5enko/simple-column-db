@@ -32,8 +32,8 @@ type ChunkExecutorThreadCache struct {
 type FilterApplyKeyType [48 + 17]byte
 
 type BlockScanFilterResultCache struct {
-	Reads  int
 	Result *bits.Bitfield
+	Reads  int
 }
 
 func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockUid schema.BlockUniqueId) (*bits.Bitfield, int) {
@@ -44,6 +44,8 @@ func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockU
 
 	val := r.FilterApplyCache[fullId]
 
+	// defer perf.AllocsDetection()()
+
 	if val == nil {
 		val = &BlockScanFilterResultCache{
 			Reads: 0,
@@ -53,13 +55,13 @@ func (r *ChunkExecutorThreadCache) GetCachedFilter(f schema.FilterIdType, blockU
 
 	val.Reads += 1
 
-	return val.Result, val.Reads
-
+	return val.Result, int(val.Reads)
 }
 
 var total atomic.Int32
 
 func (r *ChunkExecutorThreadCache) PutCached(f schema.FilterIdType, blockUid schema.BlockUniqueId, val *bits.Bitfield) {
+
 	// totalvalues := total.Add(1)
 	// color.Red("total cached filters: %d", totalvalues)
 

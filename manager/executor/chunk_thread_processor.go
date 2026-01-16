@@ -23,7 +23,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 	threadCache := &executortypes.ChunkExecutorThreadCache{
 		ThreadIdx:        threadId,
 		FilterApplyCache: make(map[executortypes.FilterApplyKeyType]*executortypes.BlockScanFilterResultCache, 1000),
-		BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](512).
+		BitsetCache: cache.NewTypedRingBuffer[bits.Bitfield](64).
 			WithInitializer(func(item *bits.Bitfield) *bits.Bitfield {
 				var newItem bits.Bitfield
 				return &newItem
@@ -147,7 +147,7 @@ func ChunkSingleThreadProcessor(threadId int, slabManager *meta.SlabManager, tas
 			// slog.Info("thread filder info", "thread_id", threadId, "filter_id", string(filterId[:20]), "blocks", len(it))
 			_ = filterId
 
-			readStats = append(readStats, it.Reads)
+			readStats = append(readStats, int(it.Reads))
 		}
 
 		slices.Sort(readStats)

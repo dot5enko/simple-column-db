@@ -129,9 +129,9 @@ func main() {
 		}()
 	}
 
-	go http.ListenAndServe("localhost:6060", nil)
-
 	if *heapProf {
+
+		go http.ListenAndServe("localhost:6060", nil)
 
 		var mstats2 runtime.MemStats
 
@@ -580,7 +580,6 @@ func main() {
 	log.Printf("waiting for worker threads to shut down")
 
 	workersWaitGroup.Wait()
-
 	slog.Info("workers shut down now")
 
 	// m.Slabs.PrintBufferEffectivityReport()
