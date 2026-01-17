@@ -61,5 +61,6 @@ type (
 	Query struct {
 		Filter []FilterCondition
 		Select []Selector
+		Groups []Selector
 	}
 )

@@ -4,6 +4,7 @@ type SelectorType byte
 
 const (
 	SelectFunction SelectorType = iota
+	SelectColumn
 )
 
 type Selector struct {

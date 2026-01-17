@@ -461,6 +461,16 @@ func main() {
 	performQueryWithFilter := func(filter []query.FilterCondition, testIdx int) *manager.QueryResult {
 		result, qerr := m.Query(testSchemaName, query.Query{
 			Filter: filter,
+			Groups: []query.Selector{
+				{
+					Alias: "ts",
+					Arguments: []any{
+						"time_bucket_seconds",
+						"created_at",
+						"60",
+					},
+				},
+			},
 			Select: []query.Selector{
 				{
 					Arguments: []any{"avg", "value"},
