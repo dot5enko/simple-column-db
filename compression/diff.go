@@ -136,9 +136,7 @@ func CompressDiffWithSkips(input []uint64, skipsSize int) ([]byte, Meta, error) 
 
 // func processBlockOfSingleByteDiffs(buf *byte, bufIdx int, metaCount int, prev uint64, out *uint64, idx int) (int, int, uint64)
 //
-//go:noescape
-//go:nosplit
-func processBlockOfSingleByteDiffs(buf []byte, bufIdx int, metaCount int, prev uint64, out []uint64, idx int) (int, int, uint64)
+// func processBlockOfSingleByteDiffs(buf []byte, bufIdx int, metaCount int, prev uint64, out []uint64, idx int) (int, int, uint64)
 
 //  {
 
